@@ -8,6 +8,8 @@
   const board = document.querySelector('.board');
   if (!board) return;
 
+  /* ---------- feedback ---------- */
+
   let toastTimer;
   function toast(message, bad) {
     let el = document.querySelector('.toast');
@@ -21,54 +23,130 @@
     el.classList.toggle('bad', !!bad);
     el.classList.add('on');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('on'), 4000);
+    toastTimer = setTimeout(() => el.classList.remove('on'), bad ? 6000 : 3000);
   }
 
+  /* ---------- the placeholder ---------- */
+
+  // A gap that opens where the card would land. Without it a drag is a guess:
+  // you find out where the card went only after letting go.
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+
+  function place(cards, y) {
+    const others = [...cards.querySelectorAll('.card:not(.dragging)')];
+    const below = others.find(card => y < card.getBoundingClientRect().top + card.offsetHeight / 2);
+    if (below) {
+      cards.insertBefore(slot, below);
+    } else {
+      cards.append(slot);
+    }
+    // "Nothing here" beside a landing place contradicts itself.
+    cards.querySelector('.empty').toggleAttribute('hidden', true);
+  }
+
+  function clearSlot() {
+    slot.remove();
+    board.querySelectorAll('.column').forEach(c => c.classList.remove('over', 'barred'));
+    recount();
+  }
+
+  // The workflow, as the server rendered it onto the card.
+  function reaches(card, column) {
+    const allowed = (card.dataset.reachable || '').split('\n').filter(Boolean);
+    return allowed.length === 0 || allowed.includes(column.dataset.status);
+  }
+
+  /* ---------- dragging ---------- */
+
   let dragged = null;
+  let moved = false;
 
   board.querySelectorAll('.card').forEach(card => {
     card.draggable = true;
 
     card.addEventListener('dragstart', event => {
       dragged = card;
+      moved = false;
       event.dataTransfer.setData('text/plain', card.dataset.key);
       event.dataTransfer.effectAllowed = 'move';
-      card.classList.add('dragging');
+      // An anchor drags as a link by default, ghost URL and all. Naming the
+      // card as the drag image makes it drag as the card it looks like.
+      const box = card.getBoundingClientRect();
+      event.dataTransfer.setDragImage(card, box.width / 2, 20);
+      // Deferred, or the browser snapshots the half-transparent card.
+      setTimeout(() => card.classList.add('dragging'), 0);
     });
 
     card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
+      clearSlot();
       dragged = null;
+      // A drag that ended on the card it started from is not a click.
+      setTimeout(() => { moved = false; }, 0);
     });
 
-    // A card is a link, so a plain drag would otherwise start a link drag.
     card.addEventListener('click', event => {
-      if (card.classList.contains('dragging')) event.preventDefault();
+      if (moved) event.preventDefault();
     });
   });
 
   board.querySelectorAll('.column').forEach(column => {
+    const cards = column.querySelector('.cards');
+
+    // dragover rather than dragenter: it keeps firing as the pointer moves, so
+    // the placeholder follows the cursor instead of jumping between children.
     column.addEventListener('dragover', event => {
       if (!dragged) return;
+      moved = true;
+
+      // Refusing before the drop rather than after it. A column you cannot
+      // drop into should look like one.
+      if (!reaches(dragged, column)) {
+        event.dataTransfer.dropEffect = 'none';
+        column.classList.add('barred');
+        // No landing place, because there is no landing.
+        slot.remove();
+        return;
+      }
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
       column.classList.add('over');
+      place(cards, event.clientY);
     });
 
-    column.addEventListener('dragleave', () => column.classList.remove('over'));
+    column.addEventListener('dragleave', event => {
+      // dragleave fires on every child boundary. Only the pointer actually
+      // leaving the column counts.
+      if (column.contains(event.relatedTarget)) return;
+      column.classList.remove('over', 'barred');
+    });
 
     column.addEventListener('drop', async event => {
       event.preventDefault();
-      column.classList.remove('over');
 
       const card = dragged;
-      if (!card) return;
-
       const status = column.dataset.status;
-      if (!status || card.dataset.status === status) return;
+      if (!card || !status) return clearSlot();
+      if (!reaches(card, column)) {
+        toast('The workflow does not allow ' + card.dataset.status + ' → ' + status, true);
+        return clearSlot();
+      }
+
+      // Where the placeholder sits is where the card goes, whether or not the
+      // status changed — reordering inside a column is a legitimate no-op.
+      const target = slot.parentNode ? slot : null;
+      if (card.dataset.status === status) {
+        if (target) target.replaceWith(card);
+        clearSlot();
+        return;
+      }
 
       const key = card.dataset.key;
       card.classList.add('pending');
+      if (target) target.replaceWith(card);
+      clearSlot();
+      recount();
 
       try {
         const response = await fetch('/api/tasks/' + key, {
@@ -93,22 +171,26 @@
         const task = await response.json();
         card.dataset.status = task.status;
         card.dataset.version = task.version;
-        column.querySelector('.cards').prepend(card);
-        recount();
         toast(key + ' → ' + task.status);
       } catch (error) {
-        toast(error.message, true);
+        toast(error.message + ' — reloading', true);
+        setTimeout(() => location.reload(), 1200);
       } finally {
         card.classList.remove('pending');
       }
     });
   });
 
+  // The board itself, so a card dropped in the gutter goes back rather than
+  // vanishing into the page.
+  board.addEventListener('dragover', event => { if (dragged) event.preventDefault(); });
+  board.addEventListener('drop', event => { event.preventDefault(); clearSlot(); });
+
   function recount() {
     board.querySelectorAll('.column').forEach(column => {
       const count = column.querySelectorAll('.card').length;
       column.querySelector('.count').textContent = count;
-      column.querySelector('.empty')?.toggleAttribute('hidden', count > 0);
+      column.querySelector('.empty').toggleAttribute('hidden', count > 0);
     });
   }
 })();

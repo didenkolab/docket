@@ -1,53 +1,123 @@
 {{template "head" .}}
 {{$data := .Data}}
 {{$t := $data.Task}}
+{{$may := .You.CanWrite}}
 
-<article class="task">
-  <h1><span class="key">{{$t.Key}}</span> {{$t.Title}}</h1>
-  <p class="path">
-    <code>{{$data.Path}}</code>
-    <span class="fingerprint" title="the bytes this page was rendered from">{{$data.Version}}</span>
-  </p>
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/?project={{$data.Project}}">{{$data.ProjectName}}</a>
+  <span aria-hidden="true">/</span>
+  <span class="key">{{$t.Key}}</span>
+</nav>
 
-  <dl class="properties">
-    <dt>Status</dt><dd><span class="pill {{categoryClass $t.StatusCategory}}">{{$t.Status}}</span></dd>
-    <dt>Type</dt><dd>{{$t.Type}}</dd>
-    <dt>Priority</dt><dd>{{$t.Priority}}</dd>
-    <dt>Assignee</dt><dd>{{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">unassigned</span>{{end}}</dd>
-    {{if $t.Parent}}<dt>Parent</dt><dd><a href="/task/{{$t.Parent}}">{{$t.Parent}}</a></dd>{{end}}
-    {{if $t.Labels}}<dt>Labels</dt><dd>{{range $t.Labels}}<span class="label">{{.}}</span>{{end}}</dd>{{end}}
-    {{if $t.Aliases}}<dt>Also known as</dt><dd>{{range $t.Aliases}}<span class="label">{{.}}</span>{{end}}</dd>{{end}}
-    <dt>Created</dt><dd>{{$t.Created}}</dd>
-    <dt>Updated</dt><dd>{{$t.Updated}}</dd>
-  </dl>
+<h1 class="issue-title">{{$t.Title}}</h1>
 
-  <div class="body">{{$data.Body}}</div>
+{{if $may}}
+<form class="statusbar" method="post" action="/task/{{$t.Key}}/status">
+  <input type="hidden" name="version" value="{{$data.Version}}">
+  <label for="status">Status</label>
+  <select id="status" name="status" class="status-select {{categoryClass $t.StatusCategory}}">
+    {{range $data.Reachable}}
+    <option value="{{.Name}}"{{if eq .Name $t.Status}} selected{{end}}>{{.Name}}</option>
+    {{end}}
+  </select>
+  <button type="submit">Move</button>
+  {{if lt (len $data.Reachable) (len .Config.Statuses)}}
+  <span class="footnote inline">The workflow limits where this can go.</span>
+  {{end}}
+</form>
+{{else}}
+<p class="statusbar">
+  <span class="label-inline">Status</span>
+  <span class="pill {{categoryClass $t.StatusCategory}}">{{$t.Status}}</span>
+</p>
+{{end}}
 
-  <div class="actions">
-    <form method="post" action="/task/{{$t.Key}}/status">
-      <input type="hidden" name="version" value="{{$data.Version}}">
-      <label for="status">Move to</label>
-      <select id="status" name="status">
-        {{range .Config.Statuses}}
-        <option value="{{.Name}}"{{if eq .Name $t.Status}} selected{{end}}>{{.Name}}</option>
+<div class="issue">
+  <div class="issue-main">
+    <section class="block">
+      <h2>Description</h2>
+      {{if $data.Description}}
+      <div class="body">{{$data.Description}}</div>
+      {{else}}
+      <p class="empty">No description.</p>
+      {{end}}
+    </section>
+
+    {{if $data.Children}}
+    <section class="block">
+      <h2>Child tasks <span class="count">{{len $data.Children}}</span></h2>
+      <ul class="children">
+        {{range $data.Children}}
+        <li>
+          <a class="key" href="/task/{{.Key}}">{{.Key}}</a>
+          <span class="child-title">{{.Title}}</span>
+          <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+        </li>
         {{end}}
-      </select>
-      <button type="submit">Move</button>
-    </form>
+      </ul>
+    </section>
+    {{end}}
 
-    <form method="post" action="/task/{{$t.Key}}/comment">
-      <input type="hidden" name="version" value="{{$data.Version}}">
-      <label for="text">Comment</label>
-      <textarea id="text" name="text" rows="3" placeholder="What happened?"></textarea>
-      <button type="submit">Add comment</button>
-    </form>
+    <section class="block">
+      <h2>Activity <span class="count">{{len $data.Comments}}</span></h2>
+
+      {{range $data.Comments}}
+      <article class="comment">
+        <span class="avatar" aria-hidden="true">{{.Initial}}</span>
+        <div>
+          <p class="comment-head"><b>{{.Author}}</b> <time>{{.When}}</time></p>
+          <div class="body">{{.Text}}</div>
+        </div>
+      </article>
+      {{else}}
+      <p class="empty">Nothing said yet.</p>
+      {{end}}
+
+      {{if $may}}
+      <form class="comment-form" method="post" action="/task/{{$t.Key}}/comment">
+        <input type="hidden" name="version" value="{{$data.Version}}">
+        <label for="text">Add a comment</label>
+        <textarea id="text" name="text" rows="3" placeholder="What happened?"></textarea>
+        <button type="submit">Comment</button>
+      </form>
+      {{end}}
+    </section>
   </div>
 
-  <p class="footnote">
-    Every change here is written to <code>{{$data.Path}}</code> and committed.
-    If the file changes underneath you — in Obsidian, or by an agent — the write is refused
-    rather than applied on top of what you never saw.
-  </p>
-</article>
+  <aside class="issue-side">
+    <section class="panel">
+      <h2>Details</h2>
+      <dl class="properties">
+        <dt>Type</dt><dd>{{$t.Type}}</dd>
+        <dt>Priority</dt><dd><span class="priority p-{{$t.Priority}}">{{$t.Priority}}</span></dd>
+        <dt>Assignee</dt>
+        <dd>{{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">Unassigned</span>{{end}}</dd>
+        {{if $t.Parent}}<dt>Parent</dt><dd><a href="/task/{{$t.Parent}}">{{$t.Parent}}</a></dd>{{end}}
+        <dt>Labels</dt>
+        <dd>{{if $t.Labels}}{{range $t.Labels}}<span class="label">{{.}}</span>{{end}}{{else}}<span class="empty">None</span>{{end}}</dd>
+        {{if $t.Aliases}}
+        <dt>Also known as</dt>
+        <dd>{{range $t.Aliases}}<span class="label">{{.}}</span>{{end}}</dd>
+        {{end}}
+      </dl>
+    </section>
+
+    <p class="stamps">
+      Created {{$t.Created}}<br>
+      Updated {{$t.Updated}}
+    </p>
+
+    <p class="stamps">
+      <code>{{$data.Path}}</code>
+      <span class="fingerprint" title="the bytes this page was rendered from">{{$data.Version}}</span>
+    </p>
+
+    <p class="footnote">
+      Every change here is written to that file and committed. If it changes underneath you —
+      in Obsidian, or by an agent — the write is refused rather than applied on top of what you
+      never saw.
+    </p>
+  </aside>
+</div>
 
 {{template "foot" .}}

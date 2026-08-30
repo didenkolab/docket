@@ -70,7 +70,8 @@ Go and the single-binary distribution were chosen for the reasons in
 For people who do not run Obsidian:
 
 ```bash
-docket serve --author "Your Name <you@example.com>"
+docket serve                       # signs people in against the repository's git host
+docket serve --auth none --author "Your Name <you@example.com>"   # one person, no sign-in
 ```
 
 A board grouped by status across every project at once — or narrowed to one — with cards you
@@ -79,7 +80,27 @@ drag between columns, plus task pages, the wiki, search, settings, and a JSON AP
 Dragging a card is the same status move as the form on the task page: it goes through the API,
 is checked against the fingerprint the card was drawn from, and lands in git as a commit. It is
 an enhancement, not the mechanism — without JavaScript the board is still a board and every
-task page still moves its own status. It is a second client
+task page still moves its own status.
+
+### Who may do what
+
+docket keeps no users of its own. People sign in with a token for the git host that already
+holds the repository — GitHub, GitLab or Bitbucket, hosted or your own — and what they may do
+is what that host says they may do: read becomes **viewer**, write becomes **member**, and
+administer becomes **admin**, who may also change the vault's vocabulary. Commits are authored
+by the person who made them, so `git log` says who moved what.
+
+Access is granted on the host, not here. Anyone who can clone the repository has everything in
+it, so a button in this interface would appear to hand out something it cannot. The reasoning
+is in
+[ADR-0004](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0004-access-comes-from-git.md).
+
+### The workflow
+
+Which status may move to which is part of the vault's configuration, so it lives in
+`docket.yaml` and changes to it show up in `git log` like everything else. Leave it out and any
+task can go anywhere, which is what a new vault does. Set it and only the allowed moves are
+offered — on the board, on the task page and through the API alike. It is a second client
 to the same files, not an owner of them: nothing is cached, every write becomes a git commit
 attributed to whoever made it, and a write that would land on top of a change made in Obsidian
 or by an agent is refused rather than applied. Point all three at one repository at once.

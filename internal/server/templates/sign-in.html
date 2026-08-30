@@ -1,0 +1,37 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<div class="sign-in">
+  <h1>Sign in</h1>
+
+  {{if $data.Error}}
+  <div class="notice">{{$data.Error}}</div>
+  {{end}}
+
+  <p>
+    This board is <code>{{$data.Repository}}</code> on {{$data.Host}}. It keeps no accounts of
+    its own: paste a {{$data.Host}} token and it asks {{$data.Host}} who you are and what you
+    may do with that repository. What it answers is what you get here.
+  </p>
+
+  <form method="post" action="/sign-in">
+    <input type="hidden" name="next" value="{{$data.Next}}">
+    <label for="token">{{$data.Host}} token</label>
+    <input id="token" name="token" type="password" autocomplete="current-password" required
+           autofocus placeholder="a token with read access to {{$data.Repository}}">
+    <button type="submit">Sign in</button>
+  </form>
+
+  <p class="footnote">
+    The token stays in this server's memory for the length of your session and is never written
+    anywhere — not to a cookie, not to disk. Restarting the server signs everyone out.
+  </p>
+  <p class="footnote">
+    Read access lets you read. Write access lets you create and move tasks. Administrator access
+    also lets you change the vault's vocabulary. Which one you have is granted on {{$data.Host}},
+    not here — because what actually matters is who can clone the repository, and that is the
+    host's to give.
+  </p>
+</div>
+
+{{template "foot" .}}

@@ -12,12 +12,18 @@
   <nav>
     <a href="/">Board</a>
     <a href="/pages">Pages</a>
-    <a href="/new">New task</a>
-    <a href="/settings">Settings</a>
+    {{if .You.CanWrite}}<a href="/new">New task</a>{{end}}
+    {{if .You.CanConfigure}}<a href="/settings">Settings</a>{{end}}
+    {{if .SignedIn}}<a href="/admin">Access</a>{{end}}
   </nav>
   <form class="search" action="/search" method="get">
     <input type="search" name="q" placeholder="Search" aria-label="Search">
   </form>
+  {{if .SignedIn}}
+  <span class="who" title="{{.You.Login}} — {{.You.Role}}">
+    {{.You.DisplayName}} <span class="role">{{.You.Role}}</span>
+  </span>
+  {{end}}
 </header>
 <main>
 {{end}}

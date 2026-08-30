@@ -32,8 +32,22 @@ type settingsView struct {
 	Priorities string
 	Projects   []projectUsage
 	Categories []string
+	Workflow   bool
+	Matrix     []transitionRow
 	Error      string
 	Saved      string
+}
+
+// transitionRow is one line of the workflow matrix: from this status, to which.
+type transitionRow struct {
+	From string
+	To   []transitionCell
+}
+
+type transitionCell struct {
+	Status  string
+	Allowed bool
+	Self    bool
 }
 
 type projectUsage struct {
@@ -45,10 +59,10 @@ type projectUsage struct {
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	s.render(w, "settings.html", c, "Settings", s.settingsView(c, "", r.URL.Query().Get("saved")))
+	s.render(w, r, "settings.html", c, "Settings", s.settingsView(c, "", r.URL.Query().Get("saved")))
 }
 
 func (s *Server) settingsView(c *project.Config, message, saved string) settingsView {
@@ -74,6 +88,19 @@ func (s *Server) settingsView(c *project.Config, message, saved string) settings
 	}
 	for _, p := range c.Projects {
 		view.Projects = append(view.Projects, projectUsage{p.Key, p.Name, perProject[p.Key]})
+	}
+
+	view.Workflow = len(c.Transitions) > 0
+	for _, from := range c.Statuses {
+		row := transitionRow{From: from.Name}
+		for _, to := range c.Statuses {
+			row.To = append(row.To, transitionCell{
+				Status:  to.Name,
+				Allowed: from.Name != to.Name && c.CanMove(from.Name, to.Name),
+				Self:    from.Name == to.Name,
+			})
+		}
+		view.Matrix = append(view.Matrix, row)
 	}
 	return view
 }
@@ -101,11 +128,11 @@ func (s *Server) usage(c *project.Config) (byStatus, byProject map[string]int) {
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		s.fail(w, http.StatusBadRequest, "Cannot read the form", err.Error())
+		s.fail(w, r, http.StatusBadRequest, "Cannot read the form", err.Error())
 		return
 	}
 
@@ -116,10 +143,11 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 	statuses, renames, err := readStatuses(r)
 	if err != nil {
-		s.rejectSettings(w, c, err.Error())
+		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
 	updated.Statuses = statuses
+	updated.Transitions = readTransitions(r, c, statuses, renames)
 
 	// A project's display name is safe to change here. Its key is its folder
 	// and cannot move without moving every task in it, so it is not editable.
@@ -133,7 +161,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	inUse, _ := s.usage(c)
 	for _, was := range removedStatuses(c, statuses, renames) {
 		if count := inUse[was]; count > 0 {
-			s.rejectSettings(w, c, fmt.Sprintf(
+			s.rejectSettings(w, r, c, fmt.Sprintf(
 				"%q still holds %d task(s). Rename it instead of removing it, or move those "+
 					"tasks first — a status no task can name is work no board can show.",
 				was, count))
@@ -147,22 +175,22 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 	moved, err := s.applyRenames(c, renames, author)
 	if err != nil {
-		s.rejectSettings(w, c, err.Error())
+		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
 	if err := updated.Save(s.root); err != nil {
-		s.rejectSettings(w, c, err.Error())
+		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
 	boards, err := vault.WriteBoards(s.root, &updated)
 	if err != nil {
-		s.rejectSettings(w, c, err.Error())
+		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
 
 	changed := append([]string{project.FileName}, boards...)
 	if err := s.repo.Commit(changed, "Settings: the vault's vocabulary", author); err != nil {
-		s.fail(w, http.StatusInternalServerError, "Saved, but not committed", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Saved, but not committed", err.Error())
 		return
 	}
 
@@ -173,9 +201,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings?saved="+saved, http.StatusSeeOther)
 }
 
-func (s *Server) rejectSettings(w http.ResponseWriter, c *project.Config, message string) {
+func (s *Server) rejectSettings(w http.ResponseWriter, r *http.Request, c *project.Config, message string) {
 	w.WriteHeader(http.StatusBadRequest)
-	s.render(w, "settings.html", c, "Settings", s.settingsView(c, message, ""))
+	s.render(w, r, "settings.html", c, "Settings", s.settingsView(c, message, ""))
 }
 
 // readStatuses reads the status table, ordered by its position column, and
@@ -225,6 +253,46 @@ func readStatuses(r *http.Request) (statuses []project.Status, renames map[strin
 		}
 	}
 	return statuses, renames, nil
+}
+
+// readTransitions reads the workflow matrix.
+//
+// The matrix is keyed on the names the page was rendered with, because a rename
+// can happen in the same submission. So it is read in the old names and then
+// put through the same rename and removal the statuses went through — one
+// mechanism, rather than a second one that has to be kept in step.
+func readTransitions(r *http.Request, before *project.Config,
+	after []project.Status, renames map[string]project.Status) map[string][]string {
+
+	if r.FormValue("workflow") == "" {
+		return nil // no workflow: anything to anything
+	}
+
+	asRendered := map[string][]string{}
+	for _, from := range before.Statuses {
+		asRendered[from.Name] = r.Form["transition_"+from.Name]
+	}
+
+	workflow := &project.Config{Transitions: asRendered}
+	for was, to := range renames {
+		workflow.RenameInTransitions(was, to.Name)
+	}
+	for _, gone := range removedStatuses(before, after, renames) {
+		workflow.DropFromTransitions(gone)
+	}
+
+	// A status is always allowed to stay where it is, so listing itself is
+	// noise in the file.
+	for from, targets := range workflow.Transitions {
+		kept := targets[:0]
+		for _, to := range targets {
+			if to != from {
+				kept = append(kept, to)
+			}
+		}
+		workflow.Transitions[from] = kept
+	}
+	return workflow.Transitions
 }
 
 // removedStatuses lists names the vault used to have and no longer does, not

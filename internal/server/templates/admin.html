@@ -1,0 +1,61 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Access</h1>
+
+{{if $data.Unauthed}}
+<div class="notice"><strong>Running without sign-in.</strong> {{$data.Note}}</div>
+{{else}}
+
+<p>
+  This board is <code>{{$data.Repository}}</code> on {{$data.Host}}. Who may do what here is
+  whatever that host says, re-asked every {{$data.Recheck}} — so access removed there stops
+  working here within that long, not at once.
+</p>
+
+<dl class="properties">
+  <dt>You are</dt><dd>{{$data.You.DisplayName}} ({{$data.You.Login}})</dd>
+  <dt>Your role</dt><dd><span class="pill">{{$data.You.Role}}</span></dd>
+  <dt>Granted on</dt><dd><a href="{{$data.SettingsURL}}">{{$data.Host}}</a></dd>
+</dl>
+
+{{if $data.Note}}
+<div class="notice">{{$data.Note}}</div>
+{{end}}
+
+{{if $data.Collaborators}}
+<table class="settings">
+  <thead><tr><th>Login</th><th>Name</th><th>Role here</th></tr></thead>
+  <tbody>
+    {{range $data.Collaborators}}
+    <tr>
+      <td><code>{{.Login}}</code></td>
+      <td>{{.Name}}</td>
+      <td><span class="pill">{{.Role}}</span></td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+
+<h2>Why there is no button here</h2>
+
+<p class="footnote">
+  Granting access is not something this program can do. Anyone who can clone the repository has
+  every task, every page and the whole history, and no check inside a web interface changes
+  that. A button here would appear to hand out something it cannot. Access is granted on
+  {{$data.Host}}, where it is actually enforced.
+</p>
+
+<p class="footnote">
+  What the roles mean: <strong>viewer</strong> reads. <strong>member</strong> creates tasks,
+  moves them and comments. <strong>admin</strong> also changes the vault's vocabulary. They come
+  from the host's own read, write and administer permissions rather than being invented here.
+</p>
+
+<form method="post" action="/sign-out">
+  <button type="submit">Sign out</button>
+</form>
+{{end}}
+
+{{template "foot" .}}

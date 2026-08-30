@@ -249,6 +249,54 @@ func (t *Task) AppendComment(author string, when time.Time, text string) {
 	t.body = body + "\n\n" + entry + "\n"
 }
 
+// Comment is one entry from the task's comment section.
+type Comment struct {
+	Author string
+	When   string
+	Text   string
+}
+
+// commentHeader matches the line a comment starts with.
+var commentHeader = regexp.MustCompile(`(?m)^\*\*(.+?) · (.+?)\*\* — `)
+
+// Description is the body up to the comment section — what the task is about,
+// without the conversation underneath it.
+func (t *Task) Description() string {
+	if at := strings.Index(t.body, CommentsHeading); at >= 0 {
+		return strings.TrimSpace(t.body[:at])
+	}
+	return strings.TrimSpace(t.body)
+}
+
+// Comments reads the comment section back into its entries.
+//
+// They are stored as text in the task file rather than as structured data, so
+// this is a parse rather than a lookup. That is the trade the format makes: the
+// conversation stays readable to anyone opening the file, and the cost is here.
+func (t *Task) Comments() []Comment {
+	at := strings.Index(t.body, CommentsHeading)
+	if at < 0 {
+		return nil
+	}
+	section := t.body[at+len(CommentsHeading):]
+
+	headers := commentHeader.FindAllStringSubmatchIndex(section, -1)
+	comments := make([]Comment, 0, len(headers))
+
+	for i, h := range headers {
+		end := len(section)
+		if i+1 < len(headers) {
+			end = headers[i+1][0]
+		}
+		comments = append(comments, Comment{
+			Author: section[h[2]:h[3]],
+			When:   section[h[4]:h[5]],
+			Text:   strings.TrimSpace(section[h[1]:end]),
+		})
+	}
+	return comments
+}
+
 // NestedProperties lists properties whose value is not a scalar or a list of
 // scalars. The format forbids them: Obsidian's property editor cannot edit a
 // nested value and Bases cannot filter on one.

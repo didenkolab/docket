@@ -3,6 +3,7 @@
 package project
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -66,6 +67,13 @@ type Config struct {
 	Statuses   []Status  `yaml:"statuses"`
 	Types      []string  `yaml:"types"`
 	Priorities []string  `yaml:"priorities"`
+
+	// Transitions is the workflow: which statuses each status can move to.
+	//
+	// Empty means anything to anything, and that is what a new vault gets. A
+	// workflow nobody asked for is a workflow that gets in the way, and it is
+	// easier to add one later than to discover why a task will not move.
+	Transitions map[string][]string `yaml:"transitions,omitempty"`
 }
 
 // ErrNotAVault is returned when a directory holds no docket.yaml.
@@ -96,13 +104,21 @@ func (c *Config) Save(dir string) error {
 	if err := c.validate(); err != nil {
 		return err
 	}
-	body, err := yaml.Marshal(c)
-	if err != nil {
+	var body bytes.Buffer
+	body.WriteString("# The projects this vault holds, and the vocabulary they share.\n")
+	body.WriteString("# A key is PROJECT/NUMBER and the project is a folder at the root.\n")
+	body.WriteString("# transitions is the workflow; leaving it out means anything can move\n")
+	body.WriteString("# to anything.\n")
+
+	enc := yaml.NewEncoder(&body)
+	enc.SetIndent(2)
+	if err := enc.Encode(c); err != nil {
 		return err
 	}
-	header := "# The projects this vault holds, and the vocabulary they share.\n" +
-		"# A key is PROJECT/NUMBER and the project is a folder at the root.\n"
-	return os.WriteFile(filepath.Join(dir, FileName), append([]byte(header), body...), 0o644)
+	if err := enc.Close(); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, FileName), body.Bytes(), 0o644)
 }
 
 // FindRoot walks up from start until it finds a vault, so that commands work
@@ -163,6 +179,17 @@ func (c *Config) validate() error {
 		if !categories[s.Category] {
 			return fmt.Errorf("status %q has category %q, want one of %s, %s, %s",
 				s.Name, s.Category, CategoryTodo, CategoryDoing, CategoryDone)
+		}
+	}
+
+	for from, targets := range c.Transitions {
+		if !statuses[from] {
+			return fmt.Errorf("transitions name %q, which is not a status", from)
+		}
+		for _, to := range targets {
+			if !statuses[to] {
+				return fmt.Errorf("%q is allowed to move to %q, which is not a status", from, to)
+			}
 		}
 	}
 
@@ -240,6 +267,73 @@ func (c *Config) CategoryOf(status string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// CanMove reports whether the workflow allows a move.
+//
+// A vault with no workflow allows everything. Moving a task to the status it
+// already has is always allowed: it is not a move.
+func (c *Config) CanMove(from, to string) bool {
+	if from == to || len(c.Transitions) == 0 {
+		return true
+	}
+	for _, allowed := range c.Transitions[from] {
+		if allowed == to {
+			return true
+		}
+	}
+	return false
+}
+
+// Reachable lists the statuses a task in this one can move to, in board order,
+// including the one it is already in.
+func (c *Config) Reachable(from string) []Status {
+	var out []Status
+	for _, s := range c.Statuses {
+		if c.CanMove(from, s.Name) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// RenameInTransitions keeps the workflow pointing at a status that was renamed.
+func (c *Config) RenameInTransitions(was, now string) {
+	if len(c.Transitions) == 0 {
+		return
+	}
+	renamed := make(map[string][]string, len(c.Transitions))
+	for from, targets := range c.Transitions {
+		if from == was {
+			from = now
+		}
+		moved := make([]string, 0, len(targets))
+		for _, to := range targets {
+			if to == was {
+				to = now
+			}
+			moved = append(moved, to)
+		}
+		renamed[from] = moved
+	}
+	c.Transitions = renamed
+}
+
+// DropFromTransitions removes a status that no longer exists.
+func (c *Config) DropFromTransitions(name string) {
+	if len(c.Transitions) == 0 {
+		return
+	}
+	delete(c.Transitions, name)
+	for from, targets := range c.Transitions {
+		kept := targets[:0]
+		for _, to := range targets {
+			if to != name {
+				kept = append(kept, to)
+			}
+		}
+		c.Transitions[from] = kept
+	}
 }
 
 // FirstStatus is the status a new task starts in: the first one listed, which

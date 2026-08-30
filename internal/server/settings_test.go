@@ -231,3 +231,144 @@ func TestTheBoardCarriesWhatADraggedCardNeeds(t *testing.T) {
 		}
 	}
 }
+
+// withWorkflow adds the matrix fields to a settings form.
+func withWorkflow(form url.Values, allow map[string][]string) url.Values {
+	form.Set("workflow", "on")
+	for from, targets := range allow {
+		for _, to := range targets {
+			form.Add("transition_"+from, to)
+		}
+	}
+	return form
+}
+
+func TestAWorkflowSavedInSettingsIsEnforcedEverywhere(t *testing.T) {
+	s, h, root := newServer(t)
+	c, _ := project.Load(root)
+
+	form := withWorkflow(settingsForm(c, nil), map[string][]string{
+		"Backlog": {"Ready"},
+		"Ready":   {"In progress"},
+	})
+	if w := postForm(t, h, "/settings", form); w.Code != http.StatusSeeOther {
+		t.Fatalf("saving the workflow: %d; body:\n%s", w.Code, w.Body)
+	}
+
+	saved, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !saved.CanMove("Backlog", "Ready") || saved.CanMove("Backlog", "Done") {
+		t.Fatalf("the workflow was not stored: %v", saved.Transitions)
+	}
+
+	// The task page offers only what the workflow allows.
+	page := get(t, h, "/task/ACME/1").Body.String()
+	if strings.Contains(page, `<option value="Done"`) {
+		t.Error("the task page offers a move the workflow forbids")
+	}
+
+	// And the move itself is refused, not merely hidden.
+	w := postForm(t, h, "/task/ACME/1/status", url.Values{
+		"version": {currentVersion(t, s, "ACME/1")},
+		"status":  {"Done"},
+	})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("a forbidden move was accepted: %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "workflow") {
+		t.Errorf("the refusal does not say what refused it:\n%s", w.Body)
+	}
+}
+
+func TestTheAPIObeysTheWorkflowToo(t *testing.T) {
+	s, h, root := newServer(t)
+	c, _ := project.Load(root)
+	postForm(t, h, "/settings", withWorkflow(settingsForm(c, nil), map[string][]string{
+		"Backlog": {"Ready"},
+	}))
+
+	body := `{"version":"` + currentVersion(t, s, "ACME/1") + `","status":"Done"}`
+	patch(t, h, "/api/tasks/ACME/1", body, http.StatusBadRequest)
+}
+
+func TestTheBoardTellsEachCardWhereItMayGo(t *testing.T) {
+	_, h, root := newServer(t)
+	c, _ := project.Load(root)
+	postForm(t, h, "/settings", withWorkflow(settingsForm(c, nil), map[string][]string{
+		"Backlog": {"Ready"},
+	}))
+
+	// The exact escaping of the separator is the template's business; what
+	// matters is that the card names where it may go and only that.
+	body := get(t, h, "/").Body.String()
+	card := body[strings.Index(body, `data-key="ACME/1"`):]
+	card = card[:strings.Index(card, ">")]
+
+	if !strings.Contains(card, "data-reachable=") {
+		t.Fatalf("the card carries no reachable statuses:\n%s", card)
+	}
+	if !strings.Contains(card, "Ready") {
+		t.Errorf("the card does not name the status it may move to:\n%s", card)
+	}
+	if strings.Contains(card, "Done") {
+		t.Errorf("the card names a status the workflow forbids:\n%s", card)
+	}
+}
+
+func TestRenamingAStatusCarriesItsWorkflowAcross(t *testing.T) {
+	_, h, root := newServer(t)
+	c, _ := project.Load(root)
+	postForm(t, h, "/settings", withWorkflow(settingsForm(c, nil), map[string][]string{
+		"Backlog": {"Ready"},
+		"Ready":   {"In progress"},
+	}))
+
+	current, _ := project.Load(root)
+	form := withWorkflow(settingsForm(current, func(i int, s project.Status) (string, string) {
+		if s.Name == "Ready" {
+			return "Next up", s.Category
+		}
+		return s.Name, s.Category
+	}), map[string][]string{
+		"Backlog": {"Ready"},
+		"Ready":   {"In progress"},
+	})
+
+	if w := postForm(t, h, "/settings", form); w.Code != http.StatusSeeOther {
+		t.Fatalf("code = %d; body:\n%s", w.Code, w.Body)
+	}
+
+	saved, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !saved.CanMove("Backlog", "Next up") {
+		t.Errorf("a move pointing at the renamed status was lost: %v", saved.Transitions)
+	}
+	if !saved.CanMove("Next up", "In progress") {
+		t.Errorf("the renamed status lost its own moves: %v", saved.Transitions)
+	}
+}
+
+func TestTurningTheWorkflowOffAllowsEverythingAgain(t *testing.T) {
+	_, h, root := newServer(t)
+	c, _ := project.Load(root)
+	postForm(t, h, "/settings", withWorkflow(settingsForm(c, nil), map[string][]string{
+		"Backlog": {"Ready"},
+	}))
+
+	current, _ := project.Load(root)
+	if w := postForm(t, h, "/settings", settingsForm(current, nil)); w.Code != http.StatusSeeOther {
+		t.Fatalf("code = %d", w.Code)
+	}
+
+	saved, _ := project.Load(root)
+	if len(saved.Transitions) != 0 {
+		t.Errorf("the workflow survived being switched off: %v", saved.Transitions)
+	}
+	if !saved.CanMove("Backlog", "Done") {
+		t.Error("moves are still restricted with no workflow")
+	}
+}

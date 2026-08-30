@@ -24,11 +24,16 @@
 <div class="board">
   {{range $data.Columns}}
   <section class="column {{categoryClass .Status.Category}}" data-status="{{.Status.Name}}">
-    <h2>{{.Status.Name}} <span class="count">{{len .Cards}}</span></h2>
+    <header class="column-head">
+      <span class="pip"></span>
+      <b>{{.Status.Name}}</b>
+      <span class="count">{{len .Cards}}</span>
+    </header>
     <div class="cards">
       {{range .Cards}}
       <a class="card" href="{{.Href}}"
-         data-key="{{.Key}}" data-status="{{.Status}}" data-version="{{.Version}}">
+         data-key="{{.Key}}" data-status="{{.Status}}" data-version="{{.Version}}"
+         data-reachable="{{.Reachable}}">
         <span class="key">{{.Key}}</span>
         <span class="card-title">{{.Title}}</span>
         <span class="meta">
@@ -38,8 +43,8 @@
         </span>
       </a>
       {{end}}
+      <p class="empty"{{if .Cards}} hidden{{end}}>Nothing here</p>
     </div>
-    <p class="empty"{{if .Cards}} hidden{{end}}>No tasks.</p>
   </section>
   {{end}}
 </div>

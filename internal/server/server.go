@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
@@ -33,12 +34,27 @@ var assets embed.FS
 // back.
 var ErrStale = errors.New("the file changed since you loaded it")
 
+// Options configure a server.
+type Options struct {
+	// Author is who writes are attributed to when nobody signs in.
+	Author gitvcs.Author
+	// Host is the git host that answers who someone is. Nil runs the server
+	// unauthenticated, which it then says out loud rather than implying.
+	Host access.Host
+	// Recheck is how often to re-ask the host about a signed-in person, and so
+	// how long a revocation takes to bite.
+	Recheck time.Duration
+	// SessionLife is how long a session lasts before it has to be renewed.
+	SessionLife time.Duration
+}
+
 // Server serves one vault.
 type Server struct {
 	root   string
 	repo   *gitvcs.Repo
 	author gitvcs.Author
 	tmpl   *template.Template
+	auth   *authority
 
 	// writes is held for the whole read-modify-write of a task, so two
 	// requests cannot interleave. It says nothing about Obsidian or an agent
@@ -50,7 +66,7 @@ type Server struct {
 }
 
 // New opens a vault for serving.
-func New(root string, author gitvcs.Author) (*Server, error) {
+func New(root string, opts Options) (*Server, error) {
 	if _, err := project.Load(root); err != nil {
 		return nil, err
 	}
@@ -66,14 +82,29 @@ func New(root string, author gitvcs.Author) (*Server, error) {
 		return nil, err
 	}
 
-	return &Server{
+	s := &Server{
 		root:   root,
 		repo:   repo,
-		author: author,
+		author: opts.Author,
 		tmpl:   tmpl,
 		now:    time.Now,
-	}, nil
+	}
+	if opts.Host != nil {
+		recheck, life := opts.Recheck, opts.SessionLife
+		if recheck <= 0 {
+			recheck = 5 * time.Minute
+		}
+		if life <= 0 {
+			life = 12 * time.Hour
+		}
+		s.auth = newAuthority(opts.Host, recheck, life)
+	}
+	return s, nil
 }
+
+// loadConfigQuietly is for pages that must render even when the vault will not
+// load — the sign-in page has to be reachable before anything else works.
+func loadConfigQuietly(root string) (*project.Config, error) { return project.Load(root) }
 
 // Handler routes every request the server answers.
 func (s *Server) Handler() http.Handler {
@@ -90,6 +121,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /search", s.handleSearch)
 	mux.HandleFunc("GET /settings", s.handleSettings)
 	mux.HandleFunc("POST /settings", s.handleSaveSettings)
+	mux.HandleFunc("GET /admin", s.handleAdmin)
+	mux.HandleFunc("GET /sign-in", s.handleSignInForm)
+	mux.HandleFunc("POST /sign-in", s.handleSignIn)
+	mux.HandleFunc("POST /sign-out", s.handleSignOut)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)
@@ -101,7 +136,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.Handle("GET /static/", http.FileServerFS(assets))
 
-	return mux
+	return s.guard(mux)
 }
 
 // version identifies the exact bytes a client saw, so a write can refuse to
@@ -173,23 +208,6 @@ func (s *Server) editTask(
 	}
 
 	return s.repo.Commit([]string{vault.TaskPath(key)}, message, author)
-}
-
-// authorFor lets a caller act as themselves instead of as the server. An API
-// client that cannot say who it is gets attributed to whoever started the
-// server, which is honest — it is who is responsible for the write.
-func (s *Server) authorFor(r *http.Request) gitvcs.Author {
-	if header := r.Header.Get("X-Docket-Author"); header != "" {
-		if a, err := gitvcs.ParseAuthor(header); err == nil {
-			return a
-		}
-	}
-	if form := r.FormValue("author"); form != "" {
-		if a, err := gitvcs.ParseAuthor(form); err == nil {
-			return a
-		}
-	}
-	return s.author
 }
 
 func categoryClass(category string) string {

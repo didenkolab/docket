@@ -6,7 +6,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
+	"time"
 
+	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/server"
@@ -19,7 +22,12 @@ Usage:
 
 A second client to the same files. Obsidian, an agent and this server can be
 pointed at one repository at once: nothing is cached, and a write that would
-land on top of a change made elsewhere is refused instead. Flags:
+land on top of a change made elsewhere is refused instead.
+
+People sign in with a token for the git host that already holds the repository,
+and what they may do is what that host says they may do. docket keeps no users
+of its own — the repository is the trust boundary, and access is granted where
+it is enforced. Flags:
 `
 
 func runServe(args []string, stdout, stderr io.Writer) int {
@@ -31,7 +39,14 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 
 	addr := flags.String("addr", "127.0.0.1:8080", "address to listen on")
-	author := flags.String("author", "", `who writes are attributed to, as "Name <email>"`)
+	author := flags.String("author", "", `who unauthenticated writes are attributed to, as "Name <email>"`)
+	auth := flags.String("auth", "auto", "auto, git, or none")
+	host := flags.String("host", "", "which host the remote is: "+strings.Join(access.Kinds, ", ")+
+		" (needed only for a self-hosted one)")
+	api := flags.String("api", "", "the host's API base URL (needed only for a self-hosted one)")
+	recheck := flags.Duration("recheck", 5*time.Minute,
+		"how often to re-ask the host about a signed-in person, and so how long a revocation takes")
+	life := flags.Duration("session", 12*time.Hour, "how long a session lasts")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -40,26 +55,39 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	if code != exitOK {
 		return code
 	}
-	if *author == "" {
-		fmt.Fprint(stderr, "docket serve: --author is required\n\n")
-		fmt.Fprint(stderr, "Every write becomes a git commit, and a commit needs someone to\n")
-		fmt.Fprint(stderr, "answer for it. There is no default worth guessing.\n\n")
-		flags.Usage()
-		return exitUsage
-	}
 
-	who, err := gitvcs.ParseAuthor(*author)
-	if err != nil {
-		fmt.Fprintf(stderr, "docket serve: %v\n", err)
-		return exitUsage
-	}
 	root, err := project.FindRoot(start)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
 		return exitError
 	}
 
-	s, err := server.New(root, who)
+	gitHost, code := resolveHost(*auth, *host, *api, root, stdout, stderr)
+	if code != exitOK {
+		return code
+	}
+
+	who := gitvcs.Author{Name: "docket", Email: "docket@localhost"}
+	if *author != "" {
+		parsed, err := gitvcs.ParseAuthor(*author)
+		if err != nil {
+			fmt.Fprintf(stderr, "docket serve: %v\n", err)
+			return exitUsage
+		}
+		who = parsed
+	} else if gitHost == nil {
+		fmt.Fprint(stderr, "docket serve: --author is required when nobody signs in\n\n")
+		fmt.Fprint(stderr, "Every write becomes a git commit, and a commit needs someone to\n")
+		fmt.Fprint(stderr, "answer for it. There is no default worth guessing.\n")
+		return exitUsage
+	}
+
+	s, err := server.New(root, server.Options{
+		Author:      who,
+		Host:        gitHost,
+		Recheck:     *recheck,
+		SessionLife: *life,
+	})
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
 		return exitError
@@ -71,10 +99,47 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	fmt.Fprintf(stdout, "Serving %s on http://%s as %s\n", root, listener.Addr(), who)
+	fmt.Fprintf(stdout, "Serving %s on http://%s\n", root, listener.Addr())
+	if gitHost != nil {
+		fmt.Fprintf(stdout, "Sign in with a %s token for %s. Access is whatever that host says "+
+			"it is, re-checked every %s.\n", gitHost.Name(), gitHost.Repository(), recheck.String())
+	} else {
+		fmt.Fprintf(stdout, "No sign-in: anyone who can reach this can write, and every change "+
+			"is attributed to %s.\n", who)
+	}
+
 	if err := http.Serve(listener, s.Handler()); err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
 		return exitError
 	}
 	return exitOK
+}
+
+// resolveHost decides who answers "may this person write".
+//
+// `auto` is the default and is deliberately quiet about failing: a vault with
+// no remote, or a remote on a host docket does not recognise, still has to be
+// servable. It says which it chose either way, because a tracker that looks
+// authenticated and is not is worse than one that says it is open.
+func resolveHost(auth, kind, api, root string, stdout, stderr io.Writer) (access.Host, int) {
+	switch auth {
+	case "none":
+		return nil, exitOK
+
+	case "git", "auto":
+		host, err := access.FromRepository(root, kind, api)
+		if err == nil {
+			return host, exitOK
+		}
+		if auth == "git" {
+			fmt.Fprintf(stderr, "docket serve: --auth git, but %v\n", err)
+			return nil, exitError
+		}
+		fmt.Fprintf(stdout, "No sign-in available: %v\n", err)
+		return nil, exitOK
+
+	default:
+		fmt.Fprintf(stderr, "docket serve: --auth %q: want auto, git or none\n", auth)
+		return nil, exitUsage
+	}
 }

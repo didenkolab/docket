@@ -107,6 +107,28 @@ header nav a:hover { color: var(--ink); }
 
 header .search { margin-left: auto; }
 
+/* Who is signed in, and as what. A board that does not say which of the three
+ * roles you have leaves you finding out by being refused. */
+.who {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.who .role {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0 0.3rem;
+}
+
+.sign-in { max-width: 34rem; }
+.sign-in form { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+.sign-in input { width: 100%; }
+.sign-in button { margin-top: 0.75rem; }
+
 input[type="search"], input[type="text"], select, textarea {
   font: inherit;
   color: var(--ink);
@@ -162,47 +184,93 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
   padding-bottom: 1rem;
 }
 
+/* A column is a box, not a hint of one. The body below it is the drop target,
+ * and it keeps a floor height so an empty column is somewhere you can aim
+ * rather than a line of text. */
 .column {
-  flex: 0 0 17rem;
-  border-left: 3px solid var(--rule);
-  padding-left: 0.75rem;
-}
-
-.column.doing { border-left-color: var(--accent); }
-.column.done { border-left-color: var(--done); opacity: 0.72; }
-
-.column h2 {
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-soft);
-  margin: 0 0 0.75rem;
+  flex: 0 0 17.5rem;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--rule);
+  border-radius: var(--radius);
 }
 
-.column .count { color: var(--ink-soft); }
+.column.doing { border-top-color: var(--accent); }
+.column.done { border-top-color: var(--done); }
+.column.done .cards { opacity: 0.72; }
+
+.column-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.column-head b { font-weight: 600; text-transform: uppercase; }
+.column-head .count { margin-left: auto; }
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 5.5rem;
+}
+
+.column.over { border-color: var(--accent); }
+
+/* A column the workflow will not take this card into. Saying so during the
+ * drag is kinder than saying it after. */
+.column.barred { border-color: var(--warn); }
+.column.barred .cards { background: color-mix(in srgb, var(--warn) 6%, transparent); cursor: not-allowed; }
+.column.over .cards { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+/* The gap that opens where the card will land. A drag without one is a guess:
+ * you find out where the card went only after letting go. */
+.slot {
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  min-height: 3.5rem;
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
 
 .card {
   display: block;
-  background: var(--raised);
+  background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   padding: 0.6rem 0.7rem;
-  margin-bottom: 0.5rem;
   text-decoration: none;
   color: inherit;
 }
 
 .card:hover { border-color: var(--accent); }
 .card[draggable="true"] { cursor: grab; }
-.card.dragging { opacity: 0.45; cursor: grabbing; }
+.card.dragging { opacity: 0.35; cursor: grabbing; }
 .card.pending { opacity: 0.6; }
 
-.column.over { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.column.over .cards { min-height: 2.5rem; }
+.card .key { display: block; color: var(--ink-soft); }
+.card-title { display: block; margin: 0.15rem 0 0.4rem; }
+
+.meta { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+
+.assignee, .label, .priority {
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0 0.3rem;
+}
+
+.priority.p-high, .priority.p-urgent { color: var(--warn); border-color: currentColor; }
+
+.empty { color: var(--ink-soft); font-style: italic; margin: 0.25rem 0.3rem; }
 
 /* A drop lands as a git commit, so it deserves the same confirmation a commit
  * would get: what moved, and where to. */
@@ -220,60 +288,177 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s, transform 0.15s;
+  z-index: 20;
 }
 
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 .toast.bad { background: var(--warn); color: #fff; }
 
-.card .key { display: block; color: var(--ink-soft); }
-.card-title { display: block; margin: 0.15rem 0 0.4rem; }
-
-.meta { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
-
-.assignee, .label, .priority {
-  color: var(--ink-soft);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  padding: 0 0.3rem;
-}
-
-.priority.p-high, .priority.p-urgent { color: var(--warn); border-color: currentColor; }
-
-.empty { color: var(--ink-soft); font-style: italic; }
-
 /* ---- one task ---- */
 
-.task, .page { max-width: 62rem; }
+/* The shape people already know from Jira: breadcrumb, title, a status control
+ * that is the first thing under it, then the work on the left and the facts on
+ * the right. Familiar beats clever on the page someone opens forty times a day. */
 
-.task h1 .key { color: var(--ink-soft); margin-right: 0.4rem; }
+.crumbs {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.4rem;
+}
+
+.crumbs a { color: var(--ink-soft); text-decoration: none; }
+.crumbs a:hover { color: var(--accent); }
+
+.issue-title {
+  font-size: 1.55rem;
+  line-height: 1.25;
+  margin: 0 0 0.9rem;
+  max-width: 48rem;
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.statusbar label, .label-inline {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+.status-select {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  border-left: 3px solid var(--rule);
+}
+
+.status-select.doing { border-left-color: var(--accent); }
+.status-select.done { border-left-color: var(--done); }
+
+.issue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 19rem;
+  gap: 2rem;
+  align-items: start;
+}
+
+.issue-main { min-width: 0; }
+
+.block { margin-bottom: 2rem; }
+
+/* Direct children only. A heading inside a description is the author's, not
+ * the interface's, and must not be dressed as a section label. */
+.block > h2, .panel > h2 {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin: 0 0 0.6rem;
+}
+
+.block > h2 .count, .panel > h2 .count { color: var(--ink-soft); opacity: 0.7; }
+
+.children { list-style: none; padding: 0; margin: 0; }
+
+.children li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.children .child-title { flex: 1; min-width: 0; }
+
+/* A comment is a person saying something, so it is shaped like one rather than
+ * like another paragraph of the description. */
+.comment {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.avatar {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--rule);
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.comment-head { margin: 0 0 0.2rem; font-size: 0.85rem; }
+.comment-head time { color: var(--ink-soft); font-family: var(--mono); font-size: 0.78rem; margin-left: 0.4rem; }
+.comment .body > :first-child { margin-top: 0; }
+.comment .body > :last-child { margin-bottom: 0; }
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+
+.comment-form textarea { width: 100%; max-width: 42rem; }
+
+.panel {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+  background: var(--raised);
+}
 
 .properties {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 0.2rem 1rem;
-  margin: 0 0 1.5rem;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--rule);
-  border-bottom: 1px solid var(--rule);
+  gap: 0.35rem 1rem;
+  margin: 0;
 }
 
 .properties dt {
   font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--ink-soft);
 }
 
 /* The property sheet is the frontmatter, so it is set in the structural face
  * rather than the prose one. */
 .properties dd { margin: 0; font-family: var(--mono); font-size: 0.85em; }
-.properties dd .empty { font-family: var(--sans); }
+.properties dd .empty { font-family: var(--sans); font-size: 0.9em; }
 
-.pill { border-bottom: 2px solid var(--rule); padding-bottom: 1px; }
+.pill { border-bottom: 2px solid var(--rule); padding-bottom: 1px; font-family: var(--mono); font-size: 0.85em; }
 .pill.doing { border-bottom-color: var(--accent); }
 .pill.done { border-bottom-color: var(--done); color: var(--ink-soft); }
 
+.stamps {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  margin: 1rem 0 0;
+}
+
 .body > :first-child { margin-top: 0; }
-.body h2 { font-size: 1.05rem; margin-top: 2rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.2rem; }
+.body h2 { font-size: 1.05rem; margin-top: 1.6rem; }
 .body h3 { font-size: 0.95rem; }
 .body pre {
   background: var(--raised);
@@ -368,6 +553,8 @@ button:hover { background: var(--accent); border-color: var(--accent); color: #f
   margin-left: 0.4rem;
 }
 
+.footnote.inline { margin: 0; }
+
 .footnote {
   margin-top: 2rem;
   color: var(--ink-soft);
@@ -420,6 +607,33 @@ table.settings .pos { width: 4rem; }
 table.settings .count { color: var(--ink-soft); font-family: var(--mono); font-size: 0.8rem; }
 
 form > label { display: block; margin-top: 1rem; }
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.matrix-wrap { overflow-x: auto; margin: 0.75rem 0; }
+
+.matrix { width: auto; }
+.matrix th { white-space: nowrap; padding-right: 0.9rem; }
+.matrix tbody th {
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.matrix td { text-align: center; padding: 0.15rem 0.3rem; }
+.matrix td input { width: auto; }
+.matrix .self { color: var(--ink-soft); }
 form > input { width: 100%; max-width: 28rem; display: block; }
 form > button { margin-top: 1.5rem; }
 
@@ -436,9 +650,9 @@ form > button { margin-top: 1.5rem; }
    * whatever the first column happens to be — usually an empty backlog —
    * and hide the work behind a gesture. */
   .board { flex-direction: column; overflow-x: visible; }
-  .column { flex-basis: auto; width: 100%; }
-  .properties { grid-template-columns: 1fr; gap: 0 0; }
-  .properties dt { margin-top: 0.5rem; }
+  .column { flex: 0 0 auto; width: 100%; }
+  .issue { grid-template-columns: 1fr; gap: 1.5rem; }
+  .issue-side { order: -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -184,6 +184,13 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 				return "", errors.New("status " + *req.Status + " is not one of " +
 					strings.Join(c.StatusNames(), ", "))
 			}
+			// The board drags through this, so the workflow has to be enforced
+			// here and not only on the form.
+			if !c.CanMove(t.Status, *req.Status) {
+				return "", errors.New("the workflow does not allow " + t.Status + " → " +
+					*req.Status + ". From " + t.Status + " a task can go to " +
+					strings.Join(names(c.Reachable(t.Status)), ", "))
+			}
 			changed = append(changed, t.Status+" → "+*req.Status)
 			t.SetStatus(*req.Status, category)
 		}

@@ -54,6 +54,53 @@
     refused while any task still holds it — the tasks come first.
   </p>
 
+  <h2>Workflow</h2>
+
+  <p class="footnote">
+    Which status can move to which. Leave it off and any task can go anywhere, which is what a
+    new vault does — a workflow nobody asked for is a workflow that gets in the way. Turn it on
+    and only the ticked moves are offered, on the board and on the task page alike.
+  </p>
+
+  <label class="switch">
+    <input type="checkbox" name="workflow" {{if $data.Workflow}}checked{{end}}>
+    Restrict moves to the ticked ones
+  </label>
+
+  <div class="matrix-wrap">
+    <table class="settings matrix">
+      <thead>
+        <tr>
+          <th>From \ To</th>
+          {{range (index $data.Matrix 0).To}}<th>{{.Status}}</th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range $data.Matrix}}
+        <tr>
+          <th>{{.From}}</th>
+          {{$from := .From}}
+          {{range .To}}
+          <td>
+            {{if .Self}}
+            <span class="self" title="a task is always allowed to stay where it is">·</span>
+            {{else}}
+            <input type="checkbox" name="transition_{{$from}}" value="{{.Status}}"
+                   {{if .Allowed}}checked{{end}}
+                   aria-label="{{$from}} to {{.Status}}">
+            {{end}}
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="footnote">
+    Renaming a status keeps its moves. Removing one removes them with it.
+  </p>
+
   <h2>Vocabulary</h2>
 
   <label for="types">Task types</label>

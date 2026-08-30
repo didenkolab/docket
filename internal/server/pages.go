@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
@@ -21,19 +23,29 @@ type pageData struct {
 	Config *project.Config
 	Title  string
 	Data   any
+	// You is who is asking, so the interface can offer only what they may do.
+	You      access.Identity
+	SignedIn bool
 }
 
-func (s *Server) render(w http.ResponseWriter, name string, c *project.Config, title string, data any) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
+	c *project.Config, title string, data any) {
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, pageData{c, title, data}); err != nil {
+	page := pageData{
+		Config: c, Title: title, Data: data,
+		You:      identityOf(r),
+		SignedIn: s.auth != nil,
+	}
+	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
-func (s *Server) fail(w http.ResponseWriter, code int, title, message string) {
+func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, title, message string) {
 	c, _ := project.Load(s.root)
 	w.WriteHeader(code)
-	s.render(w, "error.html", c, title, message)
+	s.render(w, r, "error.html", c, title, message)
 }
 
 // ---- board ----
@@ -56,6 +68,9 @@ type card struct {
 	// board hands it back when a card is dragged, so a drop lands on the file
 	// the person actually saw.
 	Version string
+	// Reachable is where the workflow lets this card go, so a drag can refuse
+	// a column before the drop rather than after it.
+	Reachable string
 }
 
 type boardView struct {
@@ -64,6 +79,15 @@ type boardView struct {
 	Projects []projectTab
 	Selected string
 	Total    int
+}
+
+// reachableList is the workflow, flattened for an attribute.
+func reachableList(c *project.Config, from string) string {
+	var names []string
+	for _, s := range c.Reachable(from) {
+		names = append(names, s.Name)
+	}
+	return strings.Join(names, "\n")
 }
 
 type projectTab struct {
@@ -81,18 +105,18 @@ type projectTab struct {
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 	entries, err := vault.List(s.root, c)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return
 	}
 
 	selected := r.URL.Query().Get("project")
 	if selected != "" && !c.HasProject(selected) {
-		s.fail(w, http.StatusNotFound, "No such project",
+		s.fail(w, r, http.StatusNotFound, "No such project",
 			selected+" is not in this vault: it holds "+strings.Join(c.ProjectKeys(), ", "))
 		return
 	}
@@ -119,6 +143,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 					Title: e.Task.Title, Status: e.Task.Status,
 					Assignee: e.Task.Assignee, Priority: e.Task.Priority,
 					Labels: e.Task.Labels, Version: version(e.Raw),
+					Reachable: reachableList(c, e.Task.Status),
 				})
 				view.Total++
 			}
@@ -139,7 +164,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 	if selected != "" {
 		title = c.ProjectName(selected)
 	}
-	s.render(w, "board.html", c, title, view)
+	s.render(w, r, "board.html", c, title, view)
 }
 
 // ---- one task ----
@@ -148,41 +173,106 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 
 	t, ver, err := s.loadTask(key)
 	if err != nil {
-		s.fail(w, http.StatusNotFound, "No such task", key+" is not in this vault")
+		s.fail(w, r, http.StatusNotFound, "No such task", key+" is not in this vault")
 		return
 	}
 	ix, err := buildIndex(s.root, c)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot index the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot index the vault", err.Error())
 		return
 	}
 
-	s.render(w, "task.html", c, t.Key+" "+t.Title, struct {
-		Task    *task.Task
-		Body    template.HTML
-		Version string
-		Path    string
-	}{t, renderMarkdown(t.Body(), ix), ver, vault.TaskPath(key)})
+	s.render(w, r, "task.html", c, t.Key+" "+t.Title, taskView{
+		Task:        t,
+		Reachable:   c.Reachable(t.Status),
+		Project:     r.PathValue("project"),
+		ProjectName: c.ProjectName(r.PathValue("project")),
+		Description: renderMarkdown(t.Description(), ix),
+		Comments:    renderComments(t.Comments(), ix),
+		Children:    s.childrenOf(c, key),
+		Version:     ver,
+		Path:        vault.TaskPath(key),
+	})
+}
+
+type taskView struct {
+	Task        *task.Task
+	Reachable   []project.Status
+	Project     string
+	ProjectName string
+	Description template.HTML
+	Comments    []renderedComment
+	Children    []childTask
+	Version     string
+	Path        string
+}
+
+type renderedComment struct {
+	Author  string
+	When    string
+	Text    template.HTML
+	Initial string
+}
+
+type childTask struct {
+	Key      string
+	Title    string
+	Status   string
+	Category string
+}
+
+func renderComments(comments []task.Comment, ix *index) []renderedComment {
+	out := make([]renderedComment, 0, len(comments))
+	for _, c := range comments {
+		initial := "?"
+		if c.Author != "" {
+			initial = strings.ToUpper(c.Author[:1])
+		}
+		out = append(out, renderedComment{
+			Author: c.Author, When: c.When,
+			Text: renderMarkdown(c.Text, ix), Initial: initial,
+		})
+	}
+	return out
+}
+
+// childrenOf lists the tasks that name this one as their parent. A hierarchy
+// written only downwards is a hierarchy you can only read from the wrong end.
+func (s *Server) childrenOf(c *project.Config, key string) []childTask {
+	entries, err := vault.List(s.root, c)
+	if err != nil {
+		return nil
+	}
+	var children []childTask
+	for _, e := range entries {
+		if e.Task != nil && e.Task.Parent == key {
+			children = append(children, childTask{
+				Key: e.Key, Title: e.Task.Title,
+				Status: e.Task.Status, Category: e.Task.StatusCategory,
+			})
+		}
+	}
+	return children
 }
 
 func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 
 	status := r.FormValue("status")
 	category, known := c.CategoryOf(status)
 	if !known {
-		s.fail(w, http.StatusBadRequest, "Unknown status",
+		s.fail(w, r, http.StatusBadRequest, "Unknown status",
 			status+" is not one of "+strings.Join(c.StatusNames(), ", "))
 		return
 	}
@@ -191,6 +281,10 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, error) {
 		if t.Status == status {
 			return "", nil
+		}
+		if !c.CanMove(t.Status, status) {
+			return "", fmt.Errorf("the workflow does not allow %s → %s. From %s a task can go to %s",
+				t.Status, status, t.Status, strings.Join(names(c.Reachable(t.Status)), ", "))
 		}
 		was := t.Status
 		t.SetStatus(status, category)
@@ -215,19 +309,30 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 	s.afterEdit(w, r, key, err)
 }
 
+// names flattens statuses for a message.
+func names(statuses []project.Status) []string {
+	out := make([]string, len(statuses))
+	for i, s := range statuses {
+		out[i] = s.Name
+	}
+	return out
+}
+
 // afterEdit turns the outcome of a write into a response.
 func (s *Server) afterEdit(w http.ResponseWriter, r *http.Request, key string, err error) {
 	switch {
 	case err == nil:
 		http.Redirect(w, r, "/task/"+key, http.StatusSeeOther)
 	case errors.Is(err, ErrStale):
-		s.fail(w, http.StatusConflict, "Someone got there first",
+		s.fail(w, r, http.StatusConflict, "Someone got there first",
 			"This task changed on disk after the page was loaded — most likely in Obsidian or "+
 				"by an agent. Nothing was written. Reload "+key+" and make the change again.")
 	case os.IsNotExist(err):
-		s.fail(w, http.StatusNotFound, "No such task", key+" is not in this vault")
+		s.fail(w, r, http.StatusNotFound, "No such task", key+" is not in this vault")
+	case strings.Contains(err.Error(), "workflow does not allow"):
+		s.fail(w, r, http.StatusBadRequest, "The workflow says no", err.Error())
 	default:
-		s.fail(w, http.StatusInternalServerError, "The change was not saved", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "The change was not saved", err.Error())
 	}
 }
 
@@ -236,16 +341,16 @@ func (s *Server) afterEdit(w http.ResponseWriter, r *http.Request, key string, e
 func (s *Server) handleNewForm(w http.ResponseWriter, r *http.Request) {
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	s.render(w, "new.html", c, "New task", r.URL.Query().Get("project"))
+	s.render(w, r, "new.html", c, "New task", r.URL.Query().Get("project"))
 }
 
 func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 
@@ -265,7 +370,7 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 	s.writes.Unlock()
 
 	if err != nil {
-		s.fail(w, http.StatusBadRequest, "The task was not created", err.Error())
+		s.fail(w, r, http.StatusBadRequest, "The task was not created", err.Error())
 		return
 	}
 	http.Redirect(w, r, "/task/"+t.Key, http.StatusSeeOther)
@@ -291,7 +396,7 @@ func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
 	})
 	sort.Strings(paths)
 
-	s.render(w, "pages.html", c, "Pages", paths)
+	s.render(w, r, "pages.html", c, "Pages", paths)
 }
 
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
@@ -299,18 +404,18 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 
 	rel := path.Clean("/" + r.PathValue("path"))[1:]
 	if rel == "" || strings.HasPrefix(rel, "..") {
-		s.fail(w, http.StatusBadRequest, "Not a page", "that path leads outside the vault")
+		s.fail(w, r, http.StatusBadRequest, "Not a page", "that path leads outside the vault")
 		return
 	}
 
 	raw, err := os.ReadFile(filepath.Join(s.root, filepath.FromSlash(rel)+".md"))
 	if err != nil {
-		s.fail(w, http.StatusNotFound, "No such page", rel+" is not in this vault")
+		s.fail(w, r, http.StatusNotFound, "No such page", rel+" is not in this vault")
 		return
 	}
 	ix, err := buildIndex(s.root, c)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot index the vault", err.Error())
+		s.fail(w, r, http.StatusInternalServerError, "Cannot index the vault", err.Error())
 		return
 	}
 
@@ -323,7 +428,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.render(w, "page.html", c, title, struct {
+	s.render(w, r, "page.html", c, title, struct {
 		Path string
 		Body template.HTML
 	}{rel, renderMarkdown(body, ix)})
@@ -346,7 +451,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		hits = s.search(c, query)
 	}
 
-	s.render(w, "search.html", c, "Search", struct {
+	s.render(w, r, "search.html", c, "Search", struct {
 		Query string
 		Hits  []hit
 	}{query, hits})

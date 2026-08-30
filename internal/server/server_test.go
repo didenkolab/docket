@@ -44,7 +44,7 @@ func newServer(t *testing.T) (*Server, http.Handler, string) {
 	git(t, root, "add", "-A")
 	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", "ACME/1")
 
-	s, err := New(root, gitvcs.Author{Name: "Server", Email: "server@example.com"})
+	s, err := New(root, Options{Author: gitvcs.Author{Name: "Server", Email: "server@example.com"}})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -383,7 +383,7 @@ func TestServingADirectoryThatIsNotAGitRepository(t *testing.T) {
 	}
 	// Every write is a commit, so a vault outside git would lose its history
 	// silently. Refusing at startup is the only honest option.
-	if _, err := New(root, gitvcs.Author{Name: "T", Email: "t@example.com"}); err == nil {
+	if _, err := New(root, Options{Author: gitvcs.Author{Name: "T", Email: "t@example.com"}}); err == nil {
 		t.Error("New accepted a vault that is not under git")
 	}
 }

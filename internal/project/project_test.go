@@ -164,3 +164,95 @@ func TestFindRootOutsideAnyVault(t *testing.T) {
 		t.Errorf("err = %v, want ErrNotAVault", err)
 	}
 }
+
+func TestAVaultWithNoWorkflowAllowsEverything(t *testing.T) {
+	// A workflow nobody asked for is a workflow that gets in the way.
+	c, err := Load(write(t, good))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, from := range c.StatusNames() {
+		for _, to := range c.StatusNames() {
+			if !c.CanMove(from, to) {
+				t.Errorf("%s → %s was refused with no workflow set", from, to)
+			}
+		}
+	}
+	if len(c.Reachable("Backlog")) != len(c.Statuses) {
+		t.Error("Reachable did not offer every status")
+	}
+}
+
+const withWorkflow = good + `transitions:
+  Backlog: [In progress]
+  In progress: [Done, Dropped]
+  Done: []
+  Dropped: []
+`
+
+func TestAWorkflowLimitsMoves(t *testing.T) {
+	c, err := Load(write(t, withWorkflow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.CanMove("Backlog", "In progress") {
+		t.Error("an allowed move was refused")
+	}
+	if c.CanMove("Backlog", "Done") {
+		t.Error("a move nobody allowed was permitted")
+	}
+	// Staying put is not a move.
+	if !c.CanMove("Done", "Done") {
+		t.Error("a task was not allowed to stay where it is")
+	}
+
+	reachable := c.Reachable("In progress")
+	if len(reachable) != 3 {
+		t.Errorf("Reachable(In progress) = %d statuses, want 3 including itself", len(reachable))
+	}
+}
+
+func TestATransitionToAStatusThatDoesNotExistIsRejected(t *testing.T) {
+	body := good + "transitions:\n  Backlog: [Nowhere]\n"
+	if _, err := Load(write(t, body)); err == nil {
+		t.Error("a transition to an unknown status was accepted")
+	}
+	body = good + "transitions:\n  Nowhere: [Done]\n"
+	if _, err := Load(write(t, body)); err == nil {
+		t.Error("a transition from an unknown status was accepted")
+	}
+}
+
+func TestRenamingAStatusKeepsItsMoves(t *testing.T) {
+	c, err := Load(write(t, withWorkflow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.RenameInTransitions("In progress", "Doing")
+
+	if targets, ok := c.Transitions["Doing"]; !ok || len(targets) != 2 {
+		t.Errorf("the renamed status lost its moves: %v", c.Transitions)
+	}
+	if targets := c.Transitions["Backlog"]; len(targets) != 1 || targets[0] != "Doing" {
+		t.Errorf("a move pointing at the renamed status was not followed: %v", targets)
+	}
+}
+
+func TestRemovingAStatusRemovesItsMoves(t *testing.T) {
+	c, err := Load(write(t, withWorkflow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.DropFromTransitions("Dropped")
+
+	if _, ok := c.Transitions["Dropped"]; ok {
+		t.Error("the removed status still has moves of its own")
+	}
+	for from, targets := range c.Transitions {
+		for _, to := range targets {
+			if to == "Dropped" {
+				t.Errorf("%s still moves to the removed status", from)
+			}
+		}
+	}
+}
