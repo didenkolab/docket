@@ -23,23 +23,26 @@
 
 <div class="board">
   {{range $data.Columns}}
-  <section class="column {{categoryClass .Status.Category}}">
+  <section class="column {{categoryClass .Status.Category}}" data-status="{{.Status.Name}}">
     <h2>{{.Status.Name}} <span class="count">{{len .Cards}}</span></h2>
-    {{range .Cards}}
-    <a class="card" href="{{.Href}}">
-      <span class="key">{{.Key}}</span>
-      <span class="card-title">{{.Title}}</span>
-      <span class="meta">
-        {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
-        <span class="priority p-{{.Priority}}">{{.Priority}}</span>
-        {{range .Labels}}<span class="label">{{.}}</span>{{end}}
-      </span>
-    </a>
-    {{else}}
-    <p class="empty">No tasks.</p>
-    {{end}}
+    <div class="cards">
+      {{range .Cards}}
+      <a class="card" href="{{.Href}}"
+         data-key="{{.Key}}" data-status="{{.Status}}" data-version="{{.Version}}">
+        <span class="key">{{.Key}}</span>
+        <span class="card-title">{{.Title}}</span>
+        <span class="meta">
+          {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
+          <span class="priority p-{{.Priority}}">{{.Priority}}</span>
+          {{range .Labels}}<span class="label">{{.}}</span>{{end}}
+        </span>
+      </a>
+      {{end}}
+    </div>
+    <p class="empty"{{if .Cards}} hidden{{end}}>No tasks.</p>
   </section>
   {{end}}
 </div>
 
+<script src="/static/board.js" defer></script>
 {{template "foot" .}}

@@ -88,6 +88,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /pages", s.handlePages)
 	mux.HandleFunc("GET /page/{path...}", s.handlePage)
 	mux.HandleFunc("GET /search", s.handleSearch)
+	mux.HandleFunc("GET /settings", s.handleSettings)
+	mux.HandleFunc("POST /settings", s.handleSaveSettings)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)

@@ -48,9 +48,14 @@ type card struct {
 	Href     string
 	Project  string
 	Title    string
+	Status   string
 	Assignee string
 	Priority string
 	Labels   []string
+	// Version is the fingerprint of the file this card was rendered from. The
+	// board hands it back when a card is dragged, so a drop lands on the file
+	// the person actually saw.
+	Version string
 }
 
 type boardView struct {
@@ -111,8 +116,9 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 			if view.Columns[i].Status.Name == e.Task.Status {
 				view.Columns[i].Cards = append(view.Columns[i].Cards, card{
 					Key: e.Key, Href: "/task/" + e.Key, Project: e.Project,
-					Title: e.Task.Title, Assignee: e.Task.Assignee,
-					Priority: e.Task.Priority, Labels: e.Task.Labels,
+					Title: e.Task.Title, Status: e.Task.Status,
+					Assignee: e.Task.Assignee, Priority: e.Task.Priority,
+					Labels: e.Task.Labels, Version: version(e.Raw),
 				})
 				view.Total++
 			}

@@ -197,6 +197,33 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
 }
 
 .card:hover { border-color: var(--accent); }
+.card[draggable="true"] { cursor: grab; }
+.card.dragging { opacity: 0.45; cursor: grabbing; }
+.card.pending { opacity: 0.6; }
+
+.column.over { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.column.over .cards { min-height: 2.5rem; }
+
+/* A drop lands as a git commit, so it deserves the same confirmation a commit
+ * would get: what moved, and where to. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translate(-50%, 1rem);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--radius);
+  padding: 0.45rem 0.9rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+.toast.bad { background: var(--warn); color: #fff; }
 
 .card .key { display: block; color: var(--ink-soft); }
 .card-title { display: block; margin: 0.15rem 0 0.4rem; }
@@ -358,6 +385,43 @@ button:hover { background: var(--accent); border-color: var(--accent); color: #f
 }
 
 .notice ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+
+.notice.ok {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--ink);
+}
+
+/* ---- settings ---- */
+
+form h2 { font-size: 1rem; margin: 2rem 0 0.5rem; }
+
+table.settings {
+  border-collapse: collapse;
+  margin: 0.5rem 0 0.25rem;
+  max-width: 46rem;
+  width: 100%;
+}
+
+table.settings th {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  text-align: left;
+  font-weight: 500;
+  padding: 0 0.5rem 0.3rem 0;
+}
+
+table.settings td { padding: 0.15rem 0.5rem 0.15rem 0; vertical-align: middle; }
+table.settings td input, table.settings td select { width: 100%; }
+table.settings .pos { width: 4rem; }
+table.settings .count { color: var(--ink-soft); font-family: var(--mono); font-size: 0.8rem; }
+
+form > label { display: block; margin-top: 1rem; }
+form > input { width: 100%; max-width: 28rem; display: block; }
+form > button { margin-top: 1.5rem; }
 
 .failure { max-width: 40rem; }
 .failure h1 { color: var(--warn); }

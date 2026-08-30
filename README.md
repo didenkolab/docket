@@ -73,8 +73,13 @@ For people who do not run Obsidian:
 docket serve --author "Your Name <you@example.com>"
 ```
 
-A board grouped by status across every project at once — or narrowed to one — plus task
-pages, the wiki, search, and a JSON API. It is a second client
+A board grouped by status across every project at once — or narrowed to one — with cards you
+drag between columns, plus task pages, the wiki, search, settings, and a JSON API.
+
+Dragging a card is the same status move as the form on the task page: it goes through the API,
+is checked against the fingerprint the card was drawn from, and lands in git as a commit. It is
+an enhancement, not the mechanism — without JavaScript the board is still a board and every
+task page still moves its own status. It is a second client
 to the same files, not an owner of them: nothing is cached, every write becomes a git commit
 attributed to whoever made it, and a write that would land on top of a change made in Obsidian
 or by an agent is refused rather than applied. Point all three at one repository at once.

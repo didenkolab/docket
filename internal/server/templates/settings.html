@@ -1,0 +1,97 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Settings</h1>
+<p class="path"><code>docket.yaml</code></p>
+
+{{if $data.Error}}
+<div class="notice"><strong>Nothing was changed.</strong> {{$data.Error}}</div>
+{{end}}
+{{if $data.Saved}}
+<div class="notice ok">{{$data.Saved}}</div>
+{{end}}
+
+<form method="post" action="/settings">
+  <label for="name">Vault name</label>
+  <input id="name" name="name" value="{{$data.Name}}" required>
+
+  <h2>Statuses</h2>
+  <p class="footnote">
+    The order here is the order of the columns. A status is a name people say paired with the
+    category machines act on, so a status you call <code>Dropped</code> belongs in
+    <code>done</code>: for every question a machine asks — is this in flight, is this closed —
+    a dropped task behaves as closed.
+  </p>
+
+  <table class="settings">
+    <thead>
+      <tr><th>#</th><th>Name</th><th>Category</th><th>Tasks</th></tr>
+    </thead>
+    <tbody>
+      {{range $data.Statuses}}
+      <tr>
+        <td><input class="pos" type="number" name="status_position" value="{{.Position}}" min="1"></td>
+        <td>
+          <input type="hidden" name="status_was" value="{{.Was}}">
+          <input name="status_name" value="{{.Name}}" placeholder="A new status">
+        </td>
+        <td>
+          <select name="status_category">
+            {{$current := .Category}}
+            {{range $data.Categories}}
+            <option value="{{.}}"{{if eq . $current}} selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </td>
+        <td class="count">{{if .InUse}}{{.InUse}}{{else}}—{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+  <p class="footnote">
+    Renaming a status here takes its tasks with it. Clearing a name removes the status, and is
+    refused while any task still holds it — the tasks come first.
+  </p>
+
+  <h2>Vocabulary</h2>
+
+  <label for="types">Task types</label>
+  <input id="types" name="types" value="{{$data.Types}}" required>
+
+  <label for="priorities">Priorities</label>
+  <input id="priorities" name="priorities" value="{{$data.Priorities}}" required>
+
+  <p class="footnote">Comma separated. Removing one that tasks still use makes them fail
+  <code>docket check</code>, so change the tasks first.</p>
+
+  <h2>Projects</h2>
+
+  <table class="settings">
+    <thead><tr><th>Key</th><th>Name</th><th>Tasks</th></tr></thead>
+    <tbody>
+      {{range $data.Projects}}
+      <tr>
+        <td><code>{{.Key}}</code></td>
+        <td><input name="project_name_{{.Key}}" value="{{.Name}}"></td>
+        <td class="count">{{.Tasks}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+  <p class="footnote">
+    A project's key is its folder and the head of every key in it, so it cannot be changed here
+    without moving every task. Adding a project is <code>docket project add</code>, which also
+    regenerates the boards.
+  </p>
+
+  <button type="submit">Save</button>
+</form>
+
+<p class="footnote">
+  Saving rewrites <code>docket.yaml</code>, regenerates the boards so every project stays
+  visible, and commits both — the same way any other change to this vault is recorded.
+</p>
+
+{{template "foot" .}}

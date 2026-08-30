@@ -20,7 +20,8 @@ type Entry struct {
 	Number  int
 	Path    string // path relative to the vault root
 	Task    *task.Task
-	Err     error // set when the file could not be parsed; Task is then nil
+	Raw     []byte // the file as read, so a caller can fingerprint it
+	Err     error  // set when the file could not be parsed; Task is then nil
 }
 
 // builtinTaskTemplate is used when a vault has no templates/task.md. A vault
@@ -100,8 +101,11 @@ func listProject(root, projectKey string) ([]Entry, error) {
 		raw, err := os.ReadFile(filepath.Join(dir, name.Name()))
 		if err != nil {
 			entry.Err = err
-		} else if entry.Task, err = task.Parse(raw); err != nil {
-			entry.Err = err
+		} else {
+			entry.Raw = raw
+			if entry.Task, err = task.Parse(raw); err != nil {
+				entry.Err = err
+			}
 		}
 		entries = append(entries, entry)
 	}
