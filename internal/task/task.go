@@ -46,6 +46,9 @@ type Task struct {
 
 	front yaml.Node
 	body  string
+	// bodyLine is the file line the body starts on, so that findings about
+	// links can be reported at a place an editor can jump to.
+	bodyLine int
 }
 
 // Parse reads a task file.
@@ -55,7 +58,9 @@ func Parse(data []byte) (*Task, error) {
 		return nil, err
 	}
 
-	t := &Task{body: body}
+	// The file is "---\n" + frontmatter + "---\n" + body, so the body starts
+	// after both delimiters and every frontmatter line.
+	t := &Task{body: body, bodyLine: bytes.Count(front, []byte("\n")) + 3}
 	if err := yaml.Unmarshal(front, &t.front); err != nil {
 		return nil, fmt.Errorf("frontmatter: %w", err)
 	}
@@ -198,6 +203,30 @@ func (t *Task) SetStatus(status, category string) {
 func (t *Task) Touch(now time.Time) {
 	t.Updated = now.UTC().Format(TimeFormat)
 	t.SetPlain("updated", t.Updated)
+}
+
+// PropertyLine is the line in the file a property sits on, or 0 when the task
+// does not have it. Frontmatter starts on line 2, after the opening delimiter.
+func (t *Task) PropertyLine(name string) int {
+	mapping := t.front.Content[0]
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == name {
+			return mapping.Content[i].Line + 1
+		}
+	}
+	return 0
+}
+
+// LineOf finds the first line of the body mentioning a wikilink target, in file
+// coordinates. It returns the body's first line when the target is not found
+// on any single line.
+func (t *Task) LineOf(target string) int {
+	for i, line := range strings.Split(t.body, "\n") {
+		if strings.Contains(line, "[["+target) {
+			return t.bodyLine + i
+		}
+	}
+	return t.bodyLine
 }
 
 // NestedProperties lists properties whose value is not a scalar or a list of
