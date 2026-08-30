@@ -38,6 +38,7 @@ Commands:
   workspace   Assemble several project repositories into one Obsidian vault
   serve       A board and an API over a vault
   import      Bring in an existing Jira and Confluence instance
+  mcp         Serve the vault to an agent over MCP
   version     Print the version
   help        Print this help
 
@@ -93,6 +94,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runServe(args[1:], stdout, stderr)
 	case "import":
 		return runImport(args[1:], stdout, stderr)
+	case "mcp":
+		return runMCP(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, Version())
 		return exitOK
