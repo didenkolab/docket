@@ -1,0 +1,52 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/task/{{$data.Key}}">{{$data.Key}}</a>
+  <span aria-hidden="true">/</span>
+  <span>History</span>
+</nav>
+
+<h1 class="issue-title">{{$data.Title}}</h1>
+
+<ol class="history">
+  {{range $data.Entries}}
+  <li class="event{{if .Created}} first{{end}}{{if .Deleted}} gone{{end}}">
+    <span class="avatar" aria-hidden="true">{{.Initial}}</span>
+    <div class="event-body">
+      <p class="event-who">
+        <strong>{{.Author}}</strong>
+        <time>{{.When}}</time>
+        <code class="hash">{{.Short}}</code>
+      </p>
+      <ul class="event-changes">
+        {{range .Changes}}
+        <li>
+          {{if .Note}}
+          <span class="note">{{.Note}}</span>
+          {{else}}
+          <span class="field">{{.Field}}</span>
+          <span class="from">{{.From}}</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <span class="to">{{.To}}</span>
+          {{end}}
+        </li>
+        {{else}}
+        <li><span class="note">no tracked field changed</span></li>
+        {{end}}
+      </ul>
+      <p class="event-subject">{{.Subject}}</p>
+    </div>
+  </li>
+  {{else}}
+  <li class="empty">Nothing in git touches this task yet.</li>
+  {{end}}
+</ol>
+
+<p class="footnote">
+  Read from git, not from a log this server keeps: there is no second record to fall out of step
+  with the files. The same history, in a terminal:
+  <code>git log --follow -p "{{$data.Path}}"</code>.
+</p>
+
+{{template "foot" .}}

@@ -94,6 +94,22 @@ arranged is still arranged after a reload — and a vault where nobody has dragg
 simply sorted by key. Dragging is an enhancement, not the mechanism: without JavaScript the
 board is still a board and every task page still moves its own status.
 
+### What happened to this task
+
+Every change is a commit, so the history of a task is the history of its file — and the
+interface shows it as a tracker does rather than as a diff: who, when, and which fields moved.
+`status  Backlog → In review`, `added 1 comment`, `edited the description`.
+
+It is read from git on the way past. There is no activity table to fall out of step with the
+files, and a change made in Obsidian or by an agent appears here beside one made on this page,
+because there was only ever one record.
+
+A task's history is found by its key rather than by following one file. A retitle renames the
+file, and git can only follow a rename by guessing from how similar the two versions look — a
+retitle that also rewrites the body falls under the threshold, and the history silently stops.
+The key is in the file name, so `ACME/ACME-12 *.md` is the whole life of ACME-12 and nothing
+else, decided by the format instead of by a heuristic.
+
 ### Who may do what
 
 docket keeps no users of its own. People sign in with a token for the git host that already

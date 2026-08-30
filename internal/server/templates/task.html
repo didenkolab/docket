@@ -24,6 +24,7 @@
   <button type="submit">Move</button>
   <a class="button-link" href="/task/{{$t.Key}}/edit">Edit</a>
   <a class="button-link" href="/new?parent={{$t.Key}}">Add child</a>
+  <a class="button-link" href="/task/{{$t.Key}}/history">History</a>
   {{if lt (len $data.Reachable) (len .Config.Statuses)}}
   <span class="footnote inline">The workflow limits where this can go.</span>
   {{end}}
@@ -122,7 +123,8 @@
     {{end}}
     <p class="stamps">
       Created {{$t.Created}}<br>
-      Updated {{$t.Updated}}
+      Updated {{$t.Updated}}<br>
+      <a href="/task/{{$t.Key}}/history">Every change to this task</a>
     </p>
 
     <p class="stamps">
@@ -135,6 +137,16 @@
       in Obsidian, or by an agent — the write is refused rather than applied on top of what you
       never saw.
     </p>
+
+    {{if $may}}
+    <form class="danger" method="post" action="/task/{{$t.Key}}/delete"
+          onsubmit="return confirm('Delete {{$t.Key}}? Git keeps it; the vault will not have it.')">
+      {{template "csrf" $}}
+      <button type="submit" class="destructive">Delete this task</button>
+      <span class="footnote inline">Git keeps every version, so this removes the file and not
+      the record. A task with children is refused.</span>
+    </form>
+    {{end}}
   </aside>
 </div>
 

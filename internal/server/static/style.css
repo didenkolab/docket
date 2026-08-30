@@ -118,7 +118,13 @@ a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset:
 code, .key, .path, .fingerprint, .stamps {
   font-family: var(--mono);
   font-size: 0.85em;
+  /* A key, a path and a command are literal strings somebody will retype. Fonts
+   * a reader may have installed — Fira Code, JetBrains Mono, Iosevka — draw
+   * `->` and `!=` as single glyphs, which is pleasant in an editor and wrong
+   * here, where the characters are the content. Both properties, because they
+   * switch off different sets. */
   font-variant-ligatures: none;
+  font-feature-settings: "calt" 0;
 }
 
 /* One small-capital label device, used for every section heading and field
@@ -649,6 +655,71 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .matrix td { text-align: center; padding: 0.15rem var(--s1); }
 .matrix td input { width: auto; }
 .matrix .self { color: var(--ink-faint); }
+
+/* ---- history ---- */
+
+/* One column of events down a rule, because a history is read downwards and
+ * the rule is what makes it read as one sequence rather than as a stack of
+ * unrelated boxes. */
+.history {
+  list-style: none;
+  margin: var(--s5) 0 0;
+  padding: 0 0 0 var(--s5);
+  border-left: 2px solid var(--rule-soft);
+  max-width: 52rem;
+}
+
+.event { display: flex; gap: var(--s3); padding: 0 0 var(--s5); position: relative; }
+
+/* The dot that puts the event on the rule. */
+.event::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--s5) - 5px);
+  top: 0.6rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--rule);
+  box-shadow: 0 0 0 3px var(--paper);
+}
+
+.event.first::before { background: var(--accent); }
+.event.gone::before { background: var(--warn); }
+
+.event-body { min-width: 0; flex: 1; }
+.event-who { margin: 0; display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+.event-who time { color: var(--ink-faint); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.event-who .hash { color: var(--ink-faint); font-size: 0.75rem; background: none; padding: 0; }
+
+.event-changes { list-style: none; margin: var(--s2) 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.event-changes li { display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; font-size: 0.9rem; }
+
+/* The field name is the thing you scan for, so it is fixed-width and quiet;
+ * the values either side of the arrow are what you stop on. */
+.event-changes .field {
+  flex: none;
+  min-width: 5.5rem;
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.event-changes .from { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+.event-changes .arrow { color: var(--ink-faint); }
+.event-changes .to { color: var(--ink); font-weight: 550; }
+.event-changes .note { color: var(--ink-soft); }
+
+/* The commit message, which is the author's own sentence about the change and
+ * belongs under the facts rather than instead of them. */
+.event-subject { margin: var(--s2) 0 0; color: var(--ink-faint); font-size: 0.85rem; }
+
+@media (max-width: 40rem) {
+  .history { padding-left: var(--s4); }
+  .event::before { left: calc(-1 * var(--s4) - 5px); }
+  .event-changes .field { min-width: 0; }
+}
 
 /* ---- lists, notices, the rest ---- */
 

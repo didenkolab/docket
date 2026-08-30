@@ -135,6 +135,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /task/{key}/status", s.handleMove)
 	mux.HandleFunc("POST /task/{key}/comment", s.handleComment)
 	mux.HandleFunc("GET /task/{key}/edit", s.handleEditForm)
+	mux.HandleFunc("GET /task/{key}/history", s.handleHistory)
 	mux.HandleFunc("POST /task/{key}/edit", s.handleEdit)
 	mux.HandleFunc("POST /task/{key}/attach", s.handleAttach)
 	mux.HandleFunc("POST /task/{key}/delete", s.handleDeleteTask)
