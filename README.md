@@ -161,6 +161,16 @@ or by an agent is refused rather than applied. Point all three at one repository
 docker run --rm -p 8080:8080 -v "$PWD:/vault" ghcr.io/vadymdidenkolab/docket
 ```
 
+While this repository is private the image is too, so that pull needs a token first:
+
+```bash
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-github-user> --password-stdin
+```
+
+The token needs `read:packages`. When the repository goes public the image follows and the
+login stops being necessary. Building it yourself needs no token at all — `docker build -t
+docket .` from a checkout.
+
 The vault is not in the image — it is your git repository, mounted. The image
 carries the binary, git and certificates, and nothing else; it keeps no state, so
 restarting it loses nothing and running two of them against one clone is only a question of
