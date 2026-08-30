@@ -14,15 +14,22 @@ docket vault, and therefore the working example.
 
 ## Status
 
-Early. The format is settled and documented; the tool is a skeleton — `version` and `help` are
-the only commands that exist. A vault is fully usable without any of it: clone, open in
-Obsidian, work.
+Early. The format is settled and documented, and `init` works. A vault is fully usable without
+any of this: clone, open in Obsidian, work.
+
+```bash
+docket init --key ACME --name "Acme Platform" acme
+```
+
+writes a complete vault — `project.yaml`, boards, templates, `AGENTS.md`, an Obsidian config
+with Bases enabled — into an empty directory. Open it in Obsidian and the board is there, with
+nothing installed.
 
 | Command | What | State |
 |---|---|---|
+| `docket init` | Scaffold a new project vault | works |
 | `docket version` | Print the version | works |
 | `docket help` | Print the usage | works |
-| `docket init` | Scaffold a new project vault | planned |
 | `docket new` | Create a task with a valid key from the project's template | planned |
 | `docket check` | Validate a vault against the specification | planned |
 | `docket workspace sync` | Assemble several project repositories into one Obsidian vault | planned |
