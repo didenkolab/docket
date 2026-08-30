@@ -376,6 +376,98 @@ func TestSearchFindsTasksAndPages(t *testing.T) {
 	}
 }
 
+func TestSearchNarrows(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A second task, so a filter has something to exclude.
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Rotate the signing key", Type: "task", Priority: "low",
+		Labels: []string{"security"}, Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "session.md"),
+		[]byte("A page about the signing key.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name     string
+		query    string
+		wants    []string
+		excludes []string
+	}{
+		{"by assignee", "?assignee=agent%2Fclaude", []string{"ACME-1"}, []string{"ACME-2"}},
+		{"unassigned", "?assignee=%21unassigned", []string{"ACME-2"}, []string{"ACME-1"}},
+		{"by label", "?label=security", []string{"ACME-2"}, []string{"ACME-1"}},
+		{"by priority", "?priority=high", []string{"ACME-1"}, []string{"ACME-2"}},
+		{"by type", "?type=bug", []string{"ACME-1"}, []string{"ACME-2"}},
+		{"by status", "?status=Backlog", []string{"ACME-1", "ACME-2"}, nil},
+		{"by project", "?project=ACME", []string{"ACME-1", "ACME-2"}, nil},
+		// Words and a filter together: both must hold.
+		{"words and a filter", "?q=signing&label=security", []string{"ACME-2"}, []string{"ACME-1"}},
+		// A page has no assignee, so narrowing by one is a question about tasks.
+		{"narrowed skips pages", "?q=signing&type=task", []string{"ACME-2"}, []string{"docs/session"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := get(t, h, "/search"+tc.query).Body.String()
+			results := body[strings.Index(body, `<ul class="hits">`):]
+			for _, want := range tc.wants {
+				if !strings.Contains(results, want) {
+					t.Errorf("%s is missing from the results:\n%s", want, results)
+				}
+			}
+			for _, unwanted := range tc.excludes {
+				if strings.Contains(results, unwanted) {
+					t.Errorf("%s should have been filtered out:\n%s", unwanted, results)
+				}
+			}
+		})
+	}
+}
+
+// An unfilled form asks nothing, so it should not answer with the whole vault.
+func TestSearchWithNothingAskedShowsNoResults(t *testing.T) {
+	_, h, _ := newServer(t)
+	body := get(t, h, "/search").Body.String()
+	if strings.Contains(body, `<ul class="hits">`) {
+		t.Error("an empty form listed results anyway")
+	}
+	if !strings.Contains(body, "narrow by project") {
+		t.Error("an empty form does not say what it can do")
+	}
+}
+
+// The filter menus offer what the vault actually uses, not a fixed list.
+func TestSearchFormOffersTheVaultsVocabulary(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Rotate the signing key", Assignee: "dana",
+		Labels: []string{"security"}, Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/search").Body.String()
+	for _, want := range []string{`value="dana"`, `value="security"`, `value="agent/claude"`,
+		`value="Backlog"`, `value="bug"`, `value="ACME"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the form does not offer %s", want)
+		}
+	}
+}
+
 func TestServingADirectoryThatIsNotAGitRepository(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vault")
 	if _, err := vault.Init(root, vault.Options{Key: "ACME"}); err != nil {

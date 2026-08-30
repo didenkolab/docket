@@ -10,8 +10,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/project"
@@ -459,43 +461,160 @@ type hit struct {
 	Href    string
 	Label   string
 	Context string
+	// Task is empty for a page, and describes the card for a task, so a result
+	// list can say what state the work is in without a second click.
+	Task *hitTask
+}
+
+type hitTask struct {
+	Key      string
+	Title    string
+	Status   string
+	Category string
+	Priority string
+	Assignee string
+	Labels   []string
+}
+
+// filters is what a person narrowed the search to. Every field is empty by
+// default, and an empty field matches everything.
+type filters struct {
+	Query    string
+	Project  string
+	Status   string
+	Type     string
+	Priority string
+	Assignee string
+	Label    string
+}
+
+// narrowed reports whether anything but the text was asked for. It decides
+// whether pages are searched at all: a page has no assignee, so a search
+// narrowed by one is asking about tasks.
+func (f filters) Narrowed() bool {
+	return f.Project != "" || f.Status != "" || f.Type != "" ||
+		f.Priority != "" || f.Assignee != "" || f.Label != ""
+}
+
+// empty reports a form nobody has filled in yet.
+func (f filters) Empty() bool { return f.Query == "" && !f.Narrowed() }
+
+// searchView carries the vocabulary the form offers alongside the results.
+// Statuses, types and priorities come from docket.yaml; assignees and labels are
+// whatever the vault actually uses, because neither is a closed list.
+type searchView struct {
+	Filters   filters
+	Hits      []hit
+	Projects  []string
+	Statuses  []project.Status
+	Types     []string
+	Prios     []string
+	Assignees []string
+	Labels    []string
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
-	c, _ := project.Load(s.root)
-	query := strings.TrimSpace(r.FormValue("q"))
-
-	var hits []hit
-	if query != "" {
-		hits = s.search(c, query)
+	c, err := project.Load(s.root)
+	if err != nil {
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		return
 	}
 
-	s.render(w, r, "search.html", c, "Search", struct {
-		Query string
-		Hits  []hit
-	}{query, hits})
+	f := filters{
+		Query:    strings.TrimSpace(r.FormValue("q")),
+		Project:  r.FormValue("project"),
+		Status:   r.FormValue("status"),
+		Type:     r.FormValue("type"),
+		Priority: r.FormValue("priority"),
+		Assignee: r.FormValue("assignee"),
+		Label:    r.FormValue("label"),
+	}
+
+	entries, err := vault.List(s.root, c)
+	if err != nil {
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
+		return
+	}
+
+	view := searchView{
+		Filters:  f,
+		Projects: c.ProjectKeys(),
+		Statuses: c.Statuses,
+		Types:    c.Types,
+		Prios:    c.Priorities,
+	}
+	view.Assignees, view.Labels = vocabulary(entries)
+	if !f.Empty() {
+		view.Hits = s.search(f, entries)
+	}
+
+	s.render(w, r, "search.html", c, "Search", view)
+}
+
+// vocabulary is the assignees and labels the vault actually uses, sorted. They
+// are not configured anywhere, so the only place to learn them is the tasks.
+func vocabulary(entries []vault.Entry) (assignees, labels []string) {
+	seenWho, seenLabel := map[string]bool{}, map[string]bool{}
+	for _, e := range entries {
+		if e.Task == nil {
+			continue
+		}
+		if who := e.Task.Assignee; who != "" && !seenWho[who] {
+			seenWho[who] = true
+			assignees = append(assignees, who)
+		}
+		for _, l := range e.Task.Labels {
+			if !seenLabel[l] {
+				seenLabel[l] = true
+				labels = append(labels, l)
+			}
+		}
+	}
+	sort.Strings(assignees)
+	sort.Strings(labels)
+	return assignees, labels
 }
 
 // search is a plain substring scan over the vault. An index would be faster and
 // would be one more thing that can disagree with the files; at the size a
 // vault reaches, reading them is fast enough.
-func (s *Server) search(c *project.Config, query string) []hit {
-	needle := strings.ToLower(query)
+func (s *Server) search(f filters, entries []vault.Entry) []hit {
+	needle := strings.ToLower(f.Query)
 	var hits []hit
 
-	entries, _ := vault.List(s.root, c)
 	for _, e := range entries {
-		if e.Task == nil {
+		if e.Task == nil || !matches(f, e) {
 			continue
 		}
 		text := e.Task.Title + "\n" + e.Task.Body()
-		if strings.Contains(strings.ToLower(text), needle) {
-			hits = append(hits, hit{
-				Href:    "/task/" + e.Key,
-				Label:   e.Key + " " + e.Task.Title,
-				Context: excerpt(text, needle),
-			})
+		if needle != "" && !strings.Contains(strings.ToLower(text), needle) {
+			continue
 		}
+		// The excerpt is drawn from the body, never from the title: the title
+		// is the link directly above it, and a search that matched it would
+		// otherwise print it twice. With nothing to point at — the words
+		// matched the title, or there were no words — the description opens
+		// instead, because acceptance criteria and comments are not a summary.
+		context := excerpt(e.Task.Body(), needle)
+		if context == "" {
+			context = excerpt(e.Task.Description(), "")
+		}
+		hits = append(hits, hit{
+			Href:    "/task/" + e.Key,
+			Label:   e.Key + " " + e.Task.Title,
+			Context: context,
+			Task: &hitTask{
+				Key: e.Key, Title: e.Task.Title,
+				Status: e.Task.Status, Category: e.Task.StatusCategory,
+				Priority: e.Task.Priority, Assignee: e.Task.Assignee, Labels: e.Task.Labels,
+			},
+		})
+	}
+
+	// A search narrowed by a task field is not a question about pages, and a
+	// search with no text is a list of tasks rather than a scan of prose.
+	if f.Narrowed() || needle == "" {
+		return hits
 	}
 
 	docs := filepath.Join(s.root, vault.DocsDir)
@@ -512,18 +631,76 @@ func (s *Server) search(c *project.Config, query string) []hit {
 			return nil
 		}
 		rel = strings.TrimSuffix(filepath.ToSlash(rel), ".md")
-		hits = append(hits, hit{"/page/" + rel, rel, excerpt(string(raw), needle)})
+		hits = append(hits, hit{Href: "/page/" + rel, Label: rel, Context: excerpt(string(raw), needle)})
 		return nil
 	})
 	return hits
 }
 
+func matches(f filters, e vault.Entry) bool {
+	switch {
+	case f.Project != "" && e.Project != f.Project:
+		return false
+	case f.Status != "" && e.Task.Status != f.Status:
+		return false
+	case f.Type != "" && e.Task.Type != f.Type:
+		return false
+	case f.Priority != "" && e.Task.Priority != f.Priority:
+		return false
+	case f.Assignee == unassigned && e.Task.Assignee != "":
+		return false
+	case f.Assignee != "" && f.Assignee != unassigned && e.Task.Assignee != f.Assignee:
+		return false
+	case f.Label != "" && !slices.Contains(e.Task.Labels, f.Label):
+		return false
+	}
+	return true
+}
+
+// unassigned stands for the absence of an assignee, which a blank option cannot
+// say: blank already means "any".
+const unassigned = "!unassigned"
+
+// excerpt is the words around the match. With no needle it is the opening of
+// the text, which is what a result list wants when the search was a filter
+// rather than a question.
 func excerpt(text, needle string) string {
+	if needle == "" {
+		return clip(text, 0, 180)
+	}
 	at := strings.Index(strings.ToLower(text), needle)
 	if at < 0 {
 		return ""
 	}
-	start := max(0, at-60)
-	end := min(len(text), at+len(needle)+60)
-	return strings.ReplaceAll(strings.TrimSpace(text[start:end]), "\n", " ")
+	return clip(text, at-60, at+len(needle)+60)
 }
+
+// clip takes the bytes between two offsets without cutting a character in half.
+// A title in Cyrillic, Greek or Japanese is one byte-slice away from a row of
+// replacement characters, and the whole point of the file naming is that a
+// title may be written in any of them.
+func clip(text string, from, to int) string {
+	from = max(0, from)
+	to = min(len(text), to)
+	for from > 0 && from < len(text) && !utf8.RuneStart(text[from]) {
+		from--
+	}
+	for to < len(text) && !utf8.RuneStart(text[to]) {
+		to++
+	}
+	if from >= to {
+		return ""
+	}
+	return strings.Join(strings.Fields(plain(text[from:to])), " ")
+}
+
+// plain takes the marks off a fragment of Markdown. An excerpt is one line of
+// context, and `## Acceptance` or `- [ ]` in the middle of it is noise from a
+// syntax that is not being rendered here.
+var marks = strings.NewReplacer(
+	"#", "", "**", "", "__", "", "`", "", ">", "",
+	"[[", "", "]]", "",
+	"- [ ]", "·", "- [x]", "·", "- ", "· ",
+)
+
+func plain(fragment string) string { return marks.Replace(fragment) }

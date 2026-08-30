@@ -648,8 +648,51 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .pages li, .hits li { padding: var(--s2) 0; border-bottom: 1px solid var(--rule-soft); }
 .pages a { font-family: var(--mono); font-size: 0.85rem; }
 
-.hits .context { margin: var(--s1) 0 0; color: var(--ink-soft); font-size: 0.85rem; }
+.hits li { display: flex; flex-direction: column; gap: var(--s1); padding: var(--s3) 0; }
+.hits .context { margin: 0; color: var(--ink-soft); font-size: 0.85rem; }
+
+/* A result is a card laid flat: the key in the same faint monospace the board
+ * uses, then the title, so the eye lands in the same place on both. */
+.hit-link { display: flex; align-items: baseline; gap: var(--s2); text-decoration: none; color: var(--ink); }
+.hit-link:hover .hit-title { text-decoration: underline; }
+.hit-link .key { color: var(--ink-faint); font-size: 0.78rem; letter-spacing: 0.02em; flex: none; }
+.hit-title { font-weight: 550; }
+.hit-link.page { font-family: var(--mono); font-size: 0.85rem; color: var(--accent); }
 .count-line { color: var(--ink-faint); }
+.count-line .muted { color: var(--ink-faint); }
+
+/* ---- the finder ---- */
+
+/* Words on top, because that is what most searches are, and the narrowing
+ * underneath as a row that wraps rather than a panel that has to be opened. */
+.finder { max-width: 60rem; margin-bottom: var(--s5); }
+
+.finder-text { display: flex; gap: var(--s2); }
+.finder-text input { flex: 1; min-width: 0; }
+
+.finder-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s2) var(--s3);
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule-soft);
+}
+
+.finder-filters label { display: flex; flex-direction: column; gap: 0.2rem; margin: 0; }
+.finder-filters select { width: auto; min-width: 8rem; }
+.finder-filters .clear { margin-left: auto; }
+
+/* The hint under an unfilled form is prose, so it is set to the reading
+ * measure rather than to the width of the window. */
+.finder + .empty { max-width: var(--measure); line-height: 1.6; }
+
+@media (max-width: 40rem) {
+  .finder-filters label { flex: 1 1 9rem; }
+  .finder-filters select { width: 100%; min-width: 0; }
+  .finder-filters .clear { margin-left: 0; }
+}
 
 .footnote { margin-top: var(--s4); color: var(--ink-faint); font-size: 0.85rem; max-width: 46rem; line-height: 1.6; }
 .footnote.inline { margin: var(--s1) 0 0; }

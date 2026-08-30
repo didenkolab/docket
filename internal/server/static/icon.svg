@@ -1,0 +1,16 @@
+<!-- The mark from the header, at icon size: a square with a square cut out of
+     it, because the product is a folder of files inside a folder of files.
+     currentColor is not available to a favicon, so the accent is written out;
+     the dark-mode accent is applied by the media query. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .mark { fill: #2f5bff; }
+    .cut { fill: #f7f7f5; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #7d9bff; }
+      .cut { fill: #0e1117; }
+    }
+  </style>
+  <rect class="mark" x="2" y="2" width="28" height="28" rx="7"/>
+  <rect class="cut" x="9" y="9" width="14" height="14" rx="3"/>
+</svg>
