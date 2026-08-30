@@ -1,0 +1,21 @@
+filters:
+  and:
+    - file.inFolder("tasks")
+    - 'note.status_category != "done"'
+properties:
+  note.title:
+    displayName: Title
+  note.assignee:
+    displayName: Assignee
+  note.priority:
+    displayName: Priority
+views:
+  - type: cards
+    name: Board
+    groupBy:
+      property: note.status
+    order:
+      - note.title
+      - note.assignee
+      - note.priority
+      - note.labels

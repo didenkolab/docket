@@ -1,0 +1,21 @@
+filters:
+  and:
+    - file.inFolder("tasks")
+    - 'note.status_category == "todo"'
+properties:
+  note.title:
+    displayName: Title
+  note.priority:
+    displayName: Priority
+  note.type:
+    displayName: Type
+views:
+  - type: table
+    name: Backlog
+    order:
+      - file.name
+      - note.title
+      - note.type
+      - note.priority
+      - note.parent
+      - note.labels
