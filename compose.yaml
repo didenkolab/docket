@@ -1,0 +1,29 @@
+# A board over a vault, in a container.
+#
+#   docker compose up
+#
+# That builds from this checkout, so it needs nothing but Docker — no registry,
+# no login, no token. Point it at the vault you want and pick a port:
+#
+#   VAULT=~/work/acme PORT=9000 docker compose up
+#
+# VAULT is the git repository to serve and defaults to the directory you run
+# this from. Sign-in is off by default, so use it on a machine only you can
+# reach — or set AUTH=git and let the git host decide who may do what.
+
+services:
+  docket:
+    build: .
+    # Or take the published image instead of building. It is only readable
+    # while you are logged in to ghcr.io, which building does not require:
+    # image: ghcr.io/vadymdidenkolab/docket:latest
+    ports:
+      - "${PORT:-8080}:8080"
+    volumes:
+      - "${VAULT:-.}:/vault"
+    command:
+      - serve
+      - --addr=0.0.0.0:8080
+      - --auth=${AUTH:-none}
+      - --author=${AUTHOR:-docket <docket@localhost>}
+    restart: unless-stopped

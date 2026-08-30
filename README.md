@@ -157,12 +157,27 @@ or by an agent is refused rather than applied. Point all three at one repository
 
 ### Running it somewhere
 
-Put the binary on the machine, clone the vault beside it, and run it. There is no runtime, no
-image and no state of its own — that is the whole deployment:
+In a container, with `compose.yaml` from this repository:
 
 ```bash
-docket serve --addr 127.0.0.1:8080 --auth git
+VAULT=~/work/acme docker compose up
 ```
+
+That builds from the checkout, so it needs nothing but Docker — no registry, no login, no
+token. `VAULT` is the repository to serve and defaults to the directory you run it from;
+`PORT` and `AUTH` are the other two knobs.
+
+The vault is not in the image. It is your git repository, mounted — baking it in would make the
+image the source of truth, which is the opposite of the whole design. The image carries the
+binary, git and certificates and keeps no state, so restarting it loses nothing and two of them
+against one clone is only a question of file locking.
+
+There is a published image as well — `ghcr.io/vadymdidenkolab/docket` — which needs a
+`docker login ghcr.io` for as long as this repository is private. Building does not, which is
+why compose builds by default.
+
+Or without any of it, since this is one static binary: put it on the machine, clone the vault
+beside it, and run `docket serve --auth git`.
 
 Behind a reverse proxy that terminates TLS, add `--behind-proxy` so rate limits follow the
 client the proxy names rather than the proxy. `--auth git` makes who may do what a question for
