@@ -34,11 +34,11 @@ Commands:
   init        Scaffold a new project vault
   new         Create a task with a valid key
   check       Validate a vault against the specification
+  workspace   Assemble several project repositories into one Obsidian vault
   version     Print the version
   help        Print this help
 
 Planned:
-  workspace   Assemble several project repositories into one Obsidian vault
   serve       Web UI and HTTP API over a repository
   import      Import from Jira and Confluence
 
@@ -86,6 +86,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runNew(args[1:], stdout, stderr)
 	case "check":
 		return runCheck(args[1:], stdout, stderr)
+	case "workspace":
+		return runWorkspace(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, Version())
 		return exitOK
