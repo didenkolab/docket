@@ -17,7 +17,7 @@ func TestInitCreatesAVault(t *testing.T) {
 	if !strings.Contains(stdout, "ACME") {
 		t.Errorf("stdout does not report what was created:\n%s", stdout)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "project.yaml")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "docket.yaml")); err != nil {
 		t.Errorf("no vault on disk: %v", err)
 	}
 }
@@ -29,7 +29,7 @@ func TestInitDefaultsToTheCurrentDirectory(t *testing.T) {
 	if code, _, stderr := run(t, "init", "--key", "ACME"); code != exitOK {
 		t.Fatalf("exit code = %d, want %d; stderr:\n%s", code, exitOK, stderr)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "project.yaml")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "docket.yaml")); err != nil {
 		t.Errorf("no vault in the current directory: %v", err)
 	}
 }

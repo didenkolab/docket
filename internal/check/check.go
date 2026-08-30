@@ -1,4 +1,4 @@
-// Package check validates a vault against the eight rules in the format
+// Package check validates a vault against the rules in the format
 // specification.
 //
 // It is what keeps the format honest once agents write most of the files, so it
@@ -21,7 +21,7 @@ import (
 
 // Rules, numbered as in the specification.
 const (
-	RuleFrontmatter = 1 // frontmatter exists and key equals the file name
+	RuleFrontmatter = 1 // frontmatter exists and key equals the path
 	RuleUniqueKeys  = 2 // no key twice
 	RuleStatus      = 3 // status is known and its category agrees
 	RuleVocabulary  = 4 // type and priority are known
@@ -29,6 +29,7 @@ const (
 	RuleFlat        = 6 // no nested frontmatter values
 	RuleTimestamps  = 7 // timestamps parse and are in order
 	RuleLinks       = 8 // every wikilink resolves
+	RuleProjects    = 9 // docket.yaml, the folders and the boards agree
 )
 
 // Finding is one problem, located.
@@ -60,12 +61,12 @@ var skipDirs = map[string]bool{
 // a readable vault come back as findings, because a validator that stops at the
 // first broken file makes fixing a batch of them a game of whack-a-mole.
 func Run(root string) ([]Finding, error) {
-	p, err := project.Load(root)
+	c, err := project.Load(root)
 	if err != nil {
 		return nil, err
 	}
 
-	entries, err := vault.List(root)
+	entries, err := vault.List(root, c)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +96,8 @@ func Run(root string) ([]Finding, error) {
 
 		if t.Key != e.Key {
 			add(Finding{e.Path, t.PropertyLine("key"), RuleFrontmatter,
-				fmt.Sprintf("key is %q but the file is named %q — the path is a function of the key",
-					t.Key, e.Key+".md")})
+				fmt.Sprintf("key is %q but the file is at %q — the key is the path",
+					t.Key, e.Path)})
 		}
 		if where, taken := seen[t.Key]; taken {
 			add(Finding{e.Path, t.PropertyLine("key"), RuleUniqueKeys,
@@ -105,8 +106,8 @@ func Run(root string) ([]Finding, error) {
 			seen[t.Key] = e.Path
 		}
 
-		checkStatus(add, e, p)
-		checkVocabulary(add, e, p)
+		checkStatus(add, e, c)
+		checkVocabulary(add, e, c)
 
 		if t.Parent != "" {
 			parents[e.Key] = t.Parent
@@ -128,11 +129,11 @@ func Run(root string) ([]Finding, error) {
 
 	for _, key := range cycles(parents) {
 		e := entryFor(entries, key)
-		add(Finding{e.Path, 0, RuleParent,
-			fmt.Sprintf("%s is part of a parent cycle", key)})
+		add(Finding{e.Path, 0, RuleParent, fmt.Sprintf("%s is part of a parent cycle", key)})
 	}
 
 	findings = append(findings, checkPageLinks(root, names)...)
+	findings = append(findings, checkProjects(root, c)...)
 
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].Path != findings[j].Path {
@@ -143,15 +144,15 @@ func Run(root string) ([]Finding, error) {
 	return findings, nil
 }
 
-func checkStatus(add func(Finding), e vault.Entry, p *project.Project) {
+func checkStatus(add func(Finding), e vault.Entry, c *project.Config) {
 	t := e.Task
-	category, known := p.CategoryOf(t.Status)
+	category, known := c.CategoryOf(t.Status)
 	switch {
 	case t.Status == "":
 		add(Finding{e.Path, t.PropertyLine("status"), RuleStatus, "no status"})
 	case !known:
 		add(Finding{e.Path, t.PropertyLine("status"), RuleStatus,
-			fmt.Sprintf("status %q is not one of %s", t.Status, strings.Join(p.StatusNames(), ", "))})
+			fmt.Sprintf("status %q is not one of %s", t.Status, strings.Join(c.StatusNames(), ", "))})
 	case t.StatusCategory != category:
 		add(Finding{e.Path, t.PropertyLine("status_category"), RuleStatus,
 			fmt.Sprintf("status %q is in category %q, but the task says %q — they move together",
@@ -159,15 +160,15 @@ func checkStatus(add func(Finding), e vault.Entry, p *project.Project) {
 	}
 }
 
-func checkVocabulary(add func(Finding), e vault.Entry, p *project.Project) {
+func checkVocabulary(add func(Finding), e vault.Entry, c *project.Config) {
 	t := e.Task
-	if !p.HasType(t.Type) {
+	if !c.HasType(t.Type) {
 		add(Finding{e.Path, t.PropertyLine("type"), RuleVocabulary,
-			fmt.Sprintf("type %q is not one of %s", t.Type, strings.Join(p.Types, ", "))})
+			fmt.Sprintf("type %q is not one of %s", t.Type, strings.Join(c.Types, ", "))})
 	}
-	if !p.HasPriority(t.Priority) {
+	if !c.HasPriority(t.Priority) {
 		add(Finding{e.Path, t.PropertyLine("priority"), RuleVocabulary,
-			fmt.Sprintf("priority %q is not one of %s", t.Priority, strings.Join(p.Priorities, ", "))})
+			fmt.Sprintf("priority %q is not one of %s", t.Priority, strings.Join(c.Priorities, ", "))})
 	}
 }
 
@@ -197,6 +198,63 @@ func checkLinks(add func(Finding), e vault.Entry, names map[string]bool) {
 				fmt.Sprintf("[[%s]] resolves to nothing in this vault", target)})
 		}
 	}
+}
+
+// checkProjects catches the two ways docket.yaml, the folders and the boards can
+// drift apart: a folder full of tasks nobody declared, and a declared project
+// no board shows. Both make work invisible, which is the one thing a tracker
+// must not do.
+func checkProjects(root string, c *project.Config) []Finding {
+	var findings []Finding
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	known := map[string]bool{}
+	for _, key := range c.ProjectKeys() {
+		known[key] = true
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if !entry.IsDir() || strings.HasPrefix(name, ".") || known[name] {
+			continue
+		}
+		if !project.KeyPattern.MatchString(name) || project.Reserved[name] {
+			continue
+		}
+		if tasks, _ := filepath.Glob(filepath.Join(root, name, "*.md")); len(tasks) > 0 {
+			findings = append(findings, Finding{name, 0, RuleProjects,
+				fmt.Sprintf("%s holds %d task file(s) but is not a project in %s",
+					name, len(tasks), project.FileName)})
+		}
+	}
+
+	boards, err := os.ReadDir(filepath.Join(root, vault.BoardsDir))
+	if err != nil {
+		return findings
+	}
+	var mentioned string
+	for _, board := range boards {
+		if strings.HasSuffix(board.Name(), ".base") {
+			raw, err := os.ReadFile(filepath.Join(root, vault.BoardsDir, board.Name()))
+			if err == nil {
+				mentioned += string(raw)
+			}
+		}
+	}
+	if mentioned == "" {
+		return findings
+	}
+	for _, key := range c.ProjectKeys() {
+		if !strings.Contains(mentioned, `"`+key+`"`) {
+			findings = append(findings, Finding{vault.BoardsDir, 0, RuleProjects,
+				fmt.Sprintf("no board mentions project %s — run docket project add or "+
+					"regenerate the boards, or its tasks are invisible", key)})
+		}
+	}
+	return findings
 }
 
 // checkPageLinks applies rule 8 to the knowledge base as well: a broken link in

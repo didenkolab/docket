@@ -33,6 +33,7 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 		".gitignore",
 		".obsidian/app.json",
 		".obsidian/core-plugins.json",
+		"ACME/.gitkeep",
 		"AGENTS.md",
 		"README.md",
 		"attachments/.gitkeep",
@@ -40,8 +41,7 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 		"boards/board.base",
 		"boards/my-tasks.base",
 		"docs/index.md",
-		"project.yaml",
-		"tasks/.gitkeep",
+		"docket.yaml",
 		"templates/page.md",
 		"templates/task.md",
 	}
@@ -66,14 +66,14 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 func TestInitStampsKeyAndName(t *testing.T) {
 	dir, _ := initVault(t, Options{Key: "ACME", Name: "Acme Platform"})
 
-	project := read(t, dir, "project.yaml")
-	if !strings.Contains(project, "key: ACME") {
-		t.Errorf("project.yaml has no key:\n%s", project)
+	config := read(t, dir, "docket.yaml")
+	if !strings.Contains(config, "key: ACME") {
+		t.Errorf("docket.yaml has no project key:\n%s", config)
 	}
-	if !strings.Contains(project, "name: Acme Platform") {
-		t.Errorf("project.yaml has no name:\n%s", project)
+	if !strings.Contains(config, "name: Acme Platform") {
+		t.Errorf("docket.yaml has no name:\n%s", config)
 	}
-	if agents := read(t, dir, "AGENTS.md"); !strings.Contains(agents, "ACME-12") {
+	if agents := read(t, dir, "AGENTS.md"); !strings.Contains(agents, "ACME/12") {
 		t.Error("AGENTS.md does not use the project key in its examples")
 	}
 	if readme := read(t, dir, "README.md"); !strings.Contains(readme, "Acme Platform") {
@@ -93,8 +93,8 @@ func TestInitLeavesNoUnrenderedPlaceholders(t *testing.T) {
 
 func TestNameDefaultsToKey(t *testing.T) {
 	dir, _ := initVault(t, Options{Key: "ACME"})
-	if project := read(t, dir, "project.yaml"); !strings.Contains(project, "name: ACME") {
-		t.Errorf("name did not default to the key:\n%s", project)
+	if config := read(t, dir, "docket.yaml"); !strings.Contains(config, "name: ACME") {
+		t.Errorf("name did not default to the key:\n%s", config)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestInitCreatesTheDirectory(t *testing.T) {
 	if _, err := Init(dir, Options{Key: "ACME"}); err != nil {
 		t.Fatalf("Init into a missing directory: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "project.yaml")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "docket.yaml")); err != nil {
 		t.Errorf("vault not created: %v", err)
 	}
 }
@@ -146,7 +146,7 @@ func TestInitRefusesToRunTwice(t *testing.T) {
 }
 
 func TestKeysThatAreRejected(t *testing.T) {
-	for _, key := range []string{"", "  ", "a", "AC ME", "acme", "1ACME", "ACME-1", "TOOLONGAKEY"} {
+	for _, key := range []string{"", "  ", "a", "AC ME", "acme", "1ACME", "ACME-1", "TOOLONGAKEY", "DOCS"} {
 		dir := filepath.Join(t.TempDir(), "vault")
 		if _, err := Init(dir, Options{Key: key}); err == nil {
 			t.Errorf("key %q was accepted", key)
@@ -168,11 +168,11 @@ func TestKeysThatAreAccepted(t *testing.T) {
 
 func TestKeyAndNameAreTrimmed(t *testing.T) {
 	dir, _ := initVault(t, Options{Key: "  ACME  ", Name: "  Acme Platform  "})
-	project := read(t, dir, "project.yaml")
-	if !strings.Contains(project, "key: ACME\n") {
-		t.Errorf("the key was not trimmed:\n%s", project)
+	config := read(t, dir, "docket.yaml")
+	if !strings.Contains(config, "key: ACME\n") {
+		t.Errorf("the key was not trimmed:\n%s", config)
 	}
-	if !strings.Contains(project, "name: Acme Platform\n") {
-		t.Errorf("the name was not trimmed:\n%s", project)
+	if !strings.Contains(config, "name: Acme Platform\n") {
+		t.Errorf("the name was not trimmed:\n%s", config)
 	}
 }

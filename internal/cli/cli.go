@@ -31,8 +31,9 @@ Usage:
   docket <command> [flags]
 
 Commands:
-  init        Scaffold a new project vault
+  init        Scaffold a new vault
   new         Create a task with a valid key
+  project     List the projects a vault holds, or add one
   check       Validate a vault against the specification
   workspace   Assemble several project repositories into one Obsidian vault
   serve       A board and an API over a vault
@@ -84,6 +85,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runNew(args[1:], stdout, stderr)
 	case "check":
 		return runCheck(args[1:], stdout, stderr)
+	case "project":
+		return runProject(args[1:], stdout, stderr)
 	case "workspace":
 		return runWorkspace(args[1:], stdout, stderr)
 	case "serve":

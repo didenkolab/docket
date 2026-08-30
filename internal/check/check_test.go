@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
 // task is a valid task, which each test then breaks in exactly one way.
 const validTask = `---
-key: ACME-1
+key: ACME/1
 title: A task
 type: task
 status: Backlog
@@ -38,7 +39,7 @@ func newVault(t *testing.T) string {
 
 func put(t *testing.T, root, name, body string) {
 	t.Helper()
-	path := filepath.Join(root, "tasks", name)
+	path := filepath.Join(root, "ACME", name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func run(t *testing.T, root string) []Finding {
 
 func TestAScaffoldedVaultIsClean(t *testing.T) {
 	root := newVault(t)
-	put(t, root, "ACME-1.md", validTask)
+	put(t, root, "1.md", validTask)
 
 	if got := run(t, root); len(got) != 0 {
 		t.Errorf("a valid vault produced findings: %v", got)
@@ -78,7 +79,7 @@ func TestEachRuleFires(t *testing.T) {
 		},
 		{
 			"key does not match the file name", RuleFrontmatter,
-			strings.Replace(validTask, "key: ACME-1", "key: ACME-99", 1),
+			strings.Replace(validTask, "key: ACME/1", "key: ACME/99", 1),
 		},
 		{
 			"unknown status", RuleStatus,
@@ -98,7 +99,7 @@ func TestEachRuleFires(t *testing.T) {
 		},
 		{
 			"parent that does not exist", RuleParent,
-			strings.Replace(validTask, "labels: []", "parent: ACME-404\nlabels: []", 1),
+			strings.Replace(validTask, "labels: []", "parent: ACME/404\nlabels: []", 1),
 		},
 		{
 			"nested property", RuleFlat,
@@ -114,14 +115,14 @@ func TestEachRuleFires(t *testing.T) {
 		},
 		{
 			"link to nothing", RuleLinks,
-			strings.Replace(validTask, "A body.", "A body linking to [[ACME-404]].", 1),
+			strings.Replace(validTask, "A body.", "A body linking to [[ACME/404]].", 1),
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			root := newVault(t)
-			put(t, root, "ACME-1.md", c.task)
+			put(t, root, "1.md", c.task)
 
 			findings := run(t, root)
 			if len(findings) == 0 {
@@ -139,10 +140,10 @@ func TestEachRuleFires(t *testing.T) {
 
 func TestDuplicateKeys(t *testing.T) {
 	root := newVault(t)
-	put(t, root, "ACME-1.md", validTask)
+	put(t, root, "1.md", validTask)
 	// A second file claiming the same key. Its own name disagrees too, so both
 	// rule 1 and rule 2 have something to say.
-	put(t, root, "ACME-2.md", validTask)
+	put(t, root, "2.md", validTask)
 
 	if !fired(run(t, root), RuleUniqueKeys) {
 		t.Error("a duplicated key was not reported")
@@ -151,12 +152,11 @@ func TestDuplicateKeys(t *testing.T) {
 
 func TestParentCycle(t *testing.T) {
 	root := newVault(t)
-	put(t, root, "ACME-1.md", strings.Replace(
-		strings.Replace(validTask, "key: ACME-1", "key: ACME-1", 1),
-		"labels: []", "parent: ACME-2\nlabels: []", 1))
-	put(t, root, "ACME-2.md", strings.Replace(
-		strings.Replace(validTask, "key: ACME-1", "key: ACME-2", 1),
-		"labels: []", "parent: ACME-1\nlabels: []", 1))
+	put(t, root, "1.md", strings.Replace(validTask,
+		"labels: []", "parent: ACME/2\nlabels: []", 1))
+	put(t, root, "2.md", strings.Replace(
+		strings.Replace(validTask, "key: ACME/1", "key: ACME/2", 1),
+		"labels: []", "parent: ACME/1\nlabels: []", 1))
 
 	findings := run(t, root)
 	if !fired(findings, RuleParent) {
@@ -176,15 +176,15 @@ func TestParentCycle(t *testing.T) {
 
 func TestLinksThatDoResolve(t *testing.T) {
 	root := newVault(t)
-	put(t, root, "ACME-2.md", strings.Replace(validTask, "key: ACME-1", "key: ACME-2", 1))
-	put(t, root, "ACME-1.md", strings.Replace(validTask, "A body.",
-		"Links: [[ACME-2]], [[index]], [[docs/index]], [[OLD-7]], `[[not-a-link]]`.", 1))
+	put(t, root, "1.md", strings.Replace(validTask, "A body.",
+		"Links: [[ACME/2]], [[index]], [[docs/index]], [[OLD-7]], `[[not-a-link]]`.", 1))
 
-	// OLD-7 resolves through the alias on ACME-2.
+	// OLD-7 resolves through the alias on ACME/2 — a key that outlived its own
+	// system keeps working.
 	aliased := strings.Replace(
-		strings.Replace(validTask, "key: ACME-1", "key: ACME-2", 1),
+		strings.Replace(validTask, "key: ACME/1", "key: ACME/2", 1),
 		"aliases: []", "aliases: [OLD-7]", 1)
-	put(t, root, "ACME-2.md", aliased)
+	put(t, root, "2.md", aliased)
 
 	if findings := run(t, root); len(findings) != 0 {
 		t.Errorf("working links were reported as broken: %v", findings)
@@ -193,7 +193,7 @@ func TestLinksThatDoResolve(t *testing.T) {
 
 func TestBrokenLinksInPagesAreReported(t *testing.T) {
 	root := newVault(t)
-	put(t, root, "ACME-1.md", validTask)
+	put(t, root, "1.md", validTask)
 	page := filepath.Join(root, "docs", "note.md")
 	if err := os.WriteFile(page, []byte("A page linking to [[nowhere]].\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -210,7 +210,7 @@ func TestBrokenLinksInPagesAreReported(t *testing.T) {
 
 func TestFindingsCarryALine(t *testing.T) {
 	root := newVault(t)
-	put(t, root, "ACME-1.md", strings.Replace(validTask, "status: Backlog", "status: Pending", 1))
+	put(t, root, "1.md", strings.Replace(validTask, "status: Backlog", "status: Pending", 1))
 
 	findings := run(t, root)
 	if len(findings) == 0 {
@@ -219,7 +219,7 @@ func TestFindingsCarryALine(t *testing.T) {
 	if findings[0].Line != 5 {
 		t.Errorf("line = %d, want 5 (the status property)", findings[0].Line)
 	}
-	if !strings.Contains(findings[0].String(), "ACME-1.md:5") {
+	if !strings.Contains(findings[0].String(), "ACME/1.md:5") {
 		t.Errorf("String() = %q, want a file:line prefix", findings[0].String())
 	}
 }
@@ -228,9 +228,9 @@ func TestEveryBrokenFileIsReported(t *testing.T) {
 	// A validator that stops at the first bad file makes fixing a batch of
 	// them a game of whack-a-mole.
 	root := newVault(t)
-	for _, key := range []string{"ACME-1", "ACME-2", "ACME-3"} {
-		put(t, root, key+".md", strings.Replace(
-			strings.Replace(validTask, "key: ACME-1", "key: "+key, 1),
+	for _, n := range []string{"1", "2", "3"} {
+		put(t, root, n+".md", strings.Replace(
+			strings.Replace(validTask, "key: ACME/1", "key: ACME/"+n, 1),
 			"status: Backlog", "status: Pending", 1))
 	}
 
@@ -252,4 +252,45 @@ func fired(findings []Finding, rule int) bool {
 		}
 	}
 	return false
+}
+
+func TestAProjectFolderNobodyDeclaredIsReported(t *testing.T) {
+	// A folder full of tasks that docket.yaml does not mention is work nobody
+	// can see, which is the one thing a tracker must not allow.
+	root := newVault(t)
+	put(t, root, "1.md", validTask)
+
+	stray := filepath.Join(root, "GHOST")
+	if err := os.MkdirAll(stray, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stray, "1.md"),
+		[]byte(strings.Replace(validTask, "key: ACME/1", "key: GHOST/1", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if !fired(run(t, root), RuleProjects) {
+		t.Error("an undeclared project folder was not reported")
+	}
+}
+
+func TestAProjectNoBoardShowsIsReported(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "1.md", validTask)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddProject("BETA", "Beta"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Save(root); err != nil {
+		t.Fatal(err)
+	}
+	// The boards were not regenerated, so BETA is invisible on them.
+
+	if !fired(run(t, root), RuleProjects) {
+		t.Error("a project no board mentions was not reported")
+	}
 }

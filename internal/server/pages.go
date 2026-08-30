@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,22 +18,22 @@ import (
 )
 
 type pageData struct {
-	Project *project.Project
-	Title   string
-	Data    any
+	Config *project.Config
+	Title  string
+	Data   any
 }
 
-func (s *Server) render(w http.ResponseWriter, name string, p *project.Project, title string, data any) {
+func (s *Server) render(w http.ResponseWriter, name string, c *project.Config, title string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, pageData{p, title, data}); err != nil {
+	if err := s.tmpl.ExecuteTemplate(w, name, pageData{c, title, data}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (s *Server) fail(w http.ResponseWriter, code int, title, message string) {
-	p, _ := project.Load(s.root)
+	c, _ := project.Load(s.root)
 	w.WriteHeader(code)
-	s.render(w, "error.html", p, title, message)
+	s.render(w, "error.html", c, title, message)
 }
 
 // ---- board ----
@@ -44,58 +45,104 @@ type column struct {
 
 type card struct {
 	Key      string
+	Href     string
+	Project  string
 	Title    string
 	Assignee string
 	Priority string
 	Labels   []string
 }
 
+type boardView struct {
+	Columns  []column
+	Broken   []vault.Entry
+	Projects []projectTab
+	Selected string
+	Total    int
+}
+
+type projectTab struct {
+	Key   string
+	Name  string
+	Count int
+	Href  string
+	On    bool
+}
+
+// handleBoard shows every project at once, or one of them.
+//
+// Work crosses projects constantly, so the default is all of them and the
+// project is a chip on the card rather than a separate board to go and find.
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
-	p, err := project.Load(s.root)
+	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the project", err.Error())
+		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	entries, err := vault.List(s.root)
+	entries, err := vault.List(s.root, c)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return
 	}
 
-	columns := make([]column, len(p.Statuses))
-	for i, status := range p.Statuses {
-		columns[i] = column{Status: status}
+	selected := r.URL.Query().Get("project")
+	if selected != "" && !c.HasProject(selected) {
+		s.fail(w, http.StatusNotFound, "No such project",
+			selected+" is not in this vault: it holds "+strings.Join(c.ProjectKeys(), ", "))
+		return
 	}
-	var broken []vault.Entry
 
+	view := boardView{Selected: selected}
+	for _, status := range c.Statuses {
+		view.Columns = append(view.Columns, column{Status: status})
+	}
+
+	counts := map[string]int{}
 	for _, e := range entries {
 		if e.Err != nil {
-			broken = append(broken, e)
+			view.Broken = append(view.Broken, e)
 			continue
 		}
-		for i := range columns {
-			if columns[i].Status.Name == e.Task.Status {
-				columns[i].Cards = append(columns[i].Cards, card{
-					Key: e.Key, Title: e.Task.Title, Assignee: e.Task.Assignee,
+		counts[e.Project]++
+		if selected != "" && e.Project != selected {
+			continue
+		}
+		for i := range view.Columns {
+			if view.Columns[i].Status.Name == e.Task.Status {
+				view.Columns[i].Cards = append(view.Columns[i].Cards, card{
+					Key: e.Key, Href: "/task/" + e.Key, Project: e.Project,
+					Title: e.Task.Title, Assignee: e.Task.Assignee,
 					Priority: e.Task.Priority, Labels: e.Task.Labels,
 				})
+				view.Total++
 			}
 		}
 	}
 
-	s.render(w, "board.html", p, p.Name, struct {
-		Columns []column
-		Broken  []vault.Entry
-	}{columns, broken})
+	view.Projects = append(view.Projects, projectTab{
+		Key: "All", Name: "Every project", Count: len(entries), Href: "/", On: selected == "",
+	})
+	for _, p := range c.Projects {
+		view.Projects = append(view.Projects, projectTab{
+			Key: p.Key, Name: p.Name, Count: counts[p.Key],
+			Href: "/?project=" + url.QueryEscape(p.Key), On: selected == p.Key,
+		})
+	}
+
+	title := c.Name
+	if selected != "" {
+		title = c.ProjectName(selected)
+	}
+	s.render(w, "board.html", c, title, view)
 }
 
 // ---- one task ----
 
 func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
-	key := r.PathValue("key")
-	p, err := project.Load(s.root)
+	key := keyOf(r)
+	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the project", err.Error())
+		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 
@@ -104,32 +151,33 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusNotFound, "No such task", key+" is not in this vault")
 		return
 	}
-	ix, err := buildIndex(s.root)
+	ix, err := buildIndex(s.root, c)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, "Cannot index the vault", err.Error())
 		return
 	}
 
-	s.render(w, "task.html", p, t.Key+" "+t.Title, struct {
+	s.render(w, "task.html", c, t.Key+" "+t.Title, struct {
 		Task    *task.Task
 		Body    template.HTML
 		Version string
-	}{t, renderMarkdown(t.Body(), ix), ver})
+		Path    string
+	}{t, renderMarkdown(t.Body(), ix), ver, vault.TaskPath(key)})
 }
 
 func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
-	key := r.PathValue("key")
-	p, err := project.Load(s.root)
+	key := keyOf(r)
+	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the project", err.Error())
+		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 
 	status := r.FormValue("status")
-	category, known := p.CategoryOf(status)
+	category, known := c.CategoryOf(status)
 	if !known {
 		s.fail(w, http.StatusBadRequest, "Unknown status",
-			status+" is not one of "+strings.Join(p.StatusNames(), ", "))
+			status+" is not one of "+strings.Join(c.StatusNames(), ", "))
 		return
 	}
 
@@ -146,7 +194,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
-	key := r.PathValue("key")
+	key := keyOf(r)
 	text := strings.TrimSpace(r.FormValue("text"))
 	if text == "" {
 		http.Redirect(w, r, "/task/"+key, http.StatusSeeOther)
@@ -180,24 +228,25 @@ func (s *Server) afterEdit(w http.ResponseWriter, r *http.Request, key string, e
 // ---- creating a task ----
 
 func (s *Server) handleNewForm(w http.ResponseWriter, r *http.Request) {
-	p, err := project.Load(s.root)
+	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the project", err.Error())
+		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	s.render(w, "new.html", p, "New task", nil)
+	s.render(w, "new.html", c, "New task", r.URL.Query().Get("project"))
 }
 
 func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
-	p, err := project.Load(s.root)
+	c, err := project.Load(s.root)
 	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Cannot read the project", err.Error())
+		s.fail(w, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
 
 	author := s.authorFor(r)
 	s.writes.Lock()
-	rel, t, err := vault.Create(s.root, p, vault.NewOptions{
+	rel, t, err := vault.Create(s.root, c, vault.NewOptions{
+		Project:  r.FormValue("project"),
 		Title:    r.FormValue("title"),
 		Type:     r.FormValue("type"),
 		Priority: r.FormValue("priority"),
@@ -219,7 +268,7 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 // ---- knowledge base ----
 
 func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
-	p, _ := project.Load(s.root)
+	c, _ := project.Load(s.root)
 
 	var paths []string
 	docs := filepath.Join(s.root, vault.DocsDir)
@@ -236,11 +285,11 @@ func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
 	})
 	sort.Strings(paths)
 
-	s.render(w, "pages.html", p, "Pages", paths)
+	s.render(w, "pages.html", c, "Pages", paths)
 }
 
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
-	p, _ := project.Load(s.root)
+	c, _ := project.Load(s.root)
 
 	rel := path.Clean("/" + r.PathValue("path"))[1:]
 	if rel == "" || strings.HasPrefix(rel, "..") {
@@ -253,7 +302,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusNotFound, "No such page", rel+" is not in this vault")
 		return
 	}
-	ix, err := buildIndex(s.root)
+	ix, err := buildIndex(s.root, c)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, "Cannot index the vault", err.Error())
 		return
@@ -268,7 +317,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.render(w, "page.html", p, title, struct {
+	s.render(w, "page.html", c, title, struct {
 		Path string
 		Body template.HTML
 	}{rel, renderMarkdown(body, ix)})
@@ -283,15 +332,15 @@ type hit struct {
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
-	p, _ := project.Load(s.root)
+	c, _ := project.Load(s.root)
 	query := strings.TrimSpace(r.FormValue("q"))
 
 	var hits []hit
 	if query != "" {
-		hits = s.search(query)
+		hits = s.search(c, query)
 	}
 
-	s.render(w, "search.html", p, "Search", struct {
+	s.render(w, "search.html", c, "Search", struct {
 		Query string
 		Hits  []hit
 	}{query, hits})
@@ -299,22 +348,22 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 // search is a plain substring scan over the vault. An index would be faster and
 // would be one more thing that can disagree with the files; at the size a
-// single project reaches, reading them is fast enough.
-func (s *Server) search(query string) []hit {
+// vault reaches, reading them is fast enough.
+func (s *Server) search(c *project.Config, query string) []hit {
 	needle := strings.ToLower(query)
 	var hits []hit
 
-	entries, _ := vault.List(s.root)
+	entries, _ := vault.List(s.root, c)
 	for _, e := range entries {
 		if e.Task == nil {
 			continue
 		}
-		haystack := strings.ToLower(e.Task.Title + "\n" + e.Task.Body())
-		if strings.Contains(haystack, needle) {
+		text := e.Task.Title + "\n" + e.Task.Body()
+		if strings.Contains(strings.ToLower(text), needle) {
 			hits = append(hits, hit{
 				Href:    "/task/" + e.Key,
 				Label:   e.Key + " " + e.Task.Title,
-				Context: excerpt(e.Task.Title+"\n"+e.Task.Body(), needle),
+				Context: excerpt(text, needle),
 			})
 		}
 	}

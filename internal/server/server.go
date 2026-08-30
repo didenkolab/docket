@@ -80,9 +80,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", s.handleBoard)
-	mux.HandleFunc("GET /task/{key}", s.handleTask)
-	mux.HandleFunc("POST /task/{key}/status", s.handleMove)
-	mux.HandleFunc("POST /task/{key}/comment", s.handleComment)
+	mux.HandleFunc("GET /task/{project}/{number}", s.handleTask)
+	mux.HandleFunc("POST /task/{project}/{number}/status", s.handleMove)
+	mux.HandleFunc("POST /task/{project}/{number}/comment", s.handleComment)
 	mux.HandleFunc("GET /new", s.handleNewForm)
 	mux.HandleFunc("POST /new", s.handleNew)
 	mux.HandleFunc("GET /pages", s.handlePages)
@@ -91,8 +91,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)
-	mux.HandleFunc("GET /api/tasks/{key}", s.apiGetTask)
-	mux.HandleFunc("PATCH /api/tasks/{key}", s.apiPatchTask)
+	mux.HandleFunc("GET /api/tasks/{project}/{number}", s.apiGetTask)
+	mux.HandleFunc("PATCH /api/tasks/{project}/{number}", s.apiPatchTask)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
@@ -109,8 +109,13 @@ func version(content []byte) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// keyOf rebuilds a task key from the two path segments that carry it.
+func keyOf(r *http.Request) string {
+	return r.PathValue("project") + "/" + r.PathValue("number")
+}
+
 func (s *Server) taskPath(key string) string {
-	return filepath.Join(s.root, vault.TasksDir, key+".md")
+	return filepath.Join(s.root, filepath.FromSlash(vault.TaskPath(key)))
 }
 
 func (s *Server) loadTask(key string) (*task.Task, string, error) {
@@ -165,8 +170,7 @@ func (s *Server) editTask(
 		return err
 	}
 
-	rel := filepath.ToSlash(filepath.Join(vault.TasksDir, key+".md"))
-	return s.repo.Commit([]string{rel}, message, author)
+	return s.repo.Commit([]string{vault.TaskPath(key)}, message, author)
 }
 
 // authorFor lets a caller act as themselves instead of as the server. An API

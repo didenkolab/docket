@@ -11,12 +11,22 @@
 </div>
 {{end}}
 
+{{if gt (len .Config.Projects) 1}}
+<nav class="projects" aria-label="Projects">
+  {{range $data.Projects}}
+  <a class="project-tab{{if .On}} on{{end}}" href="{{.Href}}" title="{{.Name}}">
+    {{.Key}} <span class="count">{{.Count}}</span>
+  </a>
+  {{end}}
+</nav>
+{{end}}
+
 <div class="board">
   {{range $data.Columns}}
   <section class="column {{categoryClass .Status.Category}}">
     <h2>{{.Status.Name}} <span class="count">{{len .Cards}}</span></h2>
     {{range .Cards}}
-    <a class="card" href="/task/{{.Key}}">
+    <a class="card" href="{{.Href}}">
       <span class="key">{{.Key}}</span>
       <span class="card-title">{{.Title}}</span>
       <span class="meta">
@@ -26,7 +36,7 @@
       </span>
     </a>
     {{else}}
-    <p class="empty">Nothing here.</p>
+    <p class="empty">No tasks.</p>
     {{end}}
   </section>
   {{end}}

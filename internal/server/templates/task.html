@@ -5,7 +5,7 @@
 <article class="task">
   <h1><span class="key">{{$t.Key}}</span> {{$t.Title}}</h1>
   <p class="path">
-    <code>tasks/{{$t.Key}}.md</code>
+    <code>{{$data.Path}}</code>
     <span class="fingerprint" title="the bytes this page was rendered from">{{$data.Version}}</span>
   </p>
 
@@ -28,7 +28,7 @@
       <input type="hidden" name="version" value="{{$data.Version}}">
       <label for="status">Move to</label>
       <select id="status" name="status">
-        {{range .Project.Statuses}}
+        {{range .Config.Statuses}}
         <option value="{{.Name}}"{{if eq .Name $t.Status}} selected{{end}}>{{.Name}}</option>
         {{end}}
       </select>
@@ -44,7 +44,7 @@
   </div>
 
   <p class="footnote">
-    Every change here is written to <code>tasks/{{$t.Key}}.md</code> and committed.
+    Every change here is written to <code>{{$data.Path}}</code> and committed.
     If the file changes underneath you — in Obsidian, or by an agent — the write is refused
     rather than applied on top of what you never saw.
   </p>

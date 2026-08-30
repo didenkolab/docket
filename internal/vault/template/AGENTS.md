@@ -7,28 +7,35 @@ The [vault format](https://github.com/vadymdidenkolab/docket-board/blob/main/doc
 is normative. This file is the short version — the rules you need in order to not corrupt the
 vault.
 
-## Picking a key for a new task
+## Keys and where files live
 
-Keys are `{{.Key}}-<n>`, numbered from 1, never reused. To create one, list `tasks/`, take the
-highest number, add one — or run `docket new`, which does exactly that. If two agents pick the
-same number in parallel branches, git reports an add/add conflict on merge: rename one task and
-fix inbound links. Do not renumber existing tasks to close gaps; a key is permanent.
+A key is `PROJECT/NUMBER`, and it is also the path: `{{.Key}}/12` is the task in
+`{{.Key}}/12.md`. Knowing the key is enough to open the file, and `[[{{.Key}}/12]]` resolves
+in Obsidian without any help.
+
+The projects this vault holds are listed in `docket.yaml`, each a folder at the root. Numbers
+start at 1 per project and are never reused.
+
+To pick a key, list the project's folder, take the highest number, add one — or run
+`docket new`, which does exactly that. If two agents pick the same number in parallel branches,
+git reports an add/add conflict on merge: rename one task and fix inbound links. Do not
+renumber existing tasks to close gaps; a key is permanent.
 
 ## Creating a task
 
-Copy `templates/task.md` to `tasks/{{.Key}}-<n>.md` and fill the frontmatter. Every field in
-the template is required except `parent`, `labels` and `aliases`.
+Copy `templates/task.md` to `{{.Key}}/<n>.md` and fill the frontmatter. Every field in the
+template is required except `parent`, `labels` and `aliases`.
 
 ```markdown
 ---
-key: {{.Key}}-12
+key: {{.Key}}/12
 title: Fix login redirect loop
 type: bug
 status: In progress
 status_category: doing
 priority: high
 assignee: agent/claude
-parent: {{.Key}}-4
+parent: {{.Key}}/4
 labels: [auth]
 created: 2026-01-01T09:00:00Z
 updated: 2026-01-01T09:00:00Z
@@ -40,12 +47,12 @@ aliases: []
 
 **Frontmatter is flat.** No nested objects, ever. Obsidian's property editor only handles flat
 values and Bases only filters on top-level properties — a nested field makes the task
-uneditable by hand and invisible to the board. Project-specific fields go at the same level as
+uneditable by hand and invisible to the board. Vault-specific fields go at the same level as
 core ones. Fields carried in from another system are prefixed `x_`.
 
-**`status` and `status_category` move together.** `status` is the human name from
-`project.yaml`; `status_category` is its category in that same file. Changing one without the
-other puts the task in a column the board cannot render. Both change in the same edit.
+**`status` and `status_category` move together.** `status` is the human name from `docket.yaml`;
+`status_category` is its category in that same file. Changing one without the other puts the
+task in a column the board cannot render. Both change in the same edit.
 
 ## Editing a task
 
@@ -53,7 +60,7 @@ other puts the task in a column the board cannot render. Both change in the same
 - Never edit `key`, `created`, or the file name.
 - Append comments under `## Comments`, newest last, in the form
   `**<author> · <YYYY-MM-DD HH:mm>** — text`.
-- Link to other tasks and pages with `[[{{.Key}}-4]]` and `[[docs/some-page]]`.
+- Link to other tasks and pages with `[[{{.Key}}/4]]` and `[[docs/some-page]]`.
 
 ## Writing documentation
 
@@ -66,4 +73,4 @@ useful. A page that nothing links to is a page nobody will find.
 One commit per logical change, describing what changed for the reader, not which files moved.
 Moving a task to `In review` is a commit. Writing a page is a commit. The commit history *is*
 the change history of the tracker: there is no separate audit log, and
-`git log -p tasks/{{.Key}}-12.md` is how anyone sees who moved what and when.
+`git log -p {{.Key}}/12.md` is how anyone sees who moved what and when.

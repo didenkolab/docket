@@ -1,19 +1,27 @@
 {{template "head" .}}
+{{$selected := .Data}}
 
 <h1>New task</h1>
 
 <form class="stacked" method="post" action="/new">
+  <label for="project">Project</label>
+  <select id="project" name="project">
+    {{range .Config.Projects}}
+    <option value="{{.Key}}"{{if eq .Key $selected}} selected{{end}}>{{.Key}} — {{.Name}}</option>
+    {{end}}
+  </select>
+
   <label for="title">Title</label>
   <input id="title" name="title" required autofocus placeholder="Fix login redirect loop">
 
   <label for="type">Type</label>
   <select id="type" name="type">
-    {{range .Project.Types}}<option value="{{.}}">{{.}}</option>{{end}}
+    {{range .Config.Types}}<option value="{{.}}">{{.}}</option>{{end}}
   </select>
 
   <label for="priority">Priority</label>
   <select id="priority" name="priority">
-    {{range .Project.Priorities}}<option value="{{.}}">{{.}}</option>{{end}}
+    {{range .Config.Priorities}}<option value="{{.}}">{{.}}</option>{{end}}
   </select>
 
   <label for="assignee">Assignee</label>
@@ -23,8 +31,8 @@
 </form>
 
 <p class="footnote">
-  The key is the highest number in <code>tasks/</code> plus one. If someone else takes the same
-  number at the same moment, the second write fails rather than replacing the first.
+  The key is the project's highest number plus one. If someone else takes the same number at
+  the same moment, the second write fails rather than replacing the first.
 </p>
 
 {{template "foot" .}}

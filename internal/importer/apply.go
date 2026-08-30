@@ -14,7 +14,6 @@ import (
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
-	"gopkg.in/yaml.v3"
 )
 
 // ApplyOptions says what to write and where.
@@ -62,7 +61,7 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 		return nil, fmt.Errorf("the snapshot holds no issues for project %s", opts.Project)
 	}
 
-	if err := writeProject(opts.Root, opts.Project, projectName(issues, opts.Project), maps); err != nil {
+	if err := writeConfig(opts.Root, opts.Project, projectName(issues, opts.Project), maps); err != nil {
 		return nil, err
 	}
 
@@ -84,7 +83,7 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 			report.Tasks++
 		}
 		if entries := histories[issue.Key]; len(entries) > 0 {
-			if err := writeHistory(opts.Root, issue.Key, entries); err != nil {
+			if err := writeHistory(opts.Root, opts.Project, numberOf(issue.Key), entries); err != nil {
 				return nil, fmt.Errorf("%s history: %w", issue.Key, err)
 			}
 			report.Histories++
@@ -140,40 +139,32 @@ func projectName(issues []sourceIssue, fallback string) string {
 	return fallback
 }
 
-// writeProject builds project.yaml from the maps, so the vault's vocabulary is
+// writeConfig builds docket.yaml from the maps, so the vault's vocabulary is
 // exactly what the import decided rather than the scaffold's defaults.
-func writeProject(root, key, name string, maps *Maps) error {
+func writeConfig(root, key, name string, maps *Maps) error {
 	if _, err := vault.Init(root, vault.Options{Key: key, Name: name}); err != nil {
 		return err
 	}
 
-	type status struct {
-		Name     string `yaml:"name"`
-		Category string `yaml:"category"`
+	c := &project.Config{
+		Name:       name,
+		Projects:   []project.Project{{Key: key, Name: name}},
+		Types:      Values(maps.Types),
+		Priorities: Values(maps.Priorities),
 	}
-	definition := struct {
-		Key        string   `yaml:"key"`
-		Name       string   `yaml:"name"`
-		Statuses   []status `yaml:"statuses"`
-		Types      []string `yaml:"types"`
-		Priorities []string `yaml:"priorities"`
-	}{Key: key, Name: name}
-
 	for _, mapped := range maps.StatusOrder() {
-		definition.Statuses = append(definition.Statuses, status{mapped.Name, mapped.Category})
+		c.Statuses = append(c.Statuses, project.Status{Name: mapped.Name, Category: mapped.Category})
 	}
-	definition.Types = Values(maps.Types)
-	definition.Priorities = Values(maps.Priorities)
-	if len(definition.Priorities) == 0 {
-		definition.Priorities = []string{"normal"}
+	if len(c.Priorities) == 0 {
+		c.Priorities = []string{"normal"}
 	}
 
-	body, err := yaml.Marshal(definition)
-	if err != nil {
+	if err := c.Save(root); err != nil {
 		return err
 	}
-	header := "# Imported. Statuses, types and priorities are what maps.yaml said to make them.\n"
-	return os.WriteFile(filepath.Join(root, project.FileName), append([]byte(header), body...), 0o644)
+	// The boards name their projects, so they have to be rebuilt for this one.
+	_, err := vault.WriteBoards(root, c)
+	return err
 }
 
 func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
@@ -226,21 +217,24 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 		return false, err
 	}
 
-	t.Set("key", issue.Key)
+	key := project.Key(opts.Project, numberOf(issue.Key))
+	t.Set("key", key)
 	t.Set("title", stringField(fields["summary"]))
 	t.Set("type", mappedType)
 	t.SetStatus(mappedStatus.Name, mappedStatus.Category)
 	t.Set("priority", priority)
 	t.Set("assignee", handle(maps, fields["assignee"]))
 
-	if key := parentKey(fields["parent"]); key != "" {
-		t.Set("parent", key)
+	if parent := parentKey(fields["parent"]); parent != "" {
+		t.Set("parent", project.Key(opts.Project, numberOf(parent)))
 	}
 
 	t.SetList("labels", stringList(fields["labels"]))
 	t.SetPlain("created", timestamp(fields["created"], opts.Now))
 	t.SetPlain("updated", timestamp(fields["updated"], opts.Now))
-	t.SetList("aliases", nil)
+	// The source key outlives its system: it sits in commit messages, branch
+	// names and years of conversation. As an alias it keeps resolving.
+	t.SetList("aliases", []string{issue.Key})
 
 	for id, mapped := range maps.Fields {
 		raw, present := fields[id]
@@ -262,7 +256,7 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 	if err != nil {
 		return false, err
 	}
-	path := filepath.Join(opts.Root, vault.TasksDir, issue.Key+".md")
+	path := filepath.Join(opts.Root, filepath.FromSlash(vault.TaskPath(key)))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
@@ -271,8 +265,8 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 
 // writeHistory keeps the change history the source had, because git never saw
 // it. Files under _history are read-only after an import.
-func writeHistory(root, key string, entries []json.RawMessage) error {
-	dir := filepath.Join(root, vault.TasksDir, "_history")
+func writeHistory(root, projectKey string, number int, entries []json.RawMessage) error {
+	dir := filepath.Join(root, projectKey, vault.HistoryDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -282,7 +276,7 @@ func writeHistory(root, key string, entries []json.RawMessage) error {
 		body.Write(raw)
 		body.WriteString("\n")
 	}
-	return os.WriteFile(filepath.Join(dir, key+".jsonl"), []byte(body.String()), 0o644)
+	return os.WriteFile(filepath.Join(dir, strconv.Itoa(number)+".jsonl"), []byte(body.String()), 0o644)
 }
 
 func groupByKey(snap Reader, rel string) (map[string][]json.RawMessage, error) {

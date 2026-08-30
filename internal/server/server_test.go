@@ -31,18 +31,18 @@ func newServer(t *testing.T) (*Server, http.Handler, string) {
 	git(t, root, "add", "-A")
 	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", "vault")
 
-	p, err := project.Load(root)
+	c, err := project.Load(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := vault.Create(root, p, vault.NewOptions{
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
 		Title: "Fix login redirect loop", Type: "bug", Priority: "high",
 		Assignee: "agent/claude", Now: noon,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	git(t, root, "add", "-A")
-	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", "ACME-1")
+	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=Test", "commit", "-q", "-m", "ACME/1")
 
 	s, err := New(root, gitvcs.Author{Name: "Server", Email: "server@example.com"})
 	if err != nil {
@@ -107,7 +107,7 @@ func TestBoardShowsEveryColumn(t *testing.T) {
 		t.Fatalf("code = %d", w.Code)
 	}
 	body := w.Body.String()
-	for _, want := range []string{"Backlog", "In progress", "Done", "ACME-1", "Fix login redirect loop"} {
+	for _, want := range []string{"Backlog", "In progress", "Done", "ACME/1", "Fix login redirect loop"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the board does not mention %q", want)
 		}
@@ -117,18 +117,18 @@ func TestBoardShowsEveryColumn(t *testing.T) {
 func TestTaskPageCarriesTheVersion(t *testing.T) {
 	s, h, _ := newServer(t)
 
-	body := get(t, h, "/task/ACME-1").Body.String()
-	if !strings.Contains(body, currentVersion(t, s, "ACME-1")) {
+	body := get(t, h, "/task/ACME/1").Body.String()
+	if !strings.Contains(body, currentVersion(t, s, "ACME/1")) {
 		t.Error("the page does not carry the version a write is checked against")
 	}
-	if !strings.Contains(body, "tasks/ACME-1.md") {
+	if !strings.Contains(body, "ACME/1.md") {
 		t.Error("the page does not name the file behind it")
 	}
 }
 
 func TestUnknownTaskIsNotFound(t *testing.T) {
 	_, h, _ := newServer(t)
-	if w := get(t, h, "/task/ACME-404"); w.Code != http.StatusNotFound {
+	if w := get(t, h, "/task/ACME/404"); w.Code != http.StatusNotFound {
 		t.Errorf("code = %d, want 404", w.Code)
 	}
 }
@@ -136,15 +136,15 @@ func TestUnknownTaskIsNotFound(t *testing.T) {
 func TestMoveWritesAndCommits(t *testing.T) {
 	s, h, root := newServer(t)
 
-	w := postForm(t, h, "/task/ACME-1/status", url.Values{
-		"version": {currentVersion(t, s, "ACME-1")},
+	w := postForm(t, h, "/task/ACME/1/status", url.Values{
+		"version": {currentVersion(t, s, "ACME/1")},
 		"status":  {"In progress"},
 	})
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("code = %d, want 303; body:\n%s", w.Code, w.Body)
 	}
 
-	raw, _ := os.ReadFile(filepath.Join(root, "tasks", "ACME-1.md"))
+	raw, _ := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
 	if !strings.Contains(string(raw), "status: In progress") {
 		t.Errorf("the status was not written:\n%s", raw)
 	}
@@ -160,8 +160,8 @@ func TestMoveToAnUnknownStatusIsRefused(t *testing.T) {
 	s, h, root := newServer(t)
 	before := lastCommit(t, root)
 
-	w := postForm(t, h, "/task/ACME-1/status", url.Values{
-		"version": {currentVersion(t, s, "ACME-1")},
+	w := postForm(t, h, "/task/ACME/1/status", url.Values{
+		"version": {currentVersion(t, s, "ACME/1")},
 		"status":  {"Pending"},
 	})
 	if w.Code != http.StatusBadRequest {
@@ -177,9 +177,9 @@ func TestAWriteOnStaleContentIsRefused(t *testing.T) {
 	// one repository: the server never lands an edit on top of a change it
 	// never saw.
 	s, h, root := newServer(t)
-	stale := currentVersion(t, s, "ACME-1")
+	stale := currentVersion(t, s, "ACME/1")
 
-	path := filepath.Join(root, "tasks", "ACME-1.md")
+	path := filepath.Join(root, "ACME", "1.md")
 	raw, _ := os.ReadFile(path)
 	edited := string(raw) + "\nAn edit made outside the server.\n"
 	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
@@ -187,7 +187,7 @@ func TestAWriteOnStaleContentIsRefused(t *testing.T) {
 	}
 	before := lastCommit(t, root)
 
-	w := postForm(t, h, "/task/ACME-1/status", url.Values{
+	w := postForm(t, h, "/task/ACME/1/status", url.Values{
 		"version": {stale},
 		"status":  {"Done"},
 	})
@@ -207,15 +207,15 @@ func TestAWriteOnStaleContentIsRefused(t *testing.T) {
 func TestCommentIsAppended(t *testing.T) {
 	s, h, root := newServer(t)
 
-	w := postForm(t, h, "/task/ACME-1/comment", url.Values{
-		"version": {currentVersion(t, s, "ACME-1")},
+	w := postForm(t, h, "/task/ACME/1/comment", url.Values{
+		"version": {currentVersion(t, s, "ACME/1")},
 		"text":    {"Reproduced on staging."},
 	})
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("code = %d; body:\n%s", w.Code, w.Body)
 	}
 
-	raw, _ := os.ReadFile(filepath.Join(root, "tasks", "ACME-1.md"))
+	raw, _ := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
 	if !strings.Contains(string(raw), "Reproduced on staging.") {
 		t.Errorf("the comment was not written:\n%s", raw)
 	}
@@ -235,10 +235,10 @@ func TestCreatingATaskThroughTheForm(t *testing.T) {
 	if w.Code != http.StatusSeeOther {
 		t.Fatalf("code = %d; body:\n%s", w.Code, w.Body)
 	}
-	if got := w.Header().Get("Location"); got != "/task/ACME-2" {
-		t.Errorf("redirected to %q, want /task/ACME-2", got)
+	if got := w.Header().Get("Location"); got != "/task/ACME/2" {
+		t.Errorf("redirected to %q, want /task/ACME/2", got)
 	}
-	if got := lastCommit(t, root); !strings.Contains(got, "ACME-2: Session model") {
+	if got := lastCommit(t, root); !strings.Contains(got, "ACME/2: Session model") {
 		t.Errorf("commit = %q", got)
 	}
 }
@@ -270,10 +270,10 @@ func TestAPIListAndFilter(t *testing.T) {
 
 func TestAPIPatchIsAttributedToTheCaller(t *testing.T) {
 	s, h, root := newServer(t)
-	version := currentVersion(t, s, "ACME-1")
+	version := currentVersion(t, s, "ACME/1")
 
 	body := `{"version":"` + version + `","status":"In progress","comment":"On it."}`
-	r := httptest.NewRequest("PATCH", "/api/tasks/ACME-1", strings.NewReader(body))
+	r := httptest.NewRequest("PATCH", "/api/tasks/ACME/1", strings.NewReader(body))
 	r.Header.Set("X-Docket-Author", "Agent <agent@example.com>")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -293,20 +293,20 @@ func TestAPIPatchIsAttributedToTheCaller(t *testing.T) {
 
 func TestAPIPatchRefusesAStaleVersion(t *testing.T) {
 	s, h, _ := newServer(t)
-	stale := currentVersion(t, s, "ACME-1")
+	stale := currentVersion(t, s, "ACME/1")
 
 	first := `{"version":"` + stale + `","priority":"low"}`
-	patch(t, h, "/api/tasks/ACME-1", first, http.StatusOK)
+	patch(t, h, "/api/tasks/ACME/1", first, http.StatusOK)
 
 	second := `{"version":"` + stale + `","priority":"urgent"}`
-	patch(t, h, "/api/tasks/ACME-1", second, http.StatusConflict)
+	patch(t, h, "/api/tasks/ACME/1", second, http.StatusConflict)
 }
 
 func TestAPIPatchRejectsValuesTheProjectDoesNotKnow(t *testing.T) {
 	s, h, _ := newServer(t)
-	version := currentVersion(t, s, "ACME-1")
+	version := currentVersion(t, s, "ACME/1")
 
-	patch(t, h, "/api/tasks/ACME-1",
+	patch(t, h, "/api/tasks/ACME/1",
 		`{"version":"`+version+`","status":"Pending"}`, http.StatusBadRequest)
 }
 
@@ -323,13 +323,13 @@ func TestAPICreate(t *testing.T) {
 	}
 	var got taskJSON
 	decode(t, w, &got)
-	if got.Key != "ACME-2" {
-		t.Errorf("key = %q, want ACME-2", got.Key)
+	if got.Key != "ACME/2" {
+		t.Errorf("key = %q, want ACME/2", got.Key)
 	}
 	if got.Version == "" {
 		t.Error("the response carries no version to write back with")
 	}
-	if commit := lastCommit(t, root); !strings.Contains(commit, "ACME-2: From the API") {
+	if commit := lastCommit(t, root); !strings.Contains(commit, "ACME/2: From the API") {
 		t.Errorf("commit = %q", commit)
 	}
 }
@@ -339,13 +339,13 @@ func TestAPICreate(t *testing.T) {
 func TestPageRendersAndResolvesLinks(t *testing.T) {
 	_, h, root := newServer(t)
 
-	page := "---\ntitle: Session model\n---\n\nSee [[ACME-1]] and [[nowhere]].\n"
+	page := "---\ntitle: Session model\n---\n\nSee [[ACME/1]] and [[nowhere]].\n"
 	if err := os.WriteFile(filepath.Join(root, "docs", "session.md"), []byte(page), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	body := get(t, h, "/page/docs/session").Body.String()
-	if !strings.Contains(body, `href="/task/ACME-1"`) {
+	if !strings.Contains(body, `href="/task/ACME/1"`) {
 		t.Errorf("a resolvable link was not turned into a link:\n%s", body)
 	}
 	if !strings.Contains(body, "dead-link") {
@@ -368,7 +368,7 @@ func TestSearchFindsTasksAndPages(t *testing.T) {
 	}
 
 	body := get(t, h, "/search?q=redirect").Body.String()
-	if !strings.Contains(body, "ACME-1") {
+	if !strings.Contains(body, "ACME/1") {
 		t.Error("search did not find the task")
 	}
 	if !strings.Contains(body, "docs/session") {
@@ -401,5 +401,92 @@ func patch(t *testing.T, h http.Handler, path, body string, wantCode int) {
 	h.ServeHTTP(w, httptest.NewRequest("PATCH", path, strings.NewReader(body)))
 	if w.Code != wantCode {
 		t.Fatalf("code = %d, want %d; body: %s", w.Code, wantCode, w.Body)
+	}
+}
+
+func TestTheBoardShowsEveryProjectAtOnce(t *testing.T) {
+	// Work crosses projects constantly, so all of them is the default view.
+	s, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.AddProject("BETA", "Beta"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Save(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Project: "BETA", Title: "Something in Beta", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_ = s
+
+	body := get(t, h, "/").Body.String()
+	if !strings.Contains(body, "ACME/1") || !strings.Contains(body, "BETA/1") {
+		t.Errorf("the board does not show both projects:\n%s", body)
+	}
+}
+
+func TestTheBoardCanBeNarrowedToOneProject(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, _ := project.Load(root)
+	if err := c.AddProject("BETA", "Beta"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Save(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Project: "BETA", Title: "Something in Beta", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/?project=BETA").Body.String()
+	if !strings.Contains(body, "BETA/1") {
+		t.Error("the selected project is missing from its own board")
+	}
+	if strings.Contains(body, "ACME/1") {
+		t.Error("a task from another project appeared on a narrowed board")
+	}
+}
+
+func TestNarrowingToAProjectThatDoesNotExist(t *testing.T) {
+	_, h, _ := newServer(t)
+	if w := get(t, h, "/?project=GHOST"); w.Code != http.StatusNotFound {
+		t.Errorf("code = %d, want 404", w.Code)
+	}
+}
+
+func TestTheAPICanFilterByProject(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, _ := project.Load(root)
+	if err := c.AddProject("BETA", "Beta"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Save(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Project: "BETA", Title: "Something in Beta", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	var all, beta []taskJSON
+	decode(t, get(t, h, "/api/tasks"), &all)
+	decode(t, get(t, h, "/api/tasks?project=BETA"), &beta)
+
+	if len(all) != 2 {
+		t.Errorf("got %d tasks across the vault, want 2", len(all))
+	}
+	if len(beta) != 1 || beta[0].Key != "BETA/1" {
+		t.Errorf("filtering by project gave %v", beta)
 	}
 }

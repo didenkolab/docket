@@ -20,13 +20,20 @@ of this — clone, open in Obsidian, work — but the tool makes the routine par
 ```bash
 docket init --key ACME --name "Acme Platform" acme   # a complete vault, ready to open
 cd acme
-docket new "Fix login redirect loop" --type bug      # ACME-1, with a valid key
-docket check                                         # eight rules, file:line findings
+docket new "Fix login redirect loop" --type bug      # ACME/1, with a valid key
+docket project add --key BETA --name "Beta"          # a second project in the same vault
+docket new --project BETA "Ship the widget"          # BETA/1
+docket check                                         # nine rules, file:line findings
 ```
+
+A key is `PROJECT/NUMBER` and it is also the path: `ACME/12` lives in `ACME/12.md`. One vault
+holds as many projects as you like, `[[ACME/12]]` resolves in Obsidian with no help, and links
+between projects work because the projects are one file tree.
 
 | Command | What | State |
 |---|---|---|
-| `docket init` | Scaffold a new project vault | works |
+| `docket init` | Scaffold a new vault | works |
+| `docket project` | List the projects a vault holds, or add one | works |
 | `docket new` | Create a task with a valid key from the project's template | works |
 | `docket check` | Validate a vault against the specification | works |
 | `docket workspace` | Assemble several project repositories into one Obsidian vault | works |
@@ -66,7 +73,8 @@ For people who do not run Obsidian:
 docket serve --author "Your Name <you@example.com>"
 ```
 
-A board grouped by status, task pages, the wiki, search, and a JSON API. It is a second client
+A board grouped by status across every project at once — or narrowed to one — plus task
+pages, the wiki, search, and a JSON API. It is a second client
 to the same files, not an owner of them: nothing is cached, every write becomes a git commit
 attributed to whoever made it, and a write that would land on top of a change made in Obsidian
 or by an agent is refused rather than applied. Point all three at one repository at once.

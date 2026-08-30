@@ -294,14 +294,14 @@ func TestApplyCarriesTheDetailAcross(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(root, "tasks", "ACME-1.md"))
+	raw, err := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(raw)
 
 	for _, want := range []string{
-		"key: ACME-1",
+		"key: ACME/1",
 		"title: Fix login redirect loop",
 		"type: bug",
 		"status: In Progress",
@@ -332,7 +332,7 @@ func TestApplyKeepsTheHistoryGitNeverSaw(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(root, "tasks", "_history", "ACME-1.jsonl"))
+	raw, err := os.ReadFile(filepath.Join(root, "ACME", "_history", "1.jsonl"))
 	if err != nil {
 		t.Fatalf("no imported history: %v", err)
 	}
@@ -350,11 +350,11 @@ func TestApplyBuildsTheProjectVocabularyFromTheMaps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, _ := os.ReadFile(filepath.Join(root, "project.yaml"))
+	raw, _ := os.ReadFile(filepath.Join(root, "docket.yaml"))
 	text := string(raw)
 	for _, want := range []string{"key: ACME", "name: Acme Platform", "Cancelled", "In Progress", "bug", "story"} {
 		if !strings.Contains(text, want) {
-			t.Errorf("missing %q in project.yaml:\n%s", want, text)
+			t.Errorf("missing %q in docket.yaml:\n%s", want, text)
 		}
 	}
 	if strings.Contains(text, "Backlog") {

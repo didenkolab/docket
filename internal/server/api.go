@@ -56,7 +56,12 @@ func apiError(w http.ResponseWriter, code int, message string) {
 }
 
 func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
-	entries, err := vault.List(s.root)
+	c, err := project.Load(s.root)
+	if err != nil {
+		apiError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	entries, err := vault.List(s.root, c)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -64,6 +69,7 @@ func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 
 	wanted := r.URL.Query().Get("status")
 	category := r.URL.Query().Get("category")
+	wantedProject := r.URL.Query().Get("project")
 
 	out := []taskJSON{}
 	for _, e := range entries {
@@ -76,13 +82,16 @@ func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 		if category != "" && e.Task.StatusCategory != category {
 			continue
 		}
+		if wantedProject != "" && e.Project != wantedProject {
+			continue
+		}
 		out = append(out, toJSON(e.Task, "", false))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) apiGetTask(w http.ResponseWriter, r *http.Request) {
-	t, version, err := s.loadTask(r.PathValue("key"))
+	t, version, err := s.loadTask(keyOf(r))
 	if err != nil {
 		apiError(w, http.StatusNotFound, err.Error())
 		return
@@ -91,6 +100,7 @@ func (s *Server) apiGetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 type createRequest struct {
+	Project  string   `json:"project"`
 	Title    string   `json:"title"`
 	Type     string   `json:"type"`
 	Status   string   `json:"status"`
@@ -106,7 +116,7 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	p, err := project.Load(s.root)
+	c, err := project.Load(s.root)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -114,8 +124,9 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 
 	author := s.authorFor(r)
 	s.writes.Lock()
-	rel, t, err := vault.Create(s.root, p, vault.NewOptions{
-		Title: req.Title, Type: req.Type, Status: req.Status,
+	rel, t, err := vault.Create(s.root, c, vault.NewOptions{
+		Project: req.Project,
+		Title:   req.Title, Type: req.Type, Status: req.Status,
 		Priority: req.Priority, Assignee: req.Assignee, Parent: req.Parent,
 		Labels: req.Labels, Now: s.now(),
 	})
@@ -146,14 +157,14 @@ type patchRequest struct {
 }
 
 func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
-	key := r.PathValue("key")
+	key := keyOf(r)
 
 	var req patchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		apiError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	p, err := project.Load(s.root)
+	c, err := project.Load(s.root)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -168,18 +179,18 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 			changed = append(changed, "title")
 		}
 		if req.Status != nil && *req.Status != t.Status {
-			category, known := p.CategoryOf(*req.Status)
+			category, known := c.CategoryOf(*req.Status)
 			if !known {
 				return "", errors.New("status " + *req.Status + " is not one of " +
-					strings.Join(p.StatusNames(), ", "))
+					strings.Join(c.StatusNames(), ", "))
 			}
 			changed = append(changed, t.Status+" → "+*req.Status)
 			t.SetStatus(*req.Status, category)
 		}
 		if req.Priority != nil && *req.Priority != t.Priority {
-			if !p.HasPriority(*req.Priority) {
+			if !c.HasPriority(*req.Priority) {
 				return "", errors.New("priority " + *req.Priority + " is not one of " +
-					strings.Join(p.Priorities, ", "))
+					strings.Join(c.Priorities, ", "))
 			}
 			t.Set("priority", *req.Priority)
 			changed = append(changed, "priority")

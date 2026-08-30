@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 	"github.com/yuin/goldmark"
@@ -28,10 +29,10 @@ type index struct {
 
 var skipDirs = map[string]bool{".git": true, ".obsidian": true, ".trash": true}
 
-func buildIndex(root string) (*index, error) {
+func buildIndex(root string, c *project.Config) (*index, error) {
 	ix := &index{targets: map[string]string{}}
 
-	entries, err := vault.List(root)
+	entries, err := vault.List(root, c)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func buildIndex(root string) (*index, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if strings.HasPrefix(rel, vault.TasksDir+"/") {
+		if _, _, err := project.SplitKey(strings.TrimSuffix(rel, ".md")); err == nil {
 			return nil // already indexed as a task
 		}
 

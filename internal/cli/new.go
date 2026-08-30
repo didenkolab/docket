@@ -29,13 +29,14 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 	}
 
 	var (
-		dir      = flags.String("C", ".", "run as if started in this directory")
-		taskType = flags.String("type", "", "task type (default: the project's first)")
-		status   = flags.String("status", "", "status (default: the project's first)")
-		priority = flags.String("priority", "", "priority (default: normal)")
-		assignee = flags.String("assignee", "", "who it is on, such as agent/claude")
-		parent   = flags.String("parent", "", "key of the parent task")
-		labels   = flags.String("labels", "", "comma-separated labels")
+		dir        = flags.String("C", ".", "run as if started in this directory")
+		projectKey = flags.String("project", "", "which project (default: the vault's first)")
+		taskType   = flags.String("type", "", "task type (default: the vault's first)")
+		status     = flags.String("status", "", "status (default: the vault's first)")
+		priority   = flags.String("priority", "", "priority (default: normal)")
+		assignee   = flags.String("assignee", "", "who it is on, such as agent/claude")
+		parent     = flags.String("parent", "", "key of the parent task")
+		labels     = flags.String("labels", "", "comma-separated labels")
 	)
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
@@ -52,13 +53,14 @@ func runNew(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docket new: %v\n", err)
 		return exitError
 	}
-	p, err := project.Load(root)
+	c, err := project.Load(root)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket new: %v\n", err)
 		return exitError
 	}
 
-	path, t, err := vault.Create(root, p, vault.NewOptions{
+	path, t, err := vault.Create(root, c, vault.NewOptions{
+		Project:  *projectKey,
 		Title:    flags.Arg(0),
 		Type:     *taskType,
 		Status:   *status,

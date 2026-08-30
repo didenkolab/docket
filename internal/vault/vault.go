@@ -1,4 +1,4 @@
-// Package vault creates docket vaults.
+// Package vault creates docket vaults and reads the tasks in them.
 //
 // The templates ship inside the binary rather than being fetched from a
 // template repository: one fewer thing to keep in sync, and init works offline.
@@ -29,11 +29,22 @@ const templateRoot = "template"
 // meant to be — it is content we hand to a new vault.
 const gitignoreSource = "gitignore"
 
+// Directories a vault keeps its content in. Everything else at the root that is
+// listed in docket.yaml is a project.
+const (
+	DocsDir      = "docs"
+	BoardsDir    = "boards"
+	TemplatesDir = "templates"
+	Attachments  = "attachments"
+	HistoryDir   = "_history"
+	TaskTemplate = "templates/task.md"
+)
+
 // Options are the values a new vault is stamped with.
 type Options struct {
-	// Key prefixes every task in the project: ACME-1, ACME-2.
+	// Key is the first project's key, which is also its folder.
 	Key string
-	// Name is what people call the project. Defaults to Key.
+	// Name is what people call the vault. Defaults to Key.
 	Name string
 }
 
@@ -44,11 +55,8 @@ func (o *Options) normalize() error {
 	if o.Key == "" {
 		return fmt.Errorf("a project key is required")
 	}
-	if !project.KeyPattern.MatchString(o.Key) {
-		return fmt.Errorf(
-			"project key %q is not usable: use 2 to 10 characters, upper-case letters and "+
-				"digits, starting with a letter — the key is the head of every task file name",
-			o.Key)
+	if err := project.ValidKey(o.Key); err != nil {
+		return err
 	}
 	if o.Name == "" {
 		o.Name = o.Key
@@ -70,6 +78,8 @@ func Init(dir string, opts Options) ([]string, error) {
 		return nil, err
 	}
 
+	data := struct{ Key, Name string }{opts.Key, opts.Name}
+
 	var written []string
 	err := fs.WalkDir(templates, templateRoot, func(src string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -87,7 +97,7 @@ func Init(dir string, opts Options) ([]string, error) {
 			rel = ".gitignore"
 		}
 
-		content, err := render(src, opts)
+		content, err := render(src, data)
 		if err != nil {
 			return err
 		}
@@ -107,11 +117,50 @@ func Init(dir string, opts Options) ([]string, error) {
 		return nil, err
 	}
 
+	config := DefaultConfig(opts.Key, opts.Name)
+	if err := config.Save(dir); err != nil {
+		return nil, err
+	}
+	written = append(written, project.FileName)
+
+	if err := os.MkdirAll(filepath.Join(dir, opts.Key), 0o755); err != nil {
+		return nil, err
+	}
+	keep := filepath.Join(opts.Key, ".gitkeep")
+	if err := os.WriteFile(filepath.Join(dir, keep), nil, 0o644); err != nil {
+		return nil, err
+	}
+	written = append(written, filepath.ToSlash(keep))
+
+	boards, err := WriteBoards(dir, config)
+	if err != nil {
+		return nil, err
+	}
+	written = append(written, boards...)
+
 	sort.Strings(written)
 	return written, nil
 }
 
-func render(src string, opts Options) ([]byte, error) {
+// DefaultConfig is the vocabulary a new vault starts with.
+func DefaultConfig(key, name string) *project.Config {
+	return &project.Config{
+		Name:     name,
+		Projects: []project.Project{{Key: key, Name: name}},
+		Statuses: []project.Status{
+			{Name: "Backlog", Category: project.CategoryTodo},
+			{Name: "Ready", Category: project.CategoryTodo},
+			{Name: "In progress", Category: project.CategoryDoing},
+			{Name: "In review", Category: project.CategoryDoing},
+			{Name: "Done", Category: project.CategoryDone},
+			{Name: "Dropped", Category: project.CategoryDone},
+		},
+		Types:      []string{"task", "bug", "story", "epic"},
+		Priorities: []string{"low", "normal", "high", "urgent"},
+	}
+}
+
+func render(src string, data any) ([]byte, error) {
 	raw, err := templates.ReadFile(src)
 	if err != nil {
 		return nil, err
@@ -123,7 +172,7 @@ func render(src string, opts Options) ([]byte, error) {
 	}
 
 	var out bytes.Buffer
-	if err := tmpl.Execute(&out, opts); err != nil {
+	if err := tmpl.Execute(&out, data); err != nil {
 		return nil, fmt.Errorf("template %s: %w", src, err)
 	}
 	return out.Bytes(), nil

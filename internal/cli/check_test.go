@@ -28,10 +28,10 @@ func TestCheckOnACleanVault(t *testing.T) {
 func TestCheckExitsNonZeroOnFindings(t *testing.T) {
 	// This is what makes it usable as a pre-commit hook.
 	dir := vaultDir(t)
-	broken := "---\nkey: ACME-1\ntitle: T\ntype: task\nstatus: Pending\n" +
+	broken := "---\nkey: ACME/1\ntitle: T\ntype: task\nstatus: Pending\n" +
 		"status_category: todo\npriority: normal\nassignee:\nlabels: []\n" +
 		"created: 2026-08-30T12:00:00Z\nupdated: 2026-08-30T12:00:00Z\naliases: []\n---\n"
-	if err := os.WriteFile(filepath.Join(dir, "tasks", "ACME-1.md"), []byte(broken), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "ACME", "1.md"), []byte(broken), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -39,7 +39,7 @@ func TestCheckExitsNonZeroOnFindings(t *testing.T) {
 	if code == exitOK {
 		t.Errorf("exit code = 0 on a broken vault; stdout:\n%s", stdout)
 	}
-	if !strings.Contains(stdout, "ACME-1.md:5") {
+	if !strings.Contains(stdout, "ACME/1.md:5") {
 		t.Errorf("the finding has no file:line:\n%s", stdout)
 	}
 	if !strings.Contains(stdout, "1 finding.") {
