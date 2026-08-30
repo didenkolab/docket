@@ -12,6 +12,10 @@ This repository holds the tool. **The format, the specification and the project'
 live in [`docket-board`](https://github.com/vadymdidenkolab/docket-board)** — which is itself an
 docket vault, and therefore the working example.
 
+To see one without reading anything, clone
+[`docket-demo`](https://github.com/vadymdidenkolab/docket-demo) and open it in Obsidian: two
+projects, a board, a backlog and a wiki, with nothing installed.
+
 ## Status
 
 The vault format is settled, and the whole local workflow works. A vault is usable without any
