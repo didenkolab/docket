@@ -35,10 +35,10 @@ func TestCreateFillsTheDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if path != "ACME/1.md" {
-		t.Errorf("path = %q, want ACME/1.md — the key is the path", path)
+	if path != "ACME/ACME-1 Fix login redirect loop.md" {
+		t.Errorf("path = %q — the file is named after the task", path)
 	}
-	if task.Key != "ACME/1" {
+	if task.Key != "ACME-1" {
 		t.Errorf("key = %q — the typed view was not refreshed after the edits", task.Key)
 	}
 	if task.Type != "task" {
@@ -65,12 +65,12 @@ func TestCreateWritesWhatTheSpecShows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
+	raw, err := os.ReadFile(filepath.Join(root, "ACME", "ACME-1 Fix login redirect loop.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"key: ACME/1\n",
+		"key: ACME-1\n",
 		"title: Fix login redirect loop\n",
 		"type: bug\n",
 		"labels: [auth, regression]\n",
@@ -100,7 +100,7 @@ func TestCreateNumbersUpwardsPerProject(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Create %d: %v", i, err)
 		}
-		if want := "ACME/" + strconv.Itoa(i) + ".md"; path != want {
+		if want := "ACME/ACME-" + strconv.Itoa(i) + " Task.md"; path != want {
 			t.Errorf("path = %q, want %q", path, want)
 		}
 	}
@@ -110,8 +110,8 @@ func TestCreateNumbersUpwardsPerProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if path != "BETA/1.md" {
-		t.Errorf("path = %q, want BETA/1.md", path)
+	if path != "BETA/BETA-1 First.md" {
+		t.Errorf("path = %q, want BETA/BETA-1 First.md", path)
 	}
 }
 
@@ -126,8 +126,8 @@ func TestNextKeySkipsGaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "ACME/8" {
-		t.Errorf("NextKey = %q, want ACME/8", got)
+	if got != "ACME-8" {
+		t.Errorf("NextKey = %q, want ACME-8", got)
 	}
 }
 
@@ -140,7 +140,7 @@ func TestCreateRefusesValuesTheVaultDoesNotDefine(t *testing.T) {
 		"unknown type":     {Title: "T", Type: "saga"},
 		"unknown status":   {Title: "T", Status: "Pending"},
 		"unknown priority": {Title: "T", Priority: "screaming"},
-		"missing parent":   {Title: "T", Parent: "ACME/404"},
+		"missing parent":   {Title: "T", Parent: "ACME-404"},
 	} {
 		if _, _, err := Create(root, c, opts); err == nil {
 			t.Errorf("%s: Create accepted it", name)
@@ -154,7 +154,7 @@ func TestCreateRefusesValuesTheVaultDoesNotDefine(t *testing.T) {
 func TestWriteNewWillNotOverwrite(t *testing.T) {
 	// This is the guard against another process picking the same key between
 	// the scan in NextKey and the write.
-	path := filepath.Join(t.TempDir(), "ACME", "2.md")
+	path := filepath.Join(t.TempDir(), "ACME", "ACME-2 A task.md")
 	if err := writeNew(path, []byte("first")); err != nil {
 		t.Fatalf("the first write failed: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestCreateUsesTheVaultsOwnTemplate(t *testing.T) {
 	if _, _, err := Create(root, c, NewOptions{Title: "T", Now: noon}); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
+	raw, _ := os.ReadFile(filepath.Join(root, "ACME", "ACME-1 T.md"))
 	if !strings.Contains(string(raw), "points: 0") {
 		t.Errorf("a vault's own property was dropped:\n%s", raw)
 	}
@@ -195,7 +195,7 @@ func TestCreateWorksWithoutATemplate(t *testing.T) {
 
 	if _, task, err := Create(root, c, NewOptions{Title: "T", Now: noon}); err != nil {
 		t.Fatalf("Create without a template: %v", err)
-	} else if task.Key != "ACME/1" {
+	} else if task.Key != "ACME-1" {
 		t.Errorf("key = %q", task.Key)
 	}
 }
@@ -210,7 +210,7 @@ func TestListSortsByNumberNotByName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"ACME/1", "ACME/2", "ACME/10"}
+	want := []string{"ACME-1", "ACME-2", "ACME-10"}
 	for i, key := range want {
 		if entries[i].Key != key {
 			t.Errorf("entry %d = %q, want %q (lexical order would say otherwise)",
@@ -245,7 +245,7 @@ func TestListCoversEveryProject(t *testing.T) {
 func TestListReportsBrokenFilesInsteadOfStopping(t *testing.T) {
 	root, c := newVault(t)
 	write(t, root, "ACME", 1)
-	if err := os.WriteFile(filepath.Join(root, "ACME", "2.md"),
+	if err := os.WriteFile(filepath.Join(root, "ACME", "ACME-2 Broken.md"),
 		[]byte("no frontmatter here\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func write(t *testing.T, root, projectKey string, number int) {
 	if err := os.MkdirAll(filepath.Join(root, projectKey), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, projectKey, strconv.Itoa(number)+".md"),
+	if err := os.WriteFile(filepath.Join(root, projectKey, FileName(key, key)),
 		[]byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

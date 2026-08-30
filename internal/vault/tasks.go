@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
@@ -15,13 +15,18 @@ import (
 
 // Entry is one task file found in a vault.
 type Entry struct {
-	Key     string // PROJECT/NUMBER, taken from the path
-	Project string
+	Key     string // ACME-12, taken from the head of the file name
+	Project string // the folder it sits in
 	Number  int
 	Path    string // path relative to the vault root
 	Task    *task.Task
 	Raw     []byte // the file as read, so a caller can fingerprint it
 	Err     error  // set when the file could not be parsed; Task is then nil
+}
+
+// Note is the file's name without .md — what a wikilink to this task says.
+func (e Entry) Note() string {
+	return strings.TrimSuffix(filepath.Base(e.Path), ".md")
 }
 
 // builtinTaskTemplate is used when a vault has no templates/task.md. A vault
@@ -43,9 +48,99 @@ aliases: []
 ## Comments
 `
 
-// TaskPath is where a key's file lives, relative to the vault root. The path is
-// the key with .md on the end, which is the whole point of the shape.
-func TaskPath(key string) string { return key + ".md" }
+// FileName is what a task's file is called: the key, a space, and the title.
+//
+// The name carries the title because that is what Obsidian shows — in the
+// graph, in the file explorer, in search. A file called 12.md tells nobody
+// anything. See ADR-0005.
+//
+// The title goes in as written, in whatever language it was written in. Only
+// the characters a file name or a wikilink genuinely cannot hold are replaced,
+// and the replacements are listed in sanitise so that a reader can see exactly
+// how much of the original survives: all of it, except those.
+func FileName(key, title string) string {
+	title = strings.TrimSpace(sanitise(title))
+	if title == "" {
+		return key + ".md"
+	}
+
+	// Most file systems cap one path component at 255 bytes. A title is only
+	// shortened when it would not otherwise fit, and never otherwise.
+	const limit = 240
+	if len(key)+1+len(title)+3 > limit {
+		title = strings.TrimSpace(truncate(title, limit-len(key)-4))
+	}
+	return key + " " + title + ".md"
+}
+
+// sanitise replaces only what cannot be in a file name that Obsidian can also
+// link to.
+//
+//	/ \  path separators — would make folders
+//	: * ? " < > |  refused by one file system or another
+//	# ^ [ ]        wikilink syntax; a note holding these cannot be linked to
+//
+// Everything else — every alphabet, every accent, punctuation, emoji — is kept
+// exactly as it was typed.
+func sanitise(title string) string {
+	return strings.NewReplacer(
+		"/", "-", "\\", "-", ":", " -", "*", "", "?", "", `"`, "'",
+		"<", "(", ">", ")", "|", "-", "#", "", "^", "", "[", "(", "]", ")",
+	).Replace(title)
+}
+
+// truncate cuts to a byte budget without splitting a character in half.
+func truncate(s string, budget int) string {
+	if len(s) <= budget {
+		return s
+	}
+	cut := budget
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
+
+// Find locates a task's file by its key, and returns the path relative to the
+// vault root.
+//
+// The key is no longer the path, so this is a glob rather than a join. It is
+// confined here, which is the point: everything else still asks for a task by
+// its key.
+func Find(root string, c *project.Config, key string) (string, error) {
+	projectKey, _, err := project.SplitKey(key)
+	if err != nil {
+		return "", err
+	}
+	if !c.HasProject(projectKey) {
+		return "", fmt.Errorf("project %s is not in this vault", projectKey)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(root, projectKey, key+"*.md"))
+	if err != nil {
+		return "", err
+	}
+	for _, match := range matches {
+		// ACME-1* also matches ACME-12; only a space or the extension ends a key.
+		if keyOfFile(filepath.Base(match)) == key {
+			rel, err := filepath.Rel(root, match)
+			if err != nil {
+				return "", err
+			}
+			return filepath.ToSlash(rel), nil
+		}
+	}
+	return "", fmt.Errorf("%s is not in this vault", key)
+}
+
+// keyOfFile reads the key off the head of a file name.
+func keyOfFile(name string) string {
+	name = strings.TrimSuffix(name, ".md")
+	if space := strings.Index(name, " "); space >= 0 {
+		return name[:space]
+	}
+	return name
+}
 
 // List reads every task in the vault, project by project in the order
 // docket.yaml gives them, and by number within each.
@@ -82,18 +177,24 @@ func listProject(root, projectKey string) ([]Entry, error) {
 			continue
 		}
 
-		base := strings.TrimSuffix(name.Name(), ".md")
-		number, convErr := strconv.Atoi(base)
-
+		key := keyOfFile(name.Name())
 		entry := Entry{
-			Key:     projectKey + "/" + base,
+			Key:     key,
 			Project: projectKey,
-			Number:  number,
 			Path:    filepath.ToSlash(filepath.Join(projectKey, name.Name())),
 		}
-		if convErr != nil {
-			entry.Err = fmt.Errorf("file name %q is not a task number: a task is PROJECT/NUMBER.md",
-				name.Name())
+
+		owner, number, keyErr := project.SplitKey(key)
+		switch {
+		case keyErr != nil:
+			entry.Err = fmt.Errorf("file name %q does not start with a task key: "+
+				"a task is named %q", name.Name(), "KEY-1 Its title.md")
+		case owner != projectKey:
+			entry.Err = fmt.Errorf("%s sits in the %s folder", key, projectKey)
+		default:
+			entry.Number = number
+		}
+		if entry.Err != nil {
 			entries = append(entries, entry)
 			continue
 		}
@@ -195,7 +296,7 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 	}
 
 	if opts.Parent != "" {
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(TaskPath(opts.Parent)))); err != nil {
+		if _, err := Find(root, c, opts.Parent); err != nil {
 			return "", nil, fmt.Errorf("parent %s does not exist", opts.Parent)
 		}
 	}
@@ -235,7 +336,7 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 		return "", nil, err
 	}
 
-	rel := TaskPath(key)
+	rel := filepath.ToSlash(filepath.Join(opts.Project, FileName(key, opts.Title)))
 	if err := writeNew(filepath.Join(root, filepath.FromSlash(rel)), content); err != nil {
 		return "", nil, err
 	}

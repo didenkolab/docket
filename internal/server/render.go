@@ -5,13 +5,11 @@ import (
 	"html"
 	"html/template"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -36,13 +34,11 @@ func buildIndex(root string, c *project.Config) (*index, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Indexed by note name, which is what Obsidian resolves — not by key, and
+	// not by alias. A link this page renders as live and Obsidian renders as
+	// dead would be worse than no rendering at all.
 	for _, e := range entries {
-		ix.put(e.Key, "/task/"+e.Key)
-		if e.Task != nil {
-			for _, alias := range e.Task.Aliases {
-				ix.put(alias, "/task/"+e.Key)
-			}
-		}
+		ix.put(e.Note(), "/task/"+e.Key)
 	}
 
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -63,25 +59,25 @@ func buildIndex(root string, c *project.Config) (*index, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if _, _, err := project.SplitKey(strings.TrimSuffix(rel, ".md")); err == nil {
+		withoutExt := strings.TrimSuffix(rel, ".md")
+		if _, _, err := project.SplitKey(keyHead(filepath.Base(withoutExt))); err == nil {
 			return nil // already indexed as a task
 		}
 
-		withoutExt := strings.TrimSuffix(rel, ".md")
 		href := "/page/" + withoutExt
 		ix.put(withoutExt, href)
 		ix.put(filepath.Base(withoutExt), href)
-
-		if raw, err := os.ReadFile(path); err == nil {
-			if t, err := task.Parse(raw); err == nil {
-				for _, alias := range t.Aliases {
-					ix.put(alias, href)
-				}
-			}
-		}
 		return nil
 	})
 	return ix, err
+}
+
+// keyHead is the first word of a note name, which is where a task's key sits.
+func keyHead(name string) string {
+	if space := strings.Index(name, " "); space >= 0 {
+		return name[:space]
+	}
+	return name
 }
 
 func (ix *index) put(target, href string) {

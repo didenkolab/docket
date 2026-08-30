@@ -68,7 +68,7 @@ func TestRenamingAStatusTakesItsTasksWithIt(t *testing.T) {
 		t.Fatalf("code = %d, want 303; body:\n%s", w.Code, w.Body)
 	}
 
-	raw, _ := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
+	raw, _ := os.ReadFile(filepath.Join(root, "ACME", "ACME-1 Fix login redirect loop.md"))
 	if !strings.Contains(string(raw), "status: Icebox") {
 		t.Errorf("the task did not follow the rename:\n%s", raw)
 	}
@@ -221,9 +221,9 @@ func TestTheBoardCarriesWhatADraggedCardNeeds(t *testing.T) {
 
 	body := get(t, h, "/").Body.String()
 	for _, want := range []string{
-		`data-key="ACME/1"`,
+		`data-key="ACME-1"`,
 		`data-status="Backlog"`,
-		`data-version="` + currentVersion(t, s, "ACME/1") + `"`,
+		`data-version="` + currentVersion(t, s, "ACME-1") + `"`,
 		`data-status="In progress"`, // the column
 	} {
 		if !strings.Contains(body, want) {
@@ -264,14 +264,14 @@ func TestAWorkflowSavedInSettingsIsEnforcedEverywhere(t *testing.T) {
 	}
 
 	// The task page offers only what the workflow allows.
-	page := get(t, h, "/task/ACME/1").Body.String()
+	page := get(t, h, "/task/ACME-1").Body.String()
 	if strings.Contains(page, `<option value="Done"`) {
 		t.Error("the task page offers a move the workflow forbids")
 	}
 
 	// And the move itself is refused, not merely hidden.
-	w := postForm(t, h, "/task/ACME/1/status", url.Values{
-		"version": {currentVersion(t, s, "ACME/1")},
+	w := postForm(t, h, "/task/ACME-1/status", url.Values{
+		"version": {currentVersion(t, s, "ACME-1")},
 		"status":  {"Done"},
 	})
 	if w.Code != http.StatusBadRequest {
@@ -289,8 +289,8 @@ func TestTheAPIObeysTheWorkflowToo(t *testing.T) {
 		"Backlog": {"Ready"},
 	}))
 
-	body := `{"version":"` + currentVersion(t, s, "ACME/1") + `","status":"Done"}`
-	patch(t, h, "/api/tasks/ACME/1", body, http.StatusBadRequest)
+	body := `{"version":"` + currentVersion(t, s, "ACME-1") + `","status":"Done"}`
+	patch(t, h, "/api/tasks/ACME-1", body, http.StatusBadRequest)
 }
 
 func TestTheBoardTellsEachCardWhereItMayGo(t *testing.T) {
@@ -303,7 +303,7 @@ func TestTheBoardTellsEachCardWhereItMayGo(t *testing.T) {
 	// The exact escaping of the separator is the template's business; what
 	// matters is that the card names where it may go and only that.
 	body := get(t, h, "/").Body.String()
-	card := body[strings.Index(body, `data-key="ACME/1"`):]
+	card := body[strings.Index(body, `data-key="ACME-1"`):]
 	card = card[:strings.Index(card, ">")]
 
 	if !strings.Contains(card, "data-reachable=") {

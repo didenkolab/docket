@@ -294,14 +294,14 @@ func TestApplyCarriesTheDetailAcross(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(root, "ACME", "1.md"))
+	raw, err := os.ReadFile(filepath.Join(root, "ACME", "ACME-1 Fix login redirect loop.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(raw)
 
 	for _, want := range []string{
-		"key: ACME/1",
+		"key: ACME-1",
 		"title: Fix login redirect loop",
 		"type: bug",
 		"status: In Progress",

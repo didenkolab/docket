@@ -182,6 +182,12 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, http.StatusNotFound, "No such task", key+" is not in this vault")
 		return
 	}
+	rel, _, err := s.locate(key)
+	if err != nil {
+		s.fail(w, r, http.StatusNotFound, "No such task", key+" is not in this vault")
+		return
+	}
+	projectKey, _, _ := project.SplitKey(key)
 	ix, err := buildIndex(s.root, c)
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot index the vault", err.Error())
@@ -191,13 +197,13 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "task.html", c, t.Key+" "+t.Title, taskView{
 		Task:        t,
 		Reachable:   c.Reachable(t.Status),
-		Project:     r.PathValue("project"),
-		ProjectName: c.ProjectName(r.PathValue("project")),
+		Project:     projectKey,
+		ProjectName: c.ProjectName(projectKey),
 		Description: renderMarkdown(t.Description(), ix),
 		Comments:    renderComments(t.Comments(), ix),
 		Children:    s.childrenOf(c, key),
 		Version:     ver,
-		Path:        vault.TaskPath(key),
+		Path:        rel,
 	})
 }
 

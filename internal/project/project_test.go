@@ -114,20 +114,20 @@ func TestSaveAndAddProject(t *testing.T) {
 }
 
 func TestSplitKey(t *testing.T) {
-	projectKey, number, err := SplitKey("ACME/12")
+	projectKey, number, err := SplitKey("ACME-12")
 	if err != nil {
 		t.Fatalf("SplitKey: %v", err)
 	}
 	if projectKey != "ACME" || number != 12 {
 		t.Errorf("got %q/%d", projectKey, number)
 	}
-	if got := Key("ACME", 12); got != "ACME/12" {
+	if got := Key("ACME", 12); got != "ACME-12" {
 		t.Errorf("Key = %q", got)
 	}
 }
 
 func TestSplitKeyRejectsWhatIsNotAKey(t *testing.T) {
-	for _, key := range []string{"", "ACME", "ACME-12", "/12", "ACME/", "acme/12", "ACME/0", "ACME/x"} {
+	for _, key := range []string{"", "ACME", "ACME/12", "-12", "ACME-", "acme-12", "ACME-0", "ACME-x"} {
 		if _, _, err := SplitKey(key); err == nil {
 			t.Errorf("SplitKey(%q) was accepted", key)
 		}

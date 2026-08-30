@@ -373,25 +373,25 @@ func contains(list []string, want string) bool {
 	return false
 }
 
-// SplitKey takes a task key apart. A key is PROJECT/NUMBER, and it is also the
-// path to the file, which is the whole point of the shape.
+// TaskKeyPattern is the shape of a task key: the project key, a hyphen, and a
+// number. One spelling, used in the frontmatter, in the file name, in links and
+// in URLs — see ADR-0005.
+var TaskKeyPattern = regexp.MustCompile(`^([A-Z][A-Z0-9]{1,9})-([1-9][0-9]*)$`)
+
+// SplitKey takes a task key apart.
 func SplitKey(key string) (projectKey string, number int, err error) {
-	slash := strings.Index(key, "/")
-	if slash < 1 || slash == len(key)-1 {
-		return "", 0, fmt.Errorf("key %q is not PROJECT/NUMBER", key)
+	m := TaskKeyPattern.FindStringSubmatch(key)
+	if m == nil {
+		return "", 0, fmt.Errorf("key %q is not PROJECT-NUMBER", key)
 	}
-	projectKey = key[:slash]
-	if !KeyPattern.MatchString(projectKey) {
-		return "", 0, fmt.Errorf("key %q does not start with a usable project key", key)
-	}
-	number, err = strconv.Atoi(key[slash+1:])
-	if err != nil || number < 1 {
+	number, err = strconv.Atoi(m[2])
+	if err != nil {
 		return "", 0, fmt.Errorf("key %q does not end in a task number", key)
 	}
-	return projectKey, number, nil
+	return m[1], number, nil
 }
 
 // Key builds a task key from its parts.
 func Key(projectKey string, number int) string {
-	return fmt.Sprintf("%s/%d", projectKey, number)
+	return fmt.Sprintf("%s-%d", projectKey, number)
 }

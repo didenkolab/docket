@@ -32,11 +32,11 @@ func TestNewCreatesATask(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("exit code = %d; stderr:\n%s", code, stderr)
 	}
-	if !strings.Contains(stdout, "ACME/1") {
+	if !strings.Contains(stdout, "ACME-1") {
 		t.Errorf("stdout does not report the key:\n%s", stdout)
 	}
 
-	raw, err := os.ReadFile(filepath.Join(dir, "ACME", "1.md"))
+	raw, err := os.ReadFile(filepath.Join(dir, "ACME", "ACME-1 Fix login redirect loop.md"))
 	if err != nil {
 		t.Fatalf("no task on disk: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestNewAcceptsFlagsAfterTheTitle(t *testing.T) {
 		t.Fatalf("exit code = %d; stderr:\n%s", code, stderr)
 	}
 
-	raw, _ := os.ReadFile(filepath.Join(dir, "ACME", "1.md"))
+	raw, _ := os.ReadFile(filepath.Join(dir, "ACME", "ACME-1 Fix login redirect loop.md"))
 	for _, want := range []string{"type: bug", "priority: high", "labels: [auth, regression]"} {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("missing %q in:\n%s", want, raw)
@@ -75,7 +75,7 @@ func TestNewFindsTheVaultFromASubdirectory(t *testing.T) {
 	if code, _, stderr := run(t, "new", "A task from deep inside"); code != exitOK {
 		t.Fatalf("exit code = %d; stderr:\n%s", code, stderr)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "ACME", "1.md")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "ACME", "ACME-1 A task from deep inside.md")); err != nil {
 		t.Errorf("the task did not land in the vault root: %v", err)
 	}
 }

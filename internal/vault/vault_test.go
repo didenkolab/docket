@@ -73,7 +73,7 @@ func TestInitStampsKeyAndName(t *testing.T) {
 	if !strings.Contains(config, "name: Acme Platform") {
 		t.Errorf("docket.yaml has no name:\n%s", config)
 	}
-	if agents := read(t, dir, "AGENTS.md"); !strings.Contains(agents, "ACME/12") {
+	if agents := read(t, dir, "AGENTS.md"); !strings.Contains(agents, "ACME-12") {
 		t.Error("AGENTS.md does not use the project key in its examples")
 	}
 	if readme := read(t, dir, "README.md"); !strings.Contains(readme, "Acme Platform") {

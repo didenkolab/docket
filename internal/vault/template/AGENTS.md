@@ -9,12 +9,22 @@ vault.
 
 ## Keys and where files live
 
-A key is `PROJECT/NUMBER`, and it is also the path: `{{.Key}}/12` is the task in
-`{{.Key}}/12.md`. Knowing the key is enough to open the file, and `[[{{.Key}}/12]]` resolves
-in Obsidian without any help.
+A key is `{{.Key}}-12`. The file is named after the task — the key, a space, and the title:
+
+```
+{{.Key}}/{{.Key}}-12 Fix login redirect loop.md
+```
+
+The name carries the title because that is what Obsidian shows in the graph, in the file
+explorer and in search. A file called `12.md` tells nobody anything.
 
 The projects this vault holds are listed in `docket.yaml`, each a folder at the root. Numbers
 start at 1 per project and are never reused.
+
+**Link to a task by its whole note name**, not by its key:
+`[[{{.Key}}-12 Fix login redirect loop]]`. Obsidian resolves the name of a note and does not
+consult aliases, so `[[{{.Key}}-12]]` on its own points at nothing. `docket check` says so and
+prints the form to use.
 
 To pick a key, list the project's folder, take the highest number, add one — or run
 `docket new`, which does exactly that. If two agents pick the same number in parallel branches,
@@ -23,19 +33,19 @@ renumber existing tasks to close gaps; a key is permanent.
 
 ## Creating a task
 
-Copy `templates/task.md` to `{{.Key}}/<n>.md` and fill the frontmatter. Every field in the
-template is required except `parent`, `labels` and `aliases`.
+Copy `templates/task.md` to `{{.Key}}/{{.Key}}-<n> <title>.md` and fill the frontmatter. Every
+field in the template is required except `parent`, `labels` and `aliases`.
 
 ```markdown
 ---
-key: {{.Key}}/12
+key: {{.Key}}-12
 title: Fix login redirect loop
 type: bug
 status: In progress
 status_category: doing
 priority: high
 assignee: agent/claude
-parent: {{.Key}}/4
+parent: {{.Key}}-4
 labels: [auth]
 created: 2026-01-01T09:00:00Z
 updated: 2026-01-01T09:00:00Z
@@ -57,10 +67,11 @@ task in a column the board cannot render. Both change in the same edit.
 ## Editing a task
 
 - Set `updated` to the current UTC time on every change.
-- Never edit `key`, `created`, or the file name.
+- Never edit `key` or `created`. Changing `title` renames the file too; `docket check`
+  reports a name that no longer matches.
 - Append comments under `## Comments`, newest last, in the form
   `**<author> · <YYYY-MM-DD HH:mm>** — text`.
-- Link to other tasks and pages with `[[{{.Key}}/4]]` and `[[docs/some-page]]`.
+- Link to other tasks and pages by note name: `[[{{.Key}}-4 Its title]]`, `[[docs/some-page]]`.
 
 ## Writing documentation
 
@@ -73,4 +84,5 @@ useful. A page that nothing links to is a page nobody will find.
 One commit per logical change, describing what changed for the reader, not which files moved.
 Moving a task to `In review` is a commit. Writing a page is a commit. The commit history *is*
 the change history of the tracker: there is no separate audit log, and
-`git log -p {{.Key}}/12.md` is how anyone sees who moved what and when.
+`git log --follow -p "{{.Key}}/{{.Key}}-12 Fix login redirect loop.md"` is how anyone sees
+who moved what and when — with `--follow`, because retitling renames the file.

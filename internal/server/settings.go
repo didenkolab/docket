@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -350,7 +351,7 @@ func (s *Server) applyRenames(c *project.Config, renames map[string]project.Stat
 		if err != nil {
 			return moved, err
 		}
-		if err := os.WriteFile(s.taskPath(e.Key), content, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(s.root, filepath.FromSlash(e.Path)), content, 0o644); err != nil {
 			return moved, err
 		}
 		if err := s.repo.Commit([]string{e.Path},

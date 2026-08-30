@@ -149,12 +149,12 @@ func TestAViewerReadsAndCannotWrite(t *testing.T) {
 	if w := as(t, h, cookie, "GET", "/", nil); w.Code != http.StatusOK {
 		t.Errorf("a viewer cannot see the board: %d", w.Code)
 	}
-	if w := as(t, h, cookie, "GET", "/task/ACME/1", nil); w.Code != http.StatusOK {
+	if w := as(t, h, cookie, "GET", "/task/ACME-1", nil); w.Code != http.StatusOK {
 		t.Errorf("a viewer cannot open a task: %d", w.Code)
 	}
 
-	w := as(t, h, cookie, "POST", "/task/ACME/1/status", url.Values{
-		"version": {currentVersion(t, s, "ACME/1")},
+	w := as(t, h, cookie, "POST", "/task/ACME-1/status", url.Values{
+		"version": {currentVersion(t, s, "ACME-1")},
 		"status":  {"Done"},
 	})
 	if w.Code != http.StatusForbidden {
@@ -169,8 +169,8 @@ func TestAMemberWritesButDoesNotConfigure(t *testing.T) {
 	s, h, _, root := guardedServer(t)
 	cookie := signIn(t, h, access.RoleMember)
 
-	w := as(t, h, cookie, "POST", "/task/ACME/1/status", url.Values{
-		"version": {currentVersion(t, s, "ACME/1")},
+	w := as(t, h, cookie, "POST", "/task/ACME-1/status", url.Values{
+		"version": {currentVersion(t, s, "ACME-1")},
 		"status":  {"In progress"},
 	})
 	if w.Code != http.StatusSeeOther {

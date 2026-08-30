@@ -76,6 +76,12 @@ func Run(root string) ([]Finding, error) {
 		return nil, err
 	}
 
+	// key → the note name a link has to use, for the suggestion below.
+	byKey := map[string]string{}
+	for _, e := range entries {
+		byKey[e.Key] = e.Note()
+	}
+
 	var findings []Finding
 	add := func(f Finding) { findings = append(findings, f) }
 
@@ -96,8 +102,15 @@ func Run(root string) ([]Finding, error) {
 
 		if t.Key != e.Key {
 			add(Finding{e.Path, t.PropertyLine("key"), RuleFrontmatter,
-				fmt.Sprintf("key is %q but the file is at %q — the key is the path",
-					t.Key, e.Path)})
+				fmt.Sprintf("key is %q but the file is named %q — the name starts with the key",
+					t.Key, filepath.Base(e.Path))})
+		}
+		if title := t.Title; title != "" {
+			if want := vault.FileName(t.Key, title); want != filepath.Base(e.Path) {
+				add(Finding{e.Path, t.PropertyLine("title"), RuleFrontmatter,
+					fmt.Sprintf("the file should be named %q — the name carries the title, so "+
+						"the graph and the file explorer can say what this is", want)})
+			}
 		}
 		if where, taken := seen[t.Key]; taken {
 			add(Finding{e.Path, t.PropertyLine("key"), RuleUniqueKeys,
@@ -124,7 +137,7 @@ func Run(root string) ([]Finding, error) {
 		}
 
 		checkTimestamps(add, e)
-		checkLinks(add, e, names)
+		checkLinks(add, e, names, byKey)
 	}
 
 	for _, key := range cycles(parents) {
@@ -132,7 +145,7 @@ func Run(root string) ([]Finding, error) {
 		add(Finding{e.Path, 0, RuleParent, fmt.Sprintf("%s is part of a parent cycle", key)})
 	}
 
-	findings = append(findings, checkPageLinks(root, names)...)
+	findings = append(findings, checkPageLinks(root, names, byKey)...)
 	findings = append(findings, checkProjects(root, c)...)
 
 	sort.Slice(findings, func(i, j int) bool {
@@ -191,13 +204,23 @@ func checkTimestamps(add func(Finding), e vault.Entry) {
 	}
 }
 
-func checkLinks(add func(Finding), e vault.Entry, names map[string]bool) {
+func checkLinks(add func(Finding), e vault.Entry, names map[string]bool, byKey map[string]string) {
 	for _, target := range e.Task.Links() {
-		if !names[strings.ToLower(target)] {
-			add(Finding{e.Path, e.Task.LineOf(target), RuleLinks,
-				fmt.Sprintf("[[%s]] resolves to nothing in this vault", target)})
+		if names[strings.ToLower(target)] {
+			continue
 		}
+		add(Finding{e.Path, e.Task.LineOf(target), RuleLinks, deadLink(target, byKey)})
 	}
+}
+
+// deadLink says what is wrong, and — for the mistake everyone makes once —
+// what to write instead. Obsidian resolves a note's name, not a task's key.
+func deadLink(target string, byKey map[string]string) string {
+	if note, ok := byKey[target]; ok {
+		return fmt.Sprintf("[[%s]] resolves to nothing — a key is not a note name; write [[%s]]",
+			target, note)
+	}
+	return fmt.Sprintf("[[%s]] resolves to nothing in this vault", target)
 }
 
 // checkProjects catches the two ways docket.yaml, the folders and the boards can
@@ -259,7 +282,7 @@ func checkProjects(root string, c *project.Config) []Finding {
 
 // checkPageLinks applies rule 8 to the knowledge base as well: a broken link in
 // a page is as dead as one in a task.
-func checkPageLinks(root string, names map[string]bool) []Finding {
+func checkPageLinks(root string, names map[string]bool, byKey map[string]string) []Finding {
 	var findings []Finding
 
 	docs := filepath.Join(root, vault.DocsDir)
@@ -280,7 +303,7 @@ func checkPageLinks(root string, names map[string]bool) []Finding {
 				continue
 			}
 			findings = append(findings, Finding{rel, lineOf(lines, target), RuleLinks,
-				fmt.Sprintf("[[%s]] resolves to nothing in this vault", target)})
+				deadLink(target, byKey)})
 		}
 		return nil
 	})
@@ -296,10 +319,13 @@ func lineOf(lines []string, target string) int {
 	return 0
 }
 
-// resolvable collects everything a wikilink can point at: file names without
-// their extension, full vault-relative paths with and without it, and the
-// aliases declared in frontmatter. Matching is case-insensitive, the way
-// Obsidian behaves on the file systems people actually use.
+// resolvable collects what a wikilink can point at, the way Obsidian resolves
+// one: a file name without its extension, or a vault-relative path.
+//
+// Aliases are deliberately not included. Obsidian's resolver does not consult
+// them, so accepting them here would pass links that are dead in the app —
+// a validator that is more generous than the thing it validates is worse than
+// none.
 func resolvable(root string) (map[string]bool, error) {
 	names := map[string]bool{}
 	addName := func(s string) { names[strings.ToLower(s)] = true }
@@ -324,27 +350,9 @@ func resolvable(root string) (map[string]bool, error) {
 		addName(rel)
 		addName(strings.TrimSuffix(rel, filepath.Ext(rel)))
 		addName(strings.TrimSuffix(d.Name(), filepath.Ext(d.Name())))
-
-		if strings.HasSuffix(path, ".md") {
-			for _, alias := range aliasesOf(path) {
-				addName(alias)
-			}
-		}
 		return nil
 	})
 	return names, err
-}
-
-func aliasesOf(path string) []string {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	t, err := task.Parse(raw)
-	if err != nil {
-		return nil // a page without frontmatter declares no aliases
-	}
-	return t.Aliases
 }
 
 // cycles returns one key from every cycle in the parent graph — the smallest,

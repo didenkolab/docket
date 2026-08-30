@@ -256,7 +256,7 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 	if err != nil {
 		return false, err
 	}
-	path := filepath.Join(opts.Root, filepath.FromSlash(vault.TaskPath(key)))
+	path := filepath.Join(opts.Root, opts.Project, vault.FileName(key, stringField(fields["summary"])))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
