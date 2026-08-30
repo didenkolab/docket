@@ -17,10 +17,10 @@ Usage:
 Reports every problem it finds, with a file and a line, and exits non-zero when
 there is at least one — so it works as a pre-commit hook.
 
---fix renames files whose name no longer matches their title, which is the one
-finding with a right answer: the frontmatter is what a task says about itself,
-and the name is derived from it. Everything else is left alone, because picking
-a side between two things a person meant would be guessing. Flags:
+--fix settles the two findings that have a right answer: a file whose name no
+longer matches its title, and a relationship still written as a string rather
+than as a link. Everything else is left alone, because picking a side between
+two things a person meant would be guessing. Flags:
 `
 
 func runCheck(args []string, stdout, stderr io.Writer) int {
@@ -32,7 +32,8 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	}
 	quiet := flags.Bool("quiet", false, "print findings only, without the summary")
 	fix := flags.Bool("fix", false,
-		"rename files whose name no longer matches their title, then check again")
+		"rename files whose name drifted from their title, rewrite relationships still\n"+
+			"    \twritten as strings, then check again")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -89,6 +90,16 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 // printed before they happen, because a file moving under an editor is
 // something to be told about rather than to discover.
 func repair(root string, stdout io.Writer) (int, error) {
+	// Relinking first: it reads every task, and a rename would move the files
+	// out from under it.
+	relinked, err := check.Relink(root)
+	if err != nil {
+		return 0, err
+	}
+	for _, path := range relinked {
+		fmt.Fprintf(stdout, "linked  %s\n", path)
+	}
+
 	renames, err := check.Renames(root)
 	if err != nil {
 		return 0, err
@@ -99,11 +110,13 @@ func repair(root string, stdout io.Writer) (int, error) {
 	if err := check.Apply(root, renames); err != nil {
 		return 0, err
 	}
-	if len(renames) > 0 {
-		fmt.Fprintf(stdout, "\n%s. Commit them together with whatever changed the titles.\n",
-			plural(len(renames), "file renamed", "files renamed"))
+
+	touched := len(relinked) + len(renames)
+	if touched > 0 {
+		fmt.Fprintf(stdout, "\n%s. Commit them together with whatever changed.\n",
+			plural(touched, "file changed", "files changed"))
 	}
-	return len(renames), nil
+	return touched, nil
 }
 
 func plural(n int, one, many string) string {

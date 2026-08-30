@@ -173,19 +173,21 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		if parent != t.Parent {
 			switch {
 			case parent == "":
-				t.Remove("parent")
+				t.SetParent("")
 			default:
-				if _, err := vault.Find(s.root, c, parent); err != nil {
+				// A parent is a link, and a link resolves by note name.
+				note, err := vault.Note(s.root, c, parent)
+				if err != nil {
 					return "", nil, fmt.Errorf("parent %s does not exist", parent)
 				}
-				t.Set("parent", parent)
+				t.SetParent(note)
 			}
 			changed = append(changed, "parent")
 		}
 
 		labels := splitCommas(r.FormValue("labels"))
 		if strings.Join(labels, ",") != strings.Join(t.Labels, ",") {
-			t.SetList("labels", labels)
+			t.SetLabels(labels)
 			changed = append(changed, "labels")
 		}
 

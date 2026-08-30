@@ -74,8 +74,13 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 		return nil, err
 	}
 
+	// Every task's note name, worked out before any of them is written: a
+	// parent is a link, a link resolves by note name, and a task may name a
+	// parent that has not been written yet.
+	notes := noteNames(opts.Project, issues)
+
 	for _, issue := range issues {
-		written, err := writeTask(opts, maps, issue, comments[issue.Key], report)
+		written, err := writeTask(opts, maps, issue, comments[issue.Key], notes, report)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", issue.Key, err)
 		}
@@ -168,7 +173,7 @@ func writeConfig(root, key, name string, maps *Maps) error {
 }
 
 func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
-	comments []json.RawMessage, report *ApplyReport) (bool, error) {
+	comments []json.RawMessage, notes map[string]string, report *ApplyReport) (bool, error) {
 
 	fields := issue.Fields
 
@@ -226,10 +231,10 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 	t.Set("assignee", handle(maps, fields["assignee"]))
 
 	if parent := parentKey(fields["parent"]); parent != "" {
-		t.Set("parent", project.Key(opts.Project, numberOf(parent)))
+		t.SetParent(notes[project.Key(opts.Project, numberOf(parent))])
 	}
 
-	t.SetList("labels", stringList(fields["labels"]))
+	t.SetLabels(stringList(fields["labels"]))
 	t.SetPlain("created", timestamp(fields["created"], opts.Now))
 	t.SetPlain("updated", timestamp(fields["updated"], opts.Now))
 	// The source key outlives its system: it sits in commit messages, branch
@@ -417,4 +422,18 @@ func timestamp(raw json.RawMessage, fallback time.Time) string {
 		return parsed.UTC().Format(task.TimeFormat)
 	}
 	return fallback.UTC().Format(task.TimeFormat)
+}
+
+// noteNames is what a wikilink to each imported task will say. A parent is a
+// link and a link resolves by note name, so every name has to be known before
+// the first file is written — a task can name a parent that comes later in the
+// snapshot.
+func noteNames(projectKey string, issues []sourceIssue) map[string]string {
+	notes := make(map[string]string, len(issues))
+	for _, issue := range issues {
+		key := project.Key(projectKey, numberOf(issue.Key))
+		title := stringField(issue.Fields["summary"])
+		notes[key] = strings.TrimSuffix(vault.FileName(key, title), ".md")
+	}
+	return notes
 }

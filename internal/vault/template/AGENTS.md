@@ -50,15 +50,30 @@ status: In progress
 status_category: doing
 priority: high
 assignee: agent/claude
-parent: {{.Key}}-4
-labels: [auth]
+parent: "[[{{.Key}}-4 Session model]]"
+labels: ["[[auth]]"]
 created: 2026-01-01T09:00:00Z
 updated: 2026-01-01T09:00:00Z
 aliases: []
 ---
 ```
 
-## The two rules that matter most
+## The three rules that matter most
+
+**A relationship is a link.** `parent` and every entry in `labels` are wikilinks — not bare
+words:
+
+```yaml
+parent: "[[{{.Key}}-4 Session model]]"
+labels: ["[[auth]]", "[[regression]]"]
+```
+
+A wikilink is the only pointer Obsidian resolves, draws in the graph and counts as a backlink.
+The same word written plainly connects nothing, so an epic written that way has no edge to its
+tasks and a label groups nothing. Link by note name — `[[{{.Key}}-4 Its title]]`, never
+`[[{{.Key}}-4]]`, because Obsidian does not consult aliases. Quote them: unquoted,
+`[[auth]]` is a nested list in YAML. A label link need not resolve; an unresolved link is still
+an edge, and writing the page later is what gives the label somewhere to explain itself.
 
 **Frontmatter is flat.** No nested objects, ever. Obsidian's property editor only handles flat
 values and Bases only filters on top-level properties — a nested field makes the task

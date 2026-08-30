@@ -27,8 +27,8 @@ cd acme
 docket new "Fix login redirect loop" --type bug      # ACME-1, with a valid key
 docket project add --key BETA --name "Beta"          # a second project in the same vault
 docket new --project BETA "Ship the widget"          # BETA-1
-docket check                                         # nine rules, file:line findings
-docket check --fix                                   # rename files whose title moved on
+docket check                                         # ten rules, file:line findings
+docket check --fix                                   # rename drifted files, link up relationships
 ```
 
 A key is `PROJECT-NUMBER`, and the file is named after the task:
@@ -94,6 +94,30 @@ it lands in the column is written down too, as an `order` on the task, so a colu
 arranged is still arranged after a reload — and a vault where nobody has dragged anything is
 simply sorted by key. Dragging is an enhancement, not the mechanism: without JavaScript the
 board is still a board and every task page still moves its own status.
+
+### An epic, a label and a task are joined by links
+
+`parent` and `labels` are wikilinks, not words:
+
+```yaml
+parent: "[[ACME-4 Session model]]"
+labels: ["[[auth]]", "[[regression]]"]
+```
+
+That is the difference between this being Obsidian with tracking on top and being a database
+that keeps its rows in Markdown. A wikilink is the only pointer Obsidian resolves, draws in its
+graph and counts as a backlink — so an epic has an edge to each of its tasks, and a label is a
+hub joining everything that carries it, across projects. The same words written plainly connect
+nothing and exist only for docket's own tools.
+
+A label link need not resolve. `[[auth]]` groups whatever carries it whether or not `auth.md`
+exists; writing that page under `docs/` is what gives the label somewhere to explain itself and
+gather what belongs to it. `tags` works too, since Obsidian already understands it.
+
+Retitling therefore rewrites every link to the renamed note — bodies and frontmatter alike, in
+the same commit as the rename, so no point in the history has the vault pointing at nothing.
+`docket check` reports a relationship still written as a string, and `docket check --fix` rewrites
+it.
 
 ### What happened to this task
 

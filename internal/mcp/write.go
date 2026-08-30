@@ -100,7 +100,7 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		changed = append(changed, "assignee")
 	}
 	if args.Labels != nil {
-		t.SetList("labels", *args.Labels)
+		t.SetLabels(*args.Labels)
 		changed = append(changed, "labels")
 	}
 	if args.Description != nil && *args.Description != t.Description() {

@@ -21,15 +21,16 @@ import (
 
 // Rules, numbered as in the specification.
 const (
-	RuleFrontmatter = 1 // frontmatter exists and key equals the path
-	RuleUniqueKeys  = 2 // no key twice
-	RuleStatus      = 3 // status is known and its category agrees
-	RuleVocabulary  = 4 // type and priority are known
-	RuleParent      = 5 // parent exists and the graph has no cycles
-	RuleFlat        = 6 // no nested frontmatter values
-	RuleTimestamps  = 7 // timestamps parse and are in order
-	RuleLinks       = 8 // every wikilink resolves
-	RuleProjects    = 9 // docket.yaml, the folders and the boards agree
+	RuleFrontmatter = 1  // frontmatter exists and key equals the path
+	RuleUniqueKeys  = 2  // no key twice
+	RuleStatus      = 3  // status is known and its category agrees
+	RuleVocabulary  = 4  // type and priority are known
+	RuleParent      = 5  // parent exists and the graph has no cycles
+	RuleFlat        = 6  // no nested frontmatter values
+	RuleTimestamps  = 7  // timestamps parse and are in order
+	RuleLinks       = 8  // every wikilink resolves
+	RuleProjects    = 9  // docket.yaml, the folders and the boards agree
+	RuleRelations   = 10 // a relationship is a link, not a string
 )
 
 // Finding is one problem, located.
@@ -129,6 +130,8 @@ func Run(root string) ([]Finding, error) {
 					fmt.Sprintf("parent %q does not exist", t.Parent)})
 			}
 		}
+
+		checkRelations(add, e, byKey)
 
 		for _, name := range t.NestedProperties() {
 			add(Finding{e.Path, t.PropertyLine(name), RuleFlat,
@@ -415,4 +418,45 @@ func entryFor(entries []vault.Entry, key string) vault.Entry {
 		}
 	}
 	return vault.Entry{Path: key}
+}
+
+// checkRelations reports a relationship written as a string.
+//
+// A parent and a label are what connect an epic to its tasks and a task to
+// everything else carrying the same label. Written as plain words they connect
+// nothing: Obsidian resolves wikilinks and nothing else, so the relationship
+// exists for docket's own tools and is absent from the graph, the backlinks and
+// the quick switcher — which is where it was supposed to show. See
+// docs/purpose.md §3.
+//
+// `docket check --fix` rewrites them, because unlike every other finding this
+// one has a right answer.
+func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string) {
+	t := e.Task
+
+	if raw := t.RawParent(); raw != "" && !task.IsLink(raw) {
+		add(Finding{e.Path, t.PropertyLine("parent"), RuleRelations,
+			fmt.Sprintf("parent %q is a string, not a link: an epic written this way draws no "+
+				"edge to its tasks in Obsidian. Write it as %q — docket check --fix does it",
+				raw, task.Link(noteFor(raw, byKey)))})
+	}
+
+	for _, raw := range t.RawLabels() {
+		if task.IsLink(raw) {
+			continue
+		}
+		add(Finding{e.Path, t.PropertyLine("labels"), RuleRelations,
+			fmt.Sprintf("label %q is a string, not a link: it connects nothing in Obsidian. "+
+				"Write it as %q — docket check --fix does it", raw, task.Link(raw))})
+	}
+}
+
+// noteFor is the note name a key should be linked by, or the key itself when
+// nothing in the vault has it — a dangling link is still a link, and rule 5
+// already reports a parent that does not exist.
+func noteFor(key string, byKey map[string]string) string {
+	if note, ok := byKey[key]; ok {
+		return note
+	}
+	return key
 }

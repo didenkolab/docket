@@ -57,7 +57,8 @@ func TestNewAcceptsFlagsAfterTheTitle(t *testing.T) {
 	}
 
 	raw, _ := os.ReadFile(filepath.Join(dir, "ACME", "ACME-1 Fix login redirect loop.md"))
-	for _, want := range []string{"type: bug", "priority: high", "labels: [auth, regression]"} {
+	for _, want := range []string{"type: bug", "priority: high",
+		`labels: ["[[auth]]", "[[regression]]"]`} {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("missing %q in:\n%s", want, raw)
 		}

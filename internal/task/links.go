@@ -1,6 +1,10 @@
 package task
 
-import "strings"
+import (
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
 
 // A wikilink is how one note points at another, and it is the only kind of
 // pointer Obsidian resolves, draws in its graph and counts as a backlink. A key
@@ -161,4 +165,53 @@ func rewriteLinks(s string, rewrite func(inner string) string) string {
 	return wikilink.ReplaceAllStringFunc(s, func(m string) string {
 		return rewrite(strings.TrimSuffix(strings.TrimPrefix(m, "[["), "]]"))
 	})
+}
+
+/* ---------- writing a relationship ---------- */
+
+// SetParent points the task at the one it belongs to, by note name —
+// `ACME-4 Session model`, not `ACME-4`. The name is what a wikilink resolves,
+// and a bare key resolves to nothing: Obsidian does not consult aliases.
+//
+// An empty note removes the property. `parent:` with no value is not "no
+// parent", it is a parent that does not exist, and the validator is right to
+// say so.
+func (t *Task) SetParent(note string) {
+	if strings.TrimSpace(note) == "" {
+		t.Remove("parent")
+		t.Parent, t.rawParent = "", ""
+		return
+	}
+	link := Link(note)
+	t.setNode("parent", quoted(link))
+	t.Parent, t.rawParent = KeyOf(note), link
+}
+
+// SetLabels writes the labels as links, so each one is an edge in the graph and
+// each one can be a page that says what it means.
+func (t *Task) SetLabels(names []string) {
+	links := make([]string, 0, len(names))
+	for _, name := range names {
+		if name = strings.TrimSpace(name); name != "" {
+			links = append(links, Link(name))
+		}
+	}
+
+	list := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
+	for _, link := range links {
+		list.Content = append(list.Content, quoted(link))
+	}
+	t.setNode("labels", list)
+
+	t.rawLabels = links
+	t.Labels = t.Labels[:0]
+	for _, link := range links {
+		t.Labels = append(t.Labels, labelName(link))
+	}
+}
+
+// quoted is a scalar YAML has to quote. `[[auth]]` unquoted is a nested
+// sequence, and a link written that way is not a link, it is two empty lists.
+func quoted(value string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Style: yaml.DoubleQuotedStyle, Value: value}
 }

@@ -220,7 +220,7 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 			changed = append(changed, "assignee")
 		}
 		if req.Labels != nil {
-			t.SetList("labels", *req.Labels)
+			t.SetLabels(*req.Labels)
 			changed = append(changed, "labels")
 		}
 		if req.Comment != nil && strings.TrimSpace(*req.Comment) != "" {

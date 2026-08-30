@@ -73,7 +73,9 @@ func TestCreateWritesWhatTheSpecShows(t *testing.T) {
 		"key: ACME-1\n",
 		"title: Fix login redirect loop\n",
 		"type: bug\n",
-		"labels: [auth, regression]\n",
+		// A label is a link, so it is an edge in Obsidian's graph rather than
+		// a word only our own tools can see.
+		`labels: ["[[auth]]", "[[regression]]"]` + "\n",
 		"created: 2026-08-30T12:00:00Z\n",
 		"aliases: []\n",
 	} {

@@ -39,11 +39,29 @@ type Task struct {
 	StatusCategory string   `yaml:"status_category"`
 	Priority       string   `yaml:"priority"`
 	Assignee       string   `yaml:"assignee"`
-	Parent         string   `yaml:"parent"`
-	Labels         []string `yaml:"labels"`
 	Created        string   `yaml:"created"`
 	Updated        string   `yaml:"updated"`
 	Aliases        []string `yaml:"aliases"`
+	// Tags are Obsidian's own, and are passed through untouched.
+	Tags []string `yaml:"tags,omitempty"`
+
+	// Parent is the key of the task this one belongs to, and Labels are the
+	// names of the labels it carries — both resolved from what is on disk.
+	//
+	// On disk they are wikilinks: `parent: "[[ACME-4 Session model]]"`. That is
+	// what Obsidian resolves, draws in the graph and counts as a backlink,
+	// which is the whole reason an epic and a label exist. See
+	// docs/purpose.md §3.
+	//
+	// Here they are a key and a list of names, because that is what everything
+	// asking the question wants. The link form is written by SetParent and
+	// SetLabels and read back by RawParent and RawLabels; a vault written
+	// before this still parses, because a bare string reads as itself.
+	Parent string   `yaml:"-"`
+	Labels []string `yaml:"-"`
+
+	rawParent string
+	rawLabels []string
 	// Order is where the task sits among the others in its column, when
 	// somebody has said. Absent — the usual case — the task sorts after every
 	// task that has one. See SetOrder.
@@ -78,8 +96,45 @@ func Parse(data []byte) (*Task, error) {
 	if err := t.front.Decode(t); err != nil {
 		return nil, fmt.Errorf("frontmatter: %w", err)
 	}
+	t.resolve()
 	return t, nil
 }
+
+// resolve turns what is written into what callers ask for: a parent link into a
+// key, and label links into names. Both forms are read; only the link form is
+// written.
+func (t *Task) resolve() {
+	var raw struct {
+		Parent string   `yaml:"parent"`
+		Labels []string `yaml:"labels"`
+	}
+	_ = t.front.Decode(&raw)
+
+	t.rawParent, t.rawLabels = raw.Parent, raw.Labels
+	t.Parent = KeyOf(NoteOf(raw.Parent))
+	t.Labels = t.Labels[:0]
+	for _, l := range raw.Labels {
+		if name := labelName(l); name != "" {
+			t.Labels = append(t.Labels, name)
+		}
+	}
+}
+
+// labelName is what a label is called: the note it points at, without any
+// folder. `[[docs/labels/auth]]` and `[[auth]]` and `auth` are all "auth", so
+// filing a label under a folder does not rename it.
+func labelName(value string) string {
+	note := NoteOf(value)
+	if slash := strings.LastIndex(note, "/"); slash >= 0 {
+		note = note[slash+1:]
+	}
+	return strings.TrimSpace(note)
+}
+
+// RawParent and RawLabels are the values exactly as the file has them, for
+// `docket check` to say which are still strings rather than links.
+func (t *Task) RawParent() string   { return t.rawParent }
+func (t *Task) RawLabels() []string { return t.rawLabels }
 
 // split separates the frontmatter block from the body.
 func split(data []byte) (front []byte, body string, err error) {
@@ -137,7 +192,13 @@ func (t *Task) SetPlain(name, value string) {
 
 // Sync refreshes the typed fields from the frontmatter. Call it after edits if
 // the struct is going to be read again.
-func (t *Task) Sync() error { return t.front.Decode(t) }
+func (t *Task) Sync() error {
+	if err := t.front.Decode(t); err != nil {
+		return err
+	}
+	t.resolve()
+	return nil
+}
 
 func textNode(value string) *yaml.Node {
 	// A bare `assignee:` is how Obsidian writes an empty text property.

@@ -296,10 +296,14 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 			opts.Status, strings.Join(c.StatusNames(), ", "))
 	}
 
+	parentNote := ""
 	if opts.Parent != "" {
-		if _, err := Find(root, c, opts.Parent); err != nil {
+		rel, err := Find(root, c, opts.Parent)
+		if err != nil {
 			return "", nil, fmt.Errorf("parent %s does not exist", opts.Parent)
 		}
+		// A parent is written as a link, and a link resolves by note name.
+		parentNote = noteName(rel)
 	}
 
 	key, err := NextKey(root, opts.Project)
@@ -321,16 +325,12 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 	t.Set("assignee", opts.Assignee)
 	t.SetPlain("created", stamp)
 	t.SetPlain("updated", stamp)
-	t.SetList("labels", opts.Labels)
+	t.SetLabels(opts.Labels)
 	t.SetList("aliases", nil)
 	if opts.Description != "" {
 		t.SetDescription(opts.Description)
 	}
-	if opts.Parent != "" {
-		t.Set("parent", opts.Parent)
-	} else {
-		t.Remove("parent")
-	}
+	t.SetParent(parentNote)
 	if err := t.Sync(); err != nil {
 		return "", nil, err
 	}
@@ -394,4 +394,19 @@ func Rename(root, from, to string) error {
 // PathFor is where a task with this key and title belongs.
 func PathFor(projectKey, key, title string) string {
 	return filepath.ToSlash(filepath.Join(projectKey, FileName(key, title)))
+}
+
+// Note is the name a wikilink to this task uses: the file name without the
+// folder and without the extension.
+//
+// A link resolves by note name, and a note is named after its task, so this is
+// the one place that knows how to turn a key into something linkable. Obsidian
+// does not consult aliases, so `[[ACME-12]]` on its own points at nothing —
+// see docs/decisions/0005-a-file-is-named-after-its-task.md.
+func Note(root string, c *project.Config, key string) (string, error) {
+	rel, err := Find(root, c, key)
+	if err != nil {
+		return "", err
+	}
+	return noteName(rel), nil
 }
