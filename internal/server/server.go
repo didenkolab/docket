@@ -95,6 +95,9 @@ func New(root string, opts Options) (*Server, error) {
 
 	tmpl, err := template.New("").Funcs(template.FuncMap{
 		"categoryClass": categoryClass,
+		// Two tags are the same tag when they differ only in case, which is
+		// what Obsidian does.
+		"sameTag": func(a, b string) bool { return strings.EqualFold(a, b) },
 	}).ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, err

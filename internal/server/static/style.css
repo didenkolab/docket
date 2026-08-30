@@ -699,6 +699,50 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .opening h1 { margin-bottom: var(--s2); }
 .opening p { margin: 0 0 var(--s2); color: var(--ink-soft); }
 
+/* ---- callouts ---- */
+
+/* Obsidian's, so they read the same in both. One hue per kind, taken from the
+ * palette already here rather than from Obsidian's, because this is a different
+ * product and should look like itself. */
+.callout {
+  --callout: var(--ink-faint);
+  --callout-soft: var(--sunken);
+  margin: var(--s4) 0;
+  padding: var(--s3) var(--s4);
+  border-left: 3px solid var(--callout);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--callout-soft);
+}
+
+.callout[data-callout="info"], .callout[data-callout="todo"],
+.callout[data-callout="question"], .callout[data-callout="example"] {
+  --callout: var(--doing); --callout-soft: var(--accent-soft);
+}
+.callout[data-callout="success"] {
+  --callout: var(--done);
+  --callout-soft: color-mix(in srgb, var(--done) 10%, transparent);
+}
+.callout[data-callout="warning"], .callout[data-callout="failure"],
+.callout[data-callout="danger"], .callout[data-callout="bug"] {
+  --callout: var(--warn); --callout-soft: var(--warn-soft);
+}
+
+.callout-title {
+  font-weight: 650;
+  font-size: 0.9rem;
+  color: var(--callout);
+  margin-bottom: var(--s1);
+}
+
+/* A foldable callout is a details element, so it folds with no script. */
+details.callout > summary.callout-title { cursor: pointer; list-style: none; }
+details.callout > summary.callout-title::-webkit-details-marker { display: none; }
+details.callout > summary.callout-title::before { content: "▸ "; }
+details.callout[open] > summary.callout-title::before { content: "▾ "; }
+
+.callout-body > :first-child { margin-top: 0; }
+.callout-body > :last-child { margin-bottom: 0; }
+
 /* ---- history ---- */
 
 /* One column of events down a rule, because a history is read downwards and

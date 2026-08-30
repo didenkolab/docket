@@ -627,10 +627,14 @@ func vocabulary(entries []vault.Entry) (assignees, labels, tags []string) {
 		}
 		// Every level of a nested tag is offered, so `area` narrows to
 		// everything under it the way Obsidian's tag pane does.
+		// One tag, whatever it was written as: Obsidian treats them as the
+		// same and shows the casing it saw first, so the list offers the first
+		// casing and matching ignores it.
 		for _, t := range e.Task.Tags {
 			for _, level := range task.TagTree(t) {
-				if !seenTag[level] {
-					seenTag[level] = true
+				folded := strings.ToLower(level)
+				if !seenTag[folded] {
+					seenTag[folded] = true
 					tags = append(tags, level)
 				}
 			}
@@ -727,8 +731,14 @@ func matches(f filters, e vault.Entry) bool {
 // `area/auth`, the way Obsidian's tag pane and its `tag:` search do. A tag is a
 // hierarchy, and a filter that ignored the hierarchy would answer a different
 // question from the one the same word answers in Obsidian.
+//
+// Case-insensitively, for the same reason: in Obsidian `#Auth` and `#auth` are
+// one tag, shown under whichever casing was written first. Matching them as two
+// would split a tag in half here that is whole there.
 func taggedWith(tags []string, wanted string) bool {
+	wanted = strings.ToLower(wanted)
 	for _, t := range tags {
+		t = strings.ToLower(t)
 		if t == wanted || strings.HasPrefix(t, wanted+"/") {
 			return true
 		}

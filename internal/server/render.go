@@ -147,7 +147,7 @@ func renderMarkdown(body string, ix *index) template.HTML {
 	})
 
 	var out bytes.Buffer
-	if err := markdown.Convert([]byte(linked), &out); err != nil {
+	if err := markdown.Convert([]byte(rewriteCallouts(linked)), &out); err != nil {
 		return template.HTML(template.HTMLEscapeString(body))
 	}
 	return template.HTML(out.String())

@@ -78,7 +78,7 @@
       <select name="tag">
         <option value="">Any</option>
         {{range $data.Tags}}
-        <option value="{{.}}" {{if eq . $f.Tag}}selected{{end}}>#{{.}}</option>
+        <option value="{{.}}" {{if sameTag . $f.Tag}}selected{{end}}>#{{.}}</option>
         {{end}}
       </select>
     </label>
