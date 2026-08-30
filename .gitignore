@@ -1,0 +1,9 @@
+# Build output
+/docket
+/dist/
+
+# Local environment
+.env
+
+# macOS
+.DS_Store
