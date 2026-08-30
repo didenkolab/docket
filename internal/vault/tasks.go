@@ -249,6 +249,7 @@ type NewOptions struct {
 	Assignee    string
 	Parent      string
 	Labels      []string
+	Tags        []string
 	Now         time.Time
 }
 
@@ -326,6 +327,7 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 	t.SetPlain("created", stamp)
 	t.SetPlain("updated", stamp)
 	t.SetLabels(opts.Labels)
+	t.SetTags(opts.Tags)
 	t.SetList("aliases", nil)
 	if opts.Description != "" {
 		t.SetDescription(opts.Description)

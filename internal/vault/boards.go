@@ -81,6 +81,8 @@ properties:
     displayName: Assignee
   note.priority:
     displayName: Priority
+  note.tags:
+    displayName: Tags
 views:
   - type: cards
     name: Board
@@ -92,6 +94,7 @@ views:
       - note.assignee
       - note.priority
       - note.labels
+      - note.tags
 `
 }
 

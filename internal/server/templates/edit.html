@@ -63,6 +63,15 @@
     <div>
       <label for="labels">Labels</label>
       <input id="labels" name="labels" value="{{$data.Labels}}" placeholder="auth, regression">
+      <p class="footnote inline">Each becomes a link, so a label joins everything carrying it —
+      and can be a page that says what it means.</p>
+    </div>
+
+    <div>
+      <label for="tags">Tags</label>
+      <input id="tags" name="tags" value="{{$data.Tags}}" placeholder="area/auth, needs-review">
+      <p class="footnote inline">Obsidian's own. Nest them with a slash: everything in
+      <code>area/auth</code> is also in <code>area</code>.</p>
     </div>
   </div>
 

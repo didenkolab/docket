@@ -215,3 +215,80 @@ func (t *Task) SetLabels(names []string) {
 func quoted(value string) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Style: yaml.DoubleQuotedStyle, Value: value}
 }
+
+/* ---------- tags ---------- */
+
+// SetTags writes Obsidian's own tags.
+//
+// A tag is not a link and does not want to be one: it is the other thing
+// Obsidian offers for grouping, with a pane of its own, a `tag:` search
+// operator and hierarchy in the name — `#area/auth` is inside `#area`. A label
+// says what a task is about and can be a page; a tag says which slice of the
+// work it belongs to, and nests.
+//
+// Written unquoted and without the hash, which is how Obsidian writes them in
+// frontmatter and the only form its tag pane reads.
+func (t *Task) SetTags(tags []string) {
+	cleaned := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag = CleanTag(tag); tag != "" {
+			cleaned = append(cleaned, tag)
+		}
+	}
+	t.SetList("tags", cleaned)
+	t.Tags = cleaned
+}
+
+// CleanTag makes a string into something Obsidian will accept as a tag.
+//
+// A tag may hold letters, digits, underscore, hyphen and the slash that nests
+// it, and may not be all digits. A space ends a tag, so a space becomes a
+// hyphen rather than two tags — losing half of what somebody typed is worse
+// than changing it visibly. The leading hash is Obsidian's inline syntax and is
+// never written in frontmatter.
+func CleanTag(tag string) string {
+	tag = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(tag), "#"))
+
+	var b strings.Builder
+	for _, r := range tag {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '_' || r == '-' || r == '/':
+			b.WriteRune(r)
+		case r == ' ' || r == '\t':
+			b.WriteRune('-')
+		case r > 127:
+			// Obsidian accepts non-Latin letters in a tag, and a vault whose
+			// language is not English should not have its tags mangled.
+			b.WriteRune(r)
+		}
+	}
+
+	cleaned := strings.Trim(b.String(), "-/")
+	if cleaned == "" || allDigits(cleaned) {
+		return ""
+	}
+	return cleaned
+}
+
+func allDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// TagTree is a tag and everything above it: `area/auth/session` is also in
+// `area/auth` and in `area`. Obsidian's tag pane nests them, and a search for
+// the parent finds the child.
+func TagTree(tag string) []string {
+	parts := strings.Split(tag, "/")
+	out := make([]string, 0, len(parts))
+	for i := range parts {
+		out = append(out, strings.Join(parts[:i+1], "/"))
+	}
+	return out
+}

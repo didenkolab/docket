@@ -292,6 +292,7 @@ type taskView struct {
 	Assignee string   `json:"assignee,omitempty"`
 	Parent   string   `json:"parent,omitempty"`
 	Labels   []string `json:"labels,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
 	Path     string   `json:"path"`
 	Note     string   `json:"note"` // what a wikilink to this task says
 }
@@ -301,7 +302,7 @@ func view(e vault.Entry) taskView {
 		Key: e.Key, Title: e.Task.Title, Type: e.Task.Type,
 		Status: e.Task.Status, Category: e.Task.StatusCategory,
 		Priority: e.Task.Priority, Assignee: e.Task.Assignee, Parent: e.Task.Parent,
-		Labels: e.Task.Labels, Path: e.Path, Note: e.Note(),
+		Labels: e.Task.Labels, Tags: e.Task.Tags, Path: e.Path, Note: e.Note(),
 	}
 }
 
@@ -388,7 +389,7 @@ func statusNames(statuses []project.Status) []string {
 func (s *Server) createTask(raw json.RawMessage) (any, error) {
 	var args struct {
 		Project, Title, Type, Priority, Assignee, Parent, Description string
-		Labels                                                        []string
+		Labels, Tags                                                  []string
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, err
@@ -417,7 +418,7 @@ func (s *Server) createTask(raw json.RawMessage) (any, error) {
 	inVault, t, err := vault.Create(v.Root, own, vault.NewOptions{
 		Project: projectKey, Title: args.Title, Type: args.Type,
 		Priority: args.Priority, Assignee: args.Assignee, Parent: args.Parent,
-		Description: args.Description, Labels: args.Labels, Now: s.Now(),
+		Description: args.Description, Labels: args.Labels, Tags: args.Tags, Now: s.Now(),
 	})
 	if err != nil {
 		return nil, err

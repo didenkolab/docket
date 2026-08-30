@@ -100,7 +100,10 @@
         <dd>{{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">Unassigned</span>{{end}}</dd>
         {{if $t.Parent}}<dt>Parent</dt><dd><a href="/task/{{$t.Parent}}">{{$t.Parent}}</a></dd>{{end}}
         <dt>Labels</dt>
-        <dd>{{if $t.Labels}}{{range $t.Labels}}<span class="label">{{.}}</span>{{end}}{{else}}<span class="empty">None</span>{{end}}</dd>
+        <dd>{{if $t.Labels}}{{range $t.Labels}}<a class="label" href="/search?label={{.}}">{{.}}</a>{{end}}{{else}}<span class="empty">None</span>{{end}}</dd>
+
+        <dt>Tags</dt>
+        <dd>{{if $t.Tags}}{{range $t.Tags}}<a class="tag" href="/search?tag={{.}}">#{{.}}</a>{{end}}{{else}}<span class="empty">None</span>{{end}}</dd>
         {{if $t.Aliases}}
         <dt>Also known as</dt>
         <dd>{{range $t.Aliases}}<span class="label">{{.}}</span>{{end}}</dd>

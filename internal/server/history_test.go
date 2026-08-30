@@ -271,3 +271,72 @@ func commitFiles(t *testing.T, root string) []string {
 	}
 	return files
 }
+
+/* ---------- tags ---------- */
+
+// A tag nests, and narrowing by a parent finds everything under it — which is
+// what the same word does in Obsidian's tag pane and its tag: search. Anything
+// else would mean the two clients answer the same question differently.
+func TestSearchByTagFollowsTheHierarchy(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, made := range []struct {
+		title string
+		tags  []string
+	}{
+		{"Session model", []string{"area/auth"}},
+		{"Rewrite the importer", []string{"area/import", "needs-review"}},
+		{"Something else", []string{"chore"}},
+	} {
+		if _, _, err := vault.Create(root, c, vault.NewOptions{
+			Title: made.title, Tags: made.tags, Now: noon,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cases := map[string][]string{
+		"area":         {"ACME-2", "ACME-3"},
+		"area/auth":    {"ACME-2"},
+		"needs-review": {"ACME-3"},
+		"chore":        {"ACME-4"},
+	}
+	for tag, want := range cases {
+		body := get(t, h, "/search?tag="+url.QueryEscape(tag)).Body.String()
+		results := body[strings.Index(body, `<ul class="hits">`):]
+		for _, key := range want {
+			if !strings.Contains(results, key) {
+				t.Errorf("tag %q does not find %s", tag, key)
+			}
+		}
+		if tag == "area/auth" && strings.Contains(results, "ACME-3") {
+			t.Errorf("tag %q reached a sibling branch", tag)
+		}
+	}
+}
+
+// The form offers every level of every tag, so a parent can be picked.
+func TestTheSearchFormOffersEveryTagLevel(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Session model", Tags: []string{"area/auth/session"}, Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/search").Body.String()
+	for _, want := range []string{`value="area"`, `value="area/auth"`, `value="area/auth/session"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the form does not offer %s", want)
+		}
+	}
+}

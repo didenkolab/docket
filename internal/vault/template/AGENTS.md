@@ -75,6 +75,10 @@ tasks and a label groups nothing. Link by note name — `[[{{.Key}}-4 Its title]
 `[[auth]]` is a nested list in YAML. A label link need not resolve; an unresolved link is still
 an edge, and writing the page later is what gives the label somewhere to explain itself.
 
+`tags` is the other one, and a different thing: a label says what a task is about, a tag says
+which slice of the work it is in, and tags nest — `area/auth` is inside `area`. Written without
+the `#` and unquoted: `tags: [area/auth, needs-review]`. No spaces, and not all digits.
+
 **Frontmatter is flat.** No nested objects, ever. Obsidian's property editor only handles flat
 values and Bases only filters on top-level properties — a nested field makes the task
 uneditable by hand and invisible to the board. Vault-specific fields go at the same level as

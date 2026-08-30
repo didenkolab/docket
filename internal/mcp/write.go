@@ -30,6 +30,7 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		Title, Status, Priority, Description, Comment *string
 		Assignee                                      *string
 		Labels                                        *[]string
+		Tags                                          *[]string
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, err
@@ -106,6 +107,10 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 	if args.Labels != nil {
 		t.SetLabels(*args.Labels)
 		changed = append(changed, "labels")
+	}
+	if args.Tags != nil {
+		t.SetTags(*args.Tags)
+		changed = append(changed, "tags")
 	}
 	if args.Description != nil && *args.Description != t.Description() {
 		t.SetDescription(*args.Description)

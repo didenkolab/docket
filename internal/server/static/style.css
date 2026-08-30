@@ -372,6 +372,21 @@ body:has(.board) header .bar { max-width: none; }
 
 .meta { display: flex; flex-wrap: wrap; gap: var(--s1); align-items: center; }
 
+/* A tag is Obsidian's, so it is shown the way Obsidian shows one — with the
+ * hash, in the accent, and nesting visible in the name itself. */
+.tag {
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.tag:hover, a.label:hover { filter: brightness(0.94); text-decoration: none; }
+a.label { text-decoration: none; }
+
 .assignee, .label {
   font-size: 0.72rem;
   color: var(--ink-soft);

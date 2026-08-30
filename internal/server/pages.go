@@ -68,6 +68,7 @@ type card struct {
 	Assignee string
 	Priority string
 	Labels   []string
+	Tags     []string
 	// order is where somebody put this card in its column, if anybody has.
 	// Cards without one follow the ones with, in key order.
 	order *int
@@ -190,7 +191,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 					Key: e.Key, Href: "/task/" + e.Key, Project: e.Project,
 					Title: e.Task.Title, Status: e.Task.Status,
 					Assignee: e.Task.Assignee, Priority: e.Task.Priority,
-					Labels: e.Task.Labels, Version: version(e.Raw),
+					Labels: e.Task.Labels, Tags: e.Task.Tags, Version: version(e.Raw),
 					Reachable: reachableList(configOf(e.Project), e.Task.Status),
 					order:     e.Task.Order,
 				})
@@ -525,6 +526,7 @@ type hitTask struct {
 	Priority string
 	Assignee string
 	Labels   []string
+	Tags     []string
 }
 
 // filters is what a person narrowed the search to. Every field is empty by
@@ -537,6 +539,7 @@ type filters struct {
 	Priority string
 	Assignee string
 	Label    string
+	Tag      string
 }
 
 // narrowed reports whether anything but the text was asked for. It decides
@@ -544,7 +547,7 @@ type filters struct {
 // narrowed by one is asking about tasks.
 func (f filters) Narrowed() bool {
 	return f.Project != "" || f.Status != "" || f.Type != "" ||
-		f.Priority != "" || f.Assignee != "" || f.Label != ""
+		f.Priority != "" || f.Assignee != "" || f.Label != "" || f.Tag != ""
 }
 
 // empty reports a form nobody has filled in yet.
@@ -562,6 +565,7 @@ type searchView struct {
 	Prios     []string
 	Assignees []string
 	Labels    []string
+	Tags      []string
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -579,6 +583,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Priority: r.FormValue("priority"),
 		Assignee: r.FormValue("assignee"),
 		Label:    r.FormValue("label"),
+		Tag:      task.CleanTag(r.FormValue("tag")),
 	}
 
 	entries, err := s.entries()
@@ -594,7 +599,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Types:    c.Types,
 		Prios:    c.Priorities,
 	}
-	view.Assignees, view.Labels = vocabulary(entries)
+	view.Assignees, view.Labels, view.Tags = vocabulary(entries)
 	if !f.Empty() {
 		view.Hits = s.search(f, entries)
 	}
@@ -604,8 +609,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 // vocabulary is the assignees and labels the vault actually uses, sorted. They
 // are not configured anywhere, so the only place to learn them is the tasks.
-func vocabulary(entries []vault.Entry) (assignees, labels []string) {
-	seenWho, seenLabel := map[string]bool{}, map[string]bool{}
+func vocabulary(entries []vault.Entry) (assignees, labels, tags []string) {
+	seenWho, seenLabel, seenTag := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, e := range entries {
 		if e.Task == nil {
 			continue
@@ -620,10 +625,21 @@ func vocabulary(entries []vault.Entry) (assignees, labels []string) {
 				labels = append(labels, l)
 			}
 		}
+		// Every level of a nested tag is offered, so `area` narrows to
+		// everything under it the way Obsidian's tag pane does.
+		for _, t := range e.Task.Tags {
+			for _, level := range task.TagTree(t) {
+				if !seenTag[level] {
+					seenTag[level] = true
+					tags = append(tags, level)
+				}
+			}
+		}
 	}
 	sort.Strings(assignees)
 	sort.Strings(labels)
-	return assignees, labels
+	sort.Strings(tags)
+	return assignees, labels, tags
 }
 
 // search is a plain substring scan over the vault. An index would be faster and
@@ -657,7 +673,8 @@ func (s *Server) search(f filters, entries []vault.Entry) []hit {
 			Task: &hitTask{
 				Key: e.Key, Title: e.Task.Title,
 				Status: e.Task.Status, Category: e.Task.StatusCategory,
-				Priority: e.Task.Priority, Assignee: e.Task.Assignee, Labels: e.Task.Labels,
+				Priority: e.Task.Priority, Assignee: e.Task.Assignee,
+				Labels: e.Task.Labels, Tags: e.Task.Tags,
 			},
 		})
 	}
@@ -700,8 +717,23 @@ func matches(f filters, e vault.Entry) bool {
 		return false
 	case f.Label != "" && !slices.Contains(e.Task.Labels, f.Label):
 		return false
+	case f.Tag != "" && !taggedWith(e.Task.Tags, f.Tag):
+		return false
 	}
 	return true
+}
+
+// taggedWith matches a tag and everything nested under it: `area` finds
+// `area/auth`, the way Obsidian's tag pane and its `tag:` search do. A tag is a
+// hierarchy, and a filter that ignored the hierarchy would answer a different
+// question from the one the same word answers in Obsidian.
+func taggedWith(tags []string, wanted string) bool {
+	for _, t := range tags {
+		if t == wanted || strings.HasPrefix(t, wanted+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // unassigned stands for the absence of an assignee, which a blank option cannot

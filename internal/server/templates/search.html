@@ -73,6 +73,16 @@
       </select>
     </label>
 
+    <label>
+      <span>Tag</span>
+      <select name="tag">
+        <option value="">Any</option>
+        {{range $data.Tags}}
+        <option value="{{.}}" {{if eq . $f.Tag}}selected{{end}}>#{{.}}</option>
+        {{end}}
+      </select>
+    </label>
+
     {{if not $f.Empty}}<a class="button-link clear" href="/search">Clear</a>{{end}}
   </div>
 </form>
@@ -80,7 +90,9 @@
 {{if $f.Empty}}
 <p class="empty">
   Search the text of every task and page, or narrow by project, status, type, priority,
-  assignee or label — with no words at all, to list the work rather than read it.
+  assignee, label or tag — with no words at all, to list the work rather than read it.
+  A tag narrows to everything nested under it, so <code>area</code> finds
+  <code>area/auth</code>.
 </p>
 {{else}}
 <p class="count-line">
@@ -105,6 +117,7 @@
       <span class="priority p-{{.Priority}}">{{.Priority}}</span>
       {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
       {{range .Labels}}<span class="label">{{.}}</span>{{end}}
+      {{range .Tags}}<span class="tag">#{{.}}</span>{{end}}
     </span>
     {{end}}
     {{if .Context}}<p class="context">{{.Context}}</p>{{end}}

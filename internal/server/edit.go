@@ -18,6 +18,7 @@ type editView struct {
 	Path      string
 	Body      string
 	Labels    string
+	Tags      string
 	Parents   []parentChoice
 	Error     string
 	Reachable []project.Status
@@ -62,6 +63,7 @@ func (s *Server) editView(c *project.Config, t *task.Task, version, rel, message
 		Path:      rel,
 		Body:      t.Description(),
 		Labels:    strings.Join(t.Labels, ", "),
+		Tags:      strings.Join(t.Tags, ", "),
 		Error:     message,
 		Reachable: c.Reachable(t.Status),
 	}
@@ -193,6 +195,12 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		if strings.Join(labels, ",") != strings.Join(t.Labels, ",") {
 			t.SetLabels(labels)
 			changed = append(changed, "labels")
+		}
+
+		tags := splitCommas(r.FormValue("tags"))
+		if strings.Join(tags, ",") != strings.Join(t.Tags, ",") {
+			t.SetTags(tags)
+			changed = append(changed, "tags")
 		}
 
 		// The description is the body above the comments. Rewriting it must

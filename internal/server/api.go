@@ -24,6 +24,7 @@ type taskJSON struct {
 	Assignee       string   `json:"assignee,omitempty"`
 	Parent         string   `json:"parent,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
 	Created        string   `json:"created"`
 	Updated        string   `json:"updated"`
 	Aliases        []string `json:"aliases,omitempty"`
@@ -41,7 +42,7 @@ func toJSON(c *project.Config, t *task.Task, version string, withBody bool) task
 		Key: t.Key, Title: t.Title, Type: t.Type,
 		Status: t.Status, StatusCategory: t.StatusCategory,
 		Priority: t.Priority, Assignee: t.Assignee, Parent: t.Parent,
-		Labels: t.Labels, Created: t.Created, Updated: t.Updated,
+		Labels: t.Labels, Tags: t.Tags, Created: t.Created, Updated: t.Updated,
 		Aliases: t.Aliases, Order: t.Order, Version: version,
 	}
 	if c != nil {
@@ -117,6 +118,7 @@ type createRequest struct {
 	Assignee string   `json:"assignee"`
 	Parent   string   `json:"parent"`
 	Labels   []string `json:"labels"`
+	Tags     []string `json:"tags"`
 }
 
 func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +139,7 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 		Project: req.Project,
 		Title:   req.Title, Type: req.Type, Status: req.Status,
 		Priority: req.Priority, Assignee: req.Assignee, Parent: req.Parent,
-		Labels: req.Labels, Now: s.now(),
+		Labels: req.Labels, Tags: req.Tags, Now: s.now(),
 	})
 	if err == nil {
 		err = s.commit([]string{rel}, t.Key+": "+t.Title, author)
@@ -161,6 +163,7 @@ type patchRequest struct {
 	Priority *string   `json:"priority"`
 	Assignee *string   `json:"assignee"`
 	Labels   *[]string `json:"labels"`
+	Tags     *[]string `json:"tags"`
 	Comment  *string   `json:"comment"`
 	Version  string    `json:"version"`
 	// After places the task in its column, directly below the task with this
@@ -224,6 +227,10 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		if req.Labels != nil {
 			t.SetLabels(*req.Labels)
 			changed = append(changed, "labels")
+		}
+		if req.Tags != nil {
+			t.SetTags(*req.Tags)
+			changed = append(changed, "tags")
 		}
 		if req.Comment != nil && strings.TrimSpace(*req.Comment) != "" {
 			t.AppendComment(author.Name, s.now(), *req.Comment)

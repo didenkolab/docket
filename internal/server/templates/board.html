@@ -55,6 +55,7 @@
           {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
           <span class="priority p-{{.Priority}}">{{.Priority}}</span>
           {{range .Labels}}<span class="label">{{.}}</span>{{end}}
+          {{range .Tags}}<span class="tag">#{{.}}</span>{{end}}
         </span>
       </a>
       {{end}}
