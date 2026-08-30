@@ -12,12 +12,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: true
+          # No dependencies yet, so there is no go.sum to key a cache on.
+          # Turn this on together with the first `require` line.
+          cache: false
 
       - name: Vet
         run: go vet ./...
