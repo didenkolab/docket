@@ -782,7 +782,30 @@ func clip(text string, from, to int) string {
 	if from >= to {
 		return ""
 	}
-	return strings.Join(strings.Fields(plain(text[from:to])), " ")
+
+	// A window cut at a fixed width starts and ends mid-word. Dropping the
+	// partial word at each end costs a few characters and saves the reader
+	// from "ession expires overnight", which reads as a typo rather than as an
+	// excerpt. An ellipsis says the sentence goes on.
+	fragment := plain(text[from:to])
+	words := strings.Fields(fragment)
+	if len(words) > 1 && from > 0 && !isBreak(rune(text[from-1])) {
+		words = words[1:]
+		if len(words) > 0 {
+			words[0] = "…" + words[0]
+		}
+	}
+	if len(words) > 1 && to < len(text) && !isBreak(rune(text[to])) {
+		words = words[:len(words)-1]
+		if len(words) > 0 {
+			words[len(words)-1] += "…"
+		}
+	}
+	return strings.Join(words, " ")
+}
+
+func isBreak(r rune) bool {
+	return r == ' ' || r == '\n' || r == '\t' || r == '\r'
 }
 
 // plain takes the marks off a fragment of Markdown. An excerpt is one line of

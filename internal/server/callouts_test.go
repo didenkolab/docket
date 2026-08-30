@@ -174,3 +174,20 @@ func TestAParentLinkIsABacklink(t *testing.T) {
 		t.Errorf("a child does not reference its parent:\n%s", body)
 	}
 }
+
+// An excerpt cut at a fixed width starts mid-word and reads as a typo.
+func TestAnExcerptStartsAndEndsOnAWord(t *testing.T) {
+	long := strings.Repeat("alpha beta gamma delta ", 12)
+	text := long + "the needle here " + long
+
+	got := excerpt(text, "needle")
+	if strings.HasPrefix(got, "lpha") || strings.HasPrefix(got, "eta") {
+		t.Errorf("the excerpt begins mid-word: %q", got)
+	}
+	if !strings.Contains(got, "needle") {
+		t.Errorf("the excerpt lost what it was looking for: %q", got)
+	}
+	if !strings.HasPrefix(got, "…") {
+		t.Errorf("a clipped start should say so: %q", got)
+	}
+}
