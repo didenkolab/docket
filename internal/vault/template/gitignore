@@ -1,6 +1,8 @@
-# Obsidian per-machine state — the layout of open panes, not content
+# Obsidian per-machine state — the layout of open panes and where somebody
+# dragged the graph, not content
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
+.obsidian/graph.json
 
 # Obsidian local trash
 .trash/

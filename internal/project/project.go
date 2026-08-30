@@ -106,7 +106,7 @@ func (c *Config) Save(dir string) error {
 	}
 	var body bytes.Buffer
 	body.WriteString("# The projects this vault holds, and the vocabulary they share.\n")
-	body.WriteString("# A key is PROJECT/NUMBER and the project is a folder at the root.\n")
+	body.WriteString("# A key is PROJECT-NUMBER and the project is a folder at the root.\n")
 	body.WriteString("# transitions is the workflow; leaving it out means anything can move\n")
 	body.WriteString("# to anything.\n")
 

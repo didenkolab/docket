@@ -17,7 +17,7 @@ Usage:
   docket project list [directory]
   docket project add --key KEY [--name NAME] [directory]
 
-A project is a folder at the vault root, and a key is PROJECT/NUMBER. Adding one
+A project is a folder at the vault root, and a key is PROJECT-NUMBER. Adding one
 also regenerates the boards, because a board selects tasks by naming the project
 folders — a project no board mentions is a project whose work is invisible.
 `

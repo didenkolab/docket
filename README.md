@@ -20,15 +20,19 @@ of this — clone, open in Obsidian, work — but the tool makes the routine par
 ```bash
 docket init --key ACME --name "Acme Platform" acme   # a complete vault, ready to open
 cd acme
-docket new "Fix login redirect loop" --type bug      # ACME/1, with a valid key
+docket new "Fix login redirect loop" --type bug      # ACME-1, with a valid key
 docket project add --key BETA --name "Beta"          # a second project in the same vault
-docket new --project BETA "Ship the widget"          # BETA/1
+docket new --project BETA "Ship the widget"          # BETA-1
 docket check                                         # nine rules, file:line findings
 ```
 
-A key is `PROJECT/NUMBER` and it is also the path: `ACME/12` lives in `ACME/12.md`. One vault
-holds as many projects as you like, `[[ACME/12]]` resolves in Obsidian with no help, and links
-between projects work because the projects are one file tree.
+A key is `PROJECT-NUMBER`, and the file is named after the task:
+`ACME/ACME-1 Fix login redirect loop.md`. The key makes it sortable and unambiguous, the title
+makes the graph readable, and `[[ACME-1 Fix login redirect loop]]` resolves in Obsidian with no
+help — the reasoning is in
+[ADR-0005](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0005-a-file-is-named-after-its-task.md).
+One vault holds as many projects as you like, and links between projects work because the
+projects are one file tree.
 
 | Command | What | State |
 |---|---|---|
@@ -38,6 +42,7 @@ between projects work because the projects are one file tree.
 | `docket check` | Validate a vault against the specification | works |
 | `docket workspace` | Assemble several project repositories into one Obsidian vault | works |
 | `docket serve` | A board and an API over the same repository | works |
+| `docket mcp` | Serve the vault to an agent over the Model Context Protocol | works |
 | `docket version` | Print the version | works |
 | `docket import` | Bring in an existing Jira and Confluence instance | works |
 
@@ -104,6 +109,31 @@ offered — on the board, on the task page and through the API alike. It is a se
 to the same files, not an owner of them: nothing is cached, every write becomes a git commit
 attributed to whoever made it, and a write that would land on top of a change made in Obsidian
 or by an agent is refused rather than applied. Point all three at one repository at once.
+
+## An agent, over a protocol
+
+An agent can edit the files directly — that is the point of the format, and nothing here
+replaces it. But an agent driving a tracker wants "move this to In review" to be one call that
+validates, writes and commits, not four file operations that might each be half-right. That is
+what `docket mcp` is:
+
+```bash
+docket mcp --author "Claude <claude@example.com>"
+```
+
+It speaks JSON-RPC on stdin and stdout — eight tools: `list_tasks`, `get_task`, `create_task`,
+`update_task`, `search`, `read_page`, `write_page`, `check`. In Claude Code:
+
+```bash
+claude mcp add docket -- docket mcp --author "Claude <claude@example.com>" /path/to/vault
+```
+
+`--author` is required, because every write becomes a git commit and an agent's commits should
+say which agent made them. `get_task` returns a `version` — the same fingerprint the board
+draws its cards from — and `update_task` refuses a write whose version no longer matches, so an
+agent cannot land on top of an edit somebody made in Obsidian while it was thinking. The
+workflow applies here exactly as it does on the board: a move the vault forbids comes back as
+an error that names the moves it allows instead.
 
 ## A workspace
 

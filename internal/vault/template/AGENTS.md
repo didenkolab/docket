@@ -3,6 +3,11 @@
 This repository is a docket vault: a task tracker and a knowledge base made of Markdown files.
 You change it with ordinary file tools. There is no API to call and no server to ask.
 
+If `docket mcp` is connected, prefer its tools for anything that changes a task: they allocate
+the key, keep `status` and `status_category` together, check the move against the workflow,
+rename the file when the title changes and commit — each of which is a way to corrupt the vault
+by hand. Read with file tools freely; this file tells you how.
+
 The [vault format](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/spec/vault-format.md)
 is normative. This file is the short version — the rules you need in order to not corrupt the
 vault.
