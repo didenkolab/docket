@@ -293,8 +293,11 @@ type taskView struct {
 	Parent   string   `json:"parent,omitempty"`
 	Labels   []string `json:"labels,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
-	Path     string   `json:"path"`
-	Note     string   `json:"note"` // what a wikilink to this task says
+	// Relations is how this task says it is connected to others, keyed by the
+	// verb: blocks, blocked_by, relates.
+	Relations map[string][]string `json:"relations,omitempty"`
+	Path      string              `json:"path"`
+	Note      string              `json:"note"` // what a wikilink to this task says
 }
 
 func view(e vault.Entry) taskView {
@@ -302,7 +305,8 @@ func view(e vault.Entry) taskView {
 		Key: e.Key, Title: e.Task.Title, Type: e.Task.Type,
 		Status: e.Task.Status, Category: e.Task.StatusCategory,
 		Priority: e.Task.Priority, Assignee: e.Task.Assignee, Parent: e.Task.Parent,
-		Labels: e.Task.Labels, Tags: e.Task.Tags, Path: e.Path, Note: e.Note(),
+		Labels: e.Task.Labels, Tags: e.Task.Tags, Relations: e.Task.AllRelations(),
+		Path: e.Path, Note: e.Note(),
 	}
 }
 

@@ -447,6 +447,25 @@ func entryFor(entries []vault.Entry, key string) vault.Entry {
 func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string) {
 	t := e.Task
 
+	for _, r := range task.Relations {
+		for _, raw := range t.RawRelated(r.Field) {
+			if !task.IsLink(raw) {
+				add(Finding{e.Path, t.PropertyLine(r.Field), RuleRelations,
+					fmt.Sprintf("%s %q is a string, not a link: it connects nothing in Obsidian. "+
+						"Write it as %q", r.Field, raw, task.Link(noteFor(raw, byKey)))})
+			}
+		}
+		// A relation pointing at nothing is a relation about a task that was
+		// renamed away or never existed, and is worth the same attention as a
+		// parent that does not exist.
+		for _, key := range t.Related(r.Field) {
+			if _, ok := byKey[key]; !ok {
+				add(Finding{e.Path, t.PropertyLine(r.Field), RuleParent,
+					fmt.Sprintf("%s %q, which is not in this vault", r.Field, key)})
+			}
+		}
+	}
+
 	if raw := t.RawParent(); raw != "" && !task.IsLink(raw) {
 		add(Finding{e.Path, t.PropertyLine("parent"), RuleRelations,
 			fmt.Sprintf("parent %q is a string, not a link: an epic written this way draws no "+

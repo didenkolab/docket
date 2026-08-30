@@ -75,6 +75,13 @@ tasks and a label groups nothing. Link by note name — `[[{{.Key}}-4 Its title]
 `[[auth]]` is a nested list in YAML. A label link need not resolve; an unresolved link is still
 an edge, and writing the page later is what gives the label somewhere to explain itself.
 
+A relation says **how** two tasks are connected, and the property name is the verb:
+`blocks`, `blocked_by`, `duplicates`, `duplicated_by`, `causes`, `caused_by`, `relates`. Same
+form — a list of links. Write each side yourself; nothing writes the inverse for you.
+
+`parent` is hierarchy and decides what the board does. A relation is an annotation. Do not use
+one for the other.
+
 `tags` is the other one, and a different thing: a label says what a task is about, a tag says
 which slice of the work it is in, and tags nest — `area/auth` is inside `area`. Written without
 the `#` and unquoted: `tags: [area/auth, needs-review]`. No spaces, and not all digits.

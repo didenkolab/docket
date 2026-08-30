@@ -69,6 +69,9 @@ type card struct {
 	Priority string
 	Labels   []string
 	Tags     []string
+	// Blocked is set when something this card waits on is unfinished. The one
+	// relation that changes what somebody picks up next, so it is on the card.
+	Blocked bool
 	// order is where somebody put this card in its column, if anybody has.
 	// Cards without one follow the ones with, in key order.
 	order *int
@@ -175,6 +178,14 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		return own
 	}
 
+	// Every task by key, so a card can say whether what it waits on is done.
+	known := map[string]vault.Entry{}
+	for _, e := range entries {
+		if e.Task != nil {
+			known[e.Key] = e
+		}
+	}
+
 	counts := map[string]int{}
 	for _, e := range entries {
 		if e.Err != nil {
@@ -194,6 +205,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 					Labels: e.Task.Labels, Tags: e.Task.Tags, Version: version(e.Raw),
 					Reachable: reachableList(configOf(e.Project), e.Task.Status),
 					order:     e.Task.Order,
+					Blocked:   blocked(e.Task, known),
 				})
 				view.Total++
 			}
@@ -263,6 +275,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		Description: renderMarkdown(t.Description(), ix),
 		Comments:    renderComments(t.Comments(), ix),
 		Children:    s.childrenOf(c, key),
+		Relations:   s.relationsOf(t),
 		Backlinks:   s.backlinks(strings.TrimSuffix(path.Base(rel), ".md"), rel),
 		Version:     ver,
 		Path:        rel,
@@ -277,6 +290,7 @@ type taskView struct {
 	Description template.HTML
 	Comments    []renderedComment
 	Children    []childTask
+	Relations   []relationGroup
 	Backlinks   []mention
 	Version     string
 	Path        string
@@ -529,6 +543,9 @@ type hitTask struct {
 	Assignee string
 	Labels   []string
 	Tags     []string
+	// Blocked is set when something this card waits on is unfinished. The one
+	// relation that changes what somebody picks up next, so it is on the card.
+	Blocked bool
 }
 
 // filters is what a person narrowed the search to. Every field is empty by

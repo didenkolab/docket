@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,5 +191,112 @@ func TestAnExcerptStartsAndEndsOnAWord(t *testing.T) {
 	}
 	if !strings.HasPrefix(got, "…") {
 		t.Errorf("a clipped start should say so: %q", got)
+	}
+}
+
+/* ---------- typed links between tasks ---------- */
+
+// A link says two tasks are connected; a relation says how. "Blocked by" is the
+// one that changes what somebody picks up next.
+func TestARelationShowsOnThePageAndOnTheCard(t *testing.T) {
+	_, h, root := newServer(t)
+	b := newBrowser(t, h)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{Title: "Session model", Now: noon}); err != nil {
+		t.Fatal(err)
+	}
+
+	// ACME-1 waits on ACME-2, which is not done.
+	patch := `{"relations":{"blocked_by":["ACME-2"],"relates":["ACME-2"]}}`
+	r := httptest.NewRequest("PATCH", "/api/tasks/ACME-1", strings.NewReader(patch))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-CSRF-Token", b.token)
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	if w := b.send(r); w.Code != http.StatusOK {
+		t.Fatalf("patch: %d %s", w.Code, w.Body)
+	}
+
+	page := get(t, h, "/task/ACME-1").Body.String()
+	for _, want := range []string{"Linked work", "is blocked by", "relates to", "Session model"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the task page does not say %q", want)
+		}
+	}
+
+	board := get(t, h, "/").Body.String()
+	if !strings.Contains(board, `class="blocked"`) {
+		t.Errorf("the board does not say the card is blocked:\n%s", board)
+	}
+}
+
+// Blocked by something already finished is not blocked.
+func TestBlockedByDoneIsNotBlocked(t *testing.T) {
+	_, h, root := newServer(t)
+	b := newBrowser(t, h)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Session model", Status: "Done", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	r := httptest.NewRequest("PATCH", "/api/tasks/ACME-1",
+		strings.NewReader(`{"relations":{"blocked_by":["ACME-2"]}}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-CSRF-Token", b.token)
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	if w := b.send(r); w.Code != http.StatusOK {
+		t.Fatalf("patch: %d %s", w.Code, w.Body)
+	}
+
+	if board := get(t, h, "/").Body.String(); strings.Contains(board, `class="blocked"`) {
+		t.Error("waiting on finished work was called blocked")
+	}
+}
+
+// A relation is written by key and stored as a link, so a key nothing has is
+// refused rather than written and reported later.
+func TestARelationToNothingIsRefused(t *testing.T) {
+	_, h, _ := newServer(t)
+	b := newBrowser(t, h)
+
+	r := httptest.NewRequest("PATCH", "/api/tasks/ACME-1",
+		strings.NewReader(`{"relations":{"blocks":["ACME-404"]}}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-CSRF-Token", b.token)
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+
+	w := b.send(r)
+	if w.Code == http.StatusOK {
+		t.Fatal("a relation to a task that does not exist was accepted")
+	}
+	if !strings.Contains(w.Body.String(), "ACME-404") {
+		t.Errorf("the refusal does not say which: %s", w.Body)
+	}
+}
+
+// parent is hierarchy and decides what a board does; a relation is an
+// annotation. Jira warns about apps that blur this with a link type called
+// "Parent-Child", and the line is kept sharp here.
+func TestParentIsNotARelation(t *testing.T) {
+	_, h, _ := newServer(t)
+	b := newBrowser(t, h)
+
+	r := httptest.NewRequest("PATCH", "/api/tasks/ACME-1",
+		strings.NewReader(`{"relations":{"parent":["ACME-2"]}}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-CSRF-Token", b.token)
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+
+	if w := b.send(r); w.Code == http.StatusOK {
+		t.Error("parent was accepted as a relation")
 	}
 }

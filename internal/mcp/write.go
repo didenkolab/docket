@@ -31,6 +31,9 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		Assignee                                      *string
 		Labels                                        *[]string
 		Tags                                          *[]string
+		// Relations is keyed by the property name — blocks, blocked_by,
+		// relates — with task keys as the values.
+		Relations map[string][]string
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, err
@@ -111,6 +114,18 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 	if args.Tags != nil {
 		t.SetTags(*args.Tags)
 		changed = append(changed, "tags")
+	}
+	for field, keys := range args.Relations {
+		if !task.IsRelation(field) {
+			return nil, fmt.Errorf("%s is not a relation: it is one of %s",
+				field, relationNames())
+		}
+		notes, err := s.notesFor(keys)
+		if err != nil {
+			return nil, err
+		}
+		t.SetRelated(field, notes)
+		changed = append(changed, field)
 	}
 	if args.Description != nil && *args.Description != t.Description() {
 		t.SetDescription(*args.Description)
@@ -313,4 +328,30 @@ func (s *Server) check() (any, error) {
 	}
 	fmt.Fprintf(&b, "\n%d finding(s).", len(findings))
 	return textResult("%s", b.String())
+}
+
+// notesFor turns task keys into the note names a link resolves by, refusing a
+// key nothing in the space has.
+func (s *Server) notesFor(keys []string) ([]string, error) {
+	notes := make([]string, 0, len(keys))
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		_, inVault, _, err := s.Space.Locate(key)
+		if err != nil {
+			return nil, fmt.Errorf("%s is not in this space", key)
+		}
+		notes = append(notes, strings.TrimSuffix(path.Base(inVault), ".md"))
+	}
+	return notes, nil
+}
+
+func relationNames() string {
+	var names []string
+	for _, r := range task.Relations {
+		names = append(names, r.Field)
+	}
+	return strings.Join(names, ", ")
 }

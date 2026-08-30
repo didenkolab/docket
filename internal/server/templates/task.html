@@ -47,6 +47,29 @@
       {{end}}
     </section>
 
+    {{if $data.Relations}}
+    <section class="block">
+      <h2>Linked work</h2>
+      <ul class="relations">
+        {{range $data.Relations}}
+        <li>
+          <span class="says">{{.Says}}</span>
+          <span class="to">
+            {{range .To}}
+            {{if .Missing}}
+            <span class="dead-link" title="nothing in this space has that key">{{.Key}}</span>
+            {{else}}
+            <a href="/task/{{.Key}}"><span class="key">{{.Key}}</span> {{.Title}}</a>
+            <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+            {{end}}
+            {{end}}
+          </span>
+        </li>
+        {{end}}
+      </ul>
+    </section>
+    {{end}}
+
     {{if $data.Backlinks}}
     <section class="block">
       <h2>Referenced by <span class="count">{{len $data.Backlinks}}</span></h2>

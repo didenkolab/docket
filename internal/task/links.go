@@ -196,18 +196,24 @@ func (t *Task) SetLabels(names []string) {
 			links = append(links, Link(name))
 		}
 	}
-
-	list := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
-	for _, link := range links {
-		list.Content = append(list.Content, quoted(link))
-	}
-	t.setNode("labels", list)
+	t.setLinkList("labels", links)
 
 	t.rawLabels = links
 	t.Labels = t.Labels[:0]
 	for _, link := range links {
 		t.Labels = append(t.Labels, labelName(link))
 	}
+}
+
+// setLinkList writes a flow list of quoted links — the form Obsidian's own
+// property editor writes, and the only one that is a list of links rather than
+// a list of lists.
+func (t *Task) setLinkList(name string, links []string) {
+	list := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
+	for _, link := range links {
+		list.Content = append(list.Content, quoted(link))
+	}
+	t.setNode(name, list)
 }
 
 // quoted is a scalar YAML has to quote. `[[auth]]` unquoted is a nested

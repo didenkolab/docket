@@ -25,12 +25,15 @@ type taskJSON struct {
 	Parent         string   `json:"parent,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
-	Created        string   `json:"created"`
-	Updated        string   `json:"updated"`
-	Aliases        []string `json:"aliases,omitempty"`
-	Body           string   `json:"body,omitempty"`
-	Order          *int     `json:"order,omitempty"`
-	Version        string   `json:"version,omitempty"`
+	// Relations are the typed links between tasks — blocks, blocked_by,
+	// relates and the rest — keyed by the property name, which is the verb.
+	Relations map[string][]string `json:"relations,omitempty"`
+	Created   string              `json:"created"`
+	Updated   string              `json:"updated"`
+	Aliases   []string            `json:"aliases,omitempty"`
+	Body      string              `json:"body,omitempty"`
+	Order     *int                `json:"order,omitempty"`
+	Version   string              `json:"version,omitempty"`
 	// Reachable is where the workflow lets this task go from where it is. The
 	// board redraws a card's constraint from it after a move, so a card dragged
 	// twice is not checked against the workflow it used to be under.
@@ -47,6 +50,9 @@ func toJSON(c *project.Config, t *task.Task, version string, withBody bool) task
 	}
 	if c != nil {
 		out.Reachable = names(c.Reachable(t.Status))
+	}
+	if related := t.AllRelations(); len(related) > 0 {
+		out.Relations = related
 	}
 	if withBody {
 		out.Body = t.Body()
@@ -164,8 +170,11 @@ type patchRequest struct {
 	Assignee *string   `json:"assignee"`
 	Labels   *[]string `json:"labels"`
 	Tags     *[]string `json:"tags"`
-	Comment  *string   `json:"comment"`
-	Version  string    `json:"version"`
+	// Relations replaces one kind of link at a time, keyed by the property
+	// name. An empty list clears that relation and leaves the others alone.
+	Relations map[string][]string `json:"relations"`
+	Comment   *string             `json:"comment"`
+	Version   string              `json:"version"`
 	// After places the task in its column, directly below the task with this
 	// key. An empty string is the top of the column. Absent — nil — leaves the
 	// order alone, which is what every client that does not draw a board wants.
@@ -231,6 +240,17 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		if req.Tags != nil {
 			t.SetTags(*req.Tags)
 			changed = append(changed, "tags")
+		}
+		for field, keys := range req.Relations {
+			if !task.IsRelation(field) {
+				return "", nil, errors.New(field + " is not a relation: " + relationNames())
+			}
+			notes, err := s.notesFor(keys)
+			if err != nil {
+				return "", nil, err
+			}
+			t.SetRelated(field, notes)
+			changed = append(changed, field)
 		}
 		if req.Comment != nil && strings.TrimSpace(*req.Comment) != "" {
 			t.AppendComment(author.Name, s.now(), *req.Comment)

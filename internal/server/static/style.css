@@ -699,6 +699,40 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .opening h1 { margin-bottom: var(--s2); }
 .opening p { margin: 0 0 var(--s2); color: var(--ink-soft); }
 
+/* ---- linked work ---- */
+
+.relations { list-style: none; margin: 0; padding: 0; }
+.relations li { display: flex; gap: var(--s3); align-items: baseline; padding: var(--s2) 0; flex-wrap: wrap; }
+
+/* The verb is what you scan for — "is blocked by" — so it is fixed-width and
+ * quiet, and the work it points at is what you stop on. */
+.relations .says {
+  flex: none;
+  min-width: 7.5rem;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.relations .to { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: baseline; }
+.relations a { text-decoration: none; color: var(--ink); }
+.relations a:hover { text-decoration: underline; }
+
+/* A card waiting on unfinished work. The one relation that changes what
+ * somebody picks up next, so it is said on the board rather than one click in. */
+.blocked {
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
 /* ---- what links here ---- */
 
 .mentions { list-style: none; margin: 0; padding: 0; }

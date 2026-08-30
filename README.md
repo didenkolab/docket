@@ -119,6 +119,24 @@ the same commit as the rename, so no point in the history has the vault pointing
 `docket check` reports a relationship still written as a string, and `docket check --fix` rewrites
 it.
 
+### How two tasks are connected
+
+`parent` is hierarchy. How else two pieces of work relate is a property whose name is the verb:
+
+```yaml
+blocked_by: ["[[ACME-4 Session model]]"]
+relates: ["[[BETA-7 Ship the widget]]"]
+```
+
+Seven of them, in inverse pairs — Jira's set, which needs a database table and an admin screen
+there and is a line of frontmatter here. Written as links, so each one is an edge in the graph
+and shows in backlinks.
+
+They carry no structure: `parent` decides what the board does, a relation is something a person
+reads. The exception is the one that changes what you pick up next — a task waiting on
+unfinished work is marked **blocked** on the board, and blocked by something already done is not
+blocked.
+
 ### What happened to this task
 
 Every change is a commit, so the history of a task is the history of its file — and the
