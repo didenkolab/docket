@@ -294,3 +294,80 @@ func TestAProjectNoBoardShowsIsReported(t *testing.T) {
 		t.Error("a project no board mentions was not reported")
 	}
 }
+
+/* ---------- --fix ---------- */
+
+// A title edited by hand leaves the file name behind. That is the one finding
+// with a right answer, so it is the one thing check can settle by itself.
+func TestRenamesFollowTheTitle(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "ACME-1 Old name.md", strings.Replace(validTask, "title: A task", "title: A new name", 1))
+
+	renames, err := Renames(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(renames) != 1 {
+		t.Fatalf("expected one rename, got %+v", renames)
+	}
+	if renames[0].To != "ACME/ACME-1 A new name.md" {
+		t.Errorf("renaming to %q", renames[0].To)
+	}
+
+	if err := Apply(root, renames); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "ACME", "ACME-1 A new name.md")); err != nil {
+		t.Errorf("the file did not move: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "ACME", "ACME-1 Old name.md")); !os.IsNotExist(err) {
+		t.Error("the old name is still there")
+	}
+	if findings := run(t, root); len(findings) != 0 {
+		t.Errorf("the vault is still not clean:\n%v", findings)
+	}
+}
+
+// A key that disagrees with the file name is two claims about which task this
+// is, and renaming would pick one of them at random.
+func TestAKeyThatDisagreesIsNotRenamedAway(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "ACME-1 A task.md", strings.Replace(validTask, "key: ACME-1", "key: ACME-7", 1))
+
+	renames, err := Renames(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(renames) != 0 {
+		t.Errorf("a key mismatch was renamed away: %+v", renames)
+	}
+}
+
+// Two tasks may share a title. They cannot share a name, because the key is
+// part of it — which is what makes renaming to match a title safe to do
+// without asking.
+func TestTwoTasksWithTheSameTitleDoNotCollide(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "ACME-1 A task.md", validTask)
+	put(t, root, "ACME-2 Some other name.md", strings.Replace(validTask, "key: ACME-1", "key: ACME-2", 1))
+
+	renames, err := Renames(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(renames) != 1 || renames[0].To != "ACME/ACME-2 A task.md" {
+		t.Fatalf("renames = %+v", renames)
+	}
+	if err := Apply(root, renames); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+
+	for _, name := range []string{"ACME-1 A task.md", "ACME-2 A task.md"} {
+		if _, err := os.Stat(filepath.Join(root, "ACME", name)); err != nil {
+			t.Errorf("%s is gone: %v", name, err)
+		}
+	}
+	if findings := run(t, root); len(findings) != 0 {
+		t.Errorf("not clean:\n%v", findings)
+	}
+}

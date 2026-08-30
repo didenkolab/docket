@@ -28,6 +28,7 @@ docket new "Fix login redirect loop" --type bug      # ACME-1, with a valid key
 docket project add --key BETA --name "Beta"          # a second project in the same vault
 docket new --project BETA "Ship the widget"          # BETA-1
 docket check                                         # nine rules, file:line findings
+docket check --fix                                   # rename files whose title moved on
 ```
 
 A key is `PROJECT-NUMBER`, and the file is named after the task:
