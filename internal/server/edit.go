@@ -124,7 +124,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, error) {
+	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		var changed []string
 
 		if title != t.Title {
@@ -135,7 +135,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		taskType := strings.TrimSpace(r.FormValue("type"))
 		if taskType != t.Type {
 			if !c.HasType(taskType) {
-				return "", fmt.Errorf("type %q is not one of %s", taskType, strings.Join(c.Types, ", "))
+				return "", nil, fmt.Errorf("type %q is not one of %s", taskType, strings.Join(c.Types, ", "))
 			}
 			t.Set("type", taskType)
 			changed = append(changed, "type")
@@ -144,7 +144,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		priority := strings.TrimSpace(r.FormValue("priority"))
 		if priority != t.Priority {
 			if !c.HasPriority(priority) {
-				return "", fmt.Errorf("priority %q is not one of %s",
+				return "", nil, fmt.Errorf("priority %q is not one of %s",
 					priority, strings.Join(c.Priorities, ", "))
 			}
 			t.Set("priority", priority)
@@ -154,11 +154,11 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		if status := strings.TrimSpace(r.FormValue("status")); status != "" && status != t.Status {
 			category, known := c.CategoryOf(status)
 			if !known {
-				return "", fmt.Errorf("status %q is not one of %s",
+				return "", nil, fmt.Errorf("status %q is not one of %s",
 					status, strings.Join(c.StatusNames(), ", "))
 			}
 			if !c.CanMove(t.Status, status) {
-				return "", fmt.Errorf("the workflow does not allow %s → %s", t.Status, status)
+				return "", nil, fmt.Errorf("the workflow does not allow %s → %s", t.Status, status)
 			}
 			changed = append(changed, t.Status+" → "+status)
 			t.SetStatus(status, category)
@@ -176,7 +176,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 				t.Remove("parent")
 			default:
 				if _, err := vault.Find(s.root, c, parent); err != nil {
-					return "", fmt.Errorf("parent %s does not exist", parent)
+					return "", nil, fmt.Errorf("parent %s does not exist", parent)
 				}
 				t.Set("parent", parent)
 			}
@@ -198,9 +198,9 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(changed) == 0 {
-			return "", nil
+			return "", nil, nil
 		}
-		return key + ": " + strings.Join(changed, ", "), nil
+		return key + ": " + strings.Join(changed, ", "), nil, nil
 	})
 
 	switch {

@@ -28,16 +28,24 @@ type taskJSON struct {
 	Updated        string   `json:"updated"`
 	Aliases        []string `json:"aliases,omitempty"`
 	Body           string   `json:"body,omitempty"`
+	Order          *int     `json:"order,omitempty"`
 	Version        string   `json:"version,omitempty"`
+	// Reachable is where the workflow lets this task go from where it is. The
+	// board redraws a card's constraint from it after a move, so a card dragged
+	// twice is not checked against the workflow it used to be under.
+	Reachable []string `json:"reachable,omitempty"`
 }
 
-func toJSON(t *task.Task, version string, withBody bool) taskJSON {
+func toJSON(c *project.Config, t *task.Task, version string, withBody bool) taskJSON {
 	out := taskJSON{
 		Key: t.Key, Title: t.Title, Type: t.Type,
 		Status: t.Status, StatusCategory: t.StatusCategory,
 		Priority: t.Priority, Assignee: t.Assignee, Parent: t.Parent,
 		Labels: t.Labels, Created: t.Created, Updated: t.Updated,
-		Aliases: t.Aliases, Version: version,
+		Aliases: t.Aliases, Order: t.Order, Version: version,
+	}
+	if c != nil {
+		out.Reachable = names(c.Reachable(t.Status))
 	}
 	if withBody {
 		out.Body = t.Body()
@@ -85,7 +93,7 @@ func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 		if wantedProject != "" && e.Project != wantedProject {
 			continue
 		}
-		out = append(out, toJSON(e.Task, "", false))
+		out = append(out, toJSON(c, e.Task, "", false))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -96,7 +104,8 @@ func (s *Server) apiGetTask(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toJSON(t, version, true))
+	c, _ := project.Load(s.root)
+	writeJSON(w, http.StatusOK, toJSON(c, t, version, true))
 }
 
 type createRequest struct {
@@ -140,7 +149,7 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, version, _ := s.loadTask(t.Key)
-	writeJSON(w, http.StatusCreated, toJSON(t, version, true))
+	writeJSON(w, http.StatusCreated, toJSON(c, t, version, true))
 }
 
 // patchRequest carries only what the client wants changed. A nil pointer means
@@ -154,6 +163,10 @@ type patchRequest struct {
 	Labels   *[]string `json:"labels"`
 	Comment  *string   `json:"comment"`
 	Version  string    `json:"version"`
+	// After places the task in its column, directly below the task with this
+	// key. An empty string is the top of the column. Absent — nil — leaves the
+	// order alone, which is what every client that does not draw a board wants.
+	After *string `json:"after"`
 }
 
 func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +184,7 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err = s.editTask(key, req.Version, author, func(t *task.Task) (string, error) {
+	err = s.editTask(key, req.Version, author, func(t *task.Task) (string, []string, error) {
 		var changed []string
 
 		if req.Title != nil && *req.Title != t.Title {
@@ -181,13 +194,13 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		if req.Status != nil && *req.Status != t.Status {
 			category, known := c.CategoryOf(*req.Status)
 			if !known {
-				return "", errors.New("status " + *req.Status + " is not one of " +
+				return "", nil, errors.New("status " + *req.Status + " is not one of " +
 					strings.Join(c.StatusNames(), ", "))
 			}
 			// The board drags through this, so the workflow has to be enforced
 			// here and not only on the form.
 			if !c.CanMove(t.Status, *req.Status) {
-				return "", errors.New("the workflow does not allow " + t.Status + " → " +
+				return "", nil, errors.New("the workflow does not allow " + t.Status + " → " +
 					*req.Status + ". From " + t.Status + " a task can go to " +
 					strings.Join(names(c.Reachable(t.Status)), ", "))
 			}
@@ -196,7 +209,7 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Priority != nil && *req.Priority != t.Priority {
 			if !c.HasPriority(*req.Priority) {
-				return "", errors.New("priority " + *req.Priority + " is not one of " +
+				return "", nil, errors.New("priority " + *req.Priority + " is not one of " +
 					strings.Join(c.Priorities, ", "))
 			}
 			t.Set("priority", *req.Priority)
@@ -215,10 +228,24 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 			changed = append(changed, "comment")
 		}
 
-		if len(changed) == 0 {
-			return "", nil
+		// Placement comes last, because where a card belongs depends on which
+		// column it is now in.
+		var alsoCommit []string
+		if req.After != nil {
+			renumbered, err := s.place(c, t, t.Status, *req.After)
+			if err != nil {
+				return "", nil, err
+			}
+			alsoCommit = renumbered
+			if len(changed) == 0 || len(renumbered) > 0 {
+				changed = append(changed, "order")
+			}
 		}
-		return key + ": " + strings.Join(changed, ", "), nil
+
+		if len(changed) == 0 {
+			return "", nil, nil
+		}
+		return key + ": " + strings.Join(changed, ", "), alsoCommit, nil
 	})
 
 	switch {
@@ -239,5 +266,5 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, toJSON(t, version, true))
+	writeJSON(w, http.StatusOK, toJSON(c, t, version, true))
 }

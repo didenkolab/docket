@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +44,10 @@ type Task struct {
 	Created        string   `yaml:"created"`
 	Updated        string   `yaml:"updated"`
 	Aliases        []string `yaml:"aliases"`
+	// Order is where the task sits among the others in its column, when
+	// somebody has said. Absent — the usual case — the task sorts after every
+	// task that has one. See SetOrder.
+	Order *int `yaml:"order,omitempty"`
 
 	front yaml.Node
 	body  string
@@ -197,6 +202,48 @@ func (t *Task) SetStatus(status, category string) {
 	t.Status, t.StatusCategory = status, category
 	t.Set("status", status)
 	t.Set("status_category", category)
+}
+
+// SetOrder writes where the task sits among the others in its column.
+//
+// It is a number rather than a list because the order has to live in the task
+// files: a separate list of keys is a second source of truth that a rename, a
+// merge or an edit in Obsidian can put out of step with the tasks it orders.
+// Numbers are spaced far apart by Between, so inserting a card between two
+// others usually rewrites one file rather than the column.
+func (t *Task) SetOrder(order int) {
+	t.Order = &order
+	t.SetPlain("order", strconv.Itoa(order))
+}
+
+// ClearOrder returns the task to the default order, which is by key.
+func (t *Task) ClearOrder() {
+	t.Order = nil
+	t.Remove("order")
+}
+
+// Step is the gap left between neighbours, so an insertion between two cards
+// has somewhere to land without renumbering them.
+const Step = 1000
+
+// Between returns an order value that sorts between two neighbours, and reports
+// whether it found room. A nil neighbour is the end of the column.
+//
+// It fails only when two neighbours are adjacent integers, which takes about
+// ten insertions into the same gap. The caller renumbers the column then.
+func Between(above, below *int) (int, bool) {
+	switch {
+	case above == nil && below == nil:
+		return 0, true
+	case above == nil:
+		return *below - Step, true
+	case below == nil:
+		return *above + Step, true
+	case *below-*above > 1:
+		return *above + (*below-*above)/2, true
+	default:
+		return 0, false
+	}
 }
 
 // Touch stamps the update time.

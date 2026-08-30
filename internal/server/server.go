@@ -194,11 +194,15 @@ func (s *Server) loadTask(key string) (*task.Task, string, error) {
 // The expected version is checked against what is on disk at the moment of the
 // write. When Obsidian or an agent has touched the file in the meantime the
 // edit is refused rather than applied on top of content the caller never saw.
+//
+// mutate runs while the write lock is held, so it may touch other files as
+// well — an uploaded attachment, the neighbours a reordering renumbered. It
+// returns their paths, and they land in the same commit: half of a change is
+// worse than none of it.
 func (s *Server) editTask(
 	key, expected string,
 	author gitvcs.Author,
-	mutate func(*task.Task) (message string, err error),
-	companions ...string,
+	mutate func(*task.Task) (message string, alsoCommit []string, err error),
 ) error {
 	s.writes.Lock()
 	defer s.writes.Unlock()
@@ -219,7 +223,7 @@ func (s *Server) editTask(
 	if err != nil {
 		return err
 	}
-	message, err := mutate(t)
+	message, companions, err := mutate(t)
 	if err != nil {
 		return err
 	}

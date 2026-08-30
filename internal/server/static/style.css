@@ -281,9 +281,17 @@ body:has(.board) header .bar { max-width: none; }
 .board { display: flex; gap: var(--s4); align-items: flex-start; overflow-x: auto; padding-bottom: var(--s4); }
 
 /* A column is a box, not a hint of one, and its body keeps a floor height so
- * an empty column is somewhere you can aim rather than a line of text. */
+ * an empty column is somewhere you can aim rather than a line of text.
+ *
+ * Columns share the width rather than taking a fixed slice of it: a board is
+ * for seeing the whole of the work at once, and a sixth column half off the
+ * edge reads as a rendering fault rather than as an invitation to scroll. They
+ * stop shrinking at 13rem, below which a title wraps to four lines, and the
+ * board scrolls sideways from there. */
 .column {
-  flex: 0 0 18rem;
+  flex: 1 1 0;
+  min-width: 13rem;
+  max-width: 22rem;
   display: flex;
   flex-direction: column;
   background: var(--sunken);
@@ -739,7 +747,7 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
    * whatever the first column happens to be — usually an empty backlog — and
    * hide the work behind a gesture. */
   .board { flex-direction: column; overflow-x: visible; }
-  .column { flex: 0 0 auto; width: 100%; }
+  .column { flex: 0 0 auto; width: 100%; max-width: none; }
 
   .issue-title { font-size: 1.3rem; }
 

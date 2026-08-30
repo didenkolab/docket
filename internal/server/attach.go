@@ -64,10 +64,10 @@ func (s *Server) handleAttach(w http.ResponseWriter, r *http.Request) {
 	// The file and the line that points at it land in one commit: half of an
 	// attachment is worse than none.
 	embed := embeddable[strings.ToLower(filepath.Ext(saved))]
-	err = s.editTask(key, "", author, func(t *task.Task) (string, error) {
+	err = s.editTask(key, "", author, func(t *task.Task) (string, []string, error) {
 		t.AppendAttachment(saved, embed)
-		return key + ": attached " + filepath.Base(saved), nil
-	}, saved)
+		return key + ": attached " + filepath.Base(saved), []string{saved}, nil
+	})
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Saved, but not recorded", err.Error())
 		return

@@ -66,6 +66,9 @@ type card struct {
 	Assignee string
 	Priority string
 	Labels   []string
+	// order is where somebody put this card in its column, if anybody has.
+	// Cards without one follow the ones with, in key order.
+	order *int
 	// Version is the fingerprint of the file this card was rendered from. The
 	// board hands it back when a card is dragged, so a drop lands on the file
 	// the person actually saw.
@@ -81,6 +84,25 @@ type boardView struct {
 	Projects []projectTab
 	Selected string
 	Total    int
+}
+
+// sortCards puts a column in the order somebody dragged it into.
+//
+// A card with no order follows every card that has one, in the order the vault
+// listed them — by key, which is by age. So a column nobody has touched reads
+// oldest first, and dragging one card to the top does not renumber the rest.
+func sortCards(cards []card) {
+	sort.SliceStable(cards, func(i, j int) bool {
+		a, b := cards[i].order, cards[j].order
+		switch {
+		case a != nil && b != nil:
+			return *a < *b
+		case a != nil:
+			return true
+		default:
+			return false
+		}
+	})
 }
 
 // reachableList is the workflow, flattened for an attribute.
@@ -146,10 +168,15 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 					Assignee: e.Task.Assignee, Priority: e.Task.Priority,
 					Labels: e.Task.Labels, Version: version(e.Raw),
 					Reachable: reachableList(c, e.Task.Status),
+					order:     e.Task.Order,
 				})
 				view.Total++
 			}
 		}
+	}
+
+	for i := range view.Columns {
+		sortCards(view.Columns[i].Cards)
 	}
 
 	view.Projects = append(view.Projects, projectTab{
@@ -286,17 +313,17 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, error) {
+	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		if t.Status == status {
-			return "", nil
+			return "", nil, nil
 		}
 		if !c.CanMove(t.Status, status) {
-			return "", fmt.Errorf("the workflow does not allow %s → %s. From %s a task can go to %s",
+			return "", nil, fmt.Errorf("the workflow does not allow %s → %s. From %s a task can go to %s",
 				t.Status, status, t.Status, strings.Join(names(c.Reachable(t.Status)), ", "))
 		}
 		was := t.Status
 		t.SetStatus(status, category)
-		return key + ": " + was + " → " + status, nil
+		return key + ": " + was + " → " + status, nil, nil
 	})
 	s.afterEdit(w, r, key, err)
 }
@@ -310,9 +337,9 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err := s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, error) {
+	err := s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		t.AppendComment(author.Name, s.now(), text)
-		return key + ": comment from " + author.Name, nil
+		return key + ": comment from " + author.Name, nil, nil
 	})
 	s.afterEdit(w, r, key, err)
 }

@@ -80,12 +80,15 @@ docket serve --auth none --author "Your Name <you@example.com>"   # one person, 
 ```
 
 A board grouped by status across every project at once — or narrowed to one — with cards you
-drag between columns, plus task pages, the wiki, search, settings, and a JSON API.
+drag between columns and up and down inside them, plus task pages, the wiki, a search you can
+narrow by project, status, type, priority, assignee and label, settings, and a JSON API.
 
 Dragging a card is the same status move as the form on the task page: it goes through the API,
-is checked against the fingerprint the card was drawn from, and lands in git as a commit. It is
-an enhancement, not the mechanism — without JavaScript the board is still a board and every
-task page still moves its own status.
+is checked against the fingerprint the card was drawn from, and lands in git as a commit. Where
+it lands in the column is written down too, as an `order` on the task, so a column somebody
+arranged is still arranged after a reload — and a vault where nobody has dragged anything is
+simply sorted by key. Dragging is an enhancement, not the mechanism: without JavaScript the
+board is still a board and every task page still moves its own status.
 
 ### Who may do what
 

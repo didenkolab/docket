@@ -51,6 +51,18 @@
     recount();
   }
 
+  // Which card the dropped one lands behind — a key, or "" for the top of the
+  // column. A key rather than an index: between drawing this board and letting
+  // go, somebody else may have added or moved a card, and "after ACME-4"
+  // survives that where "third from the top" quietly means something else.
+  function precedingKey(at) {
+    let previous = at.previousElementSibling;
+    while (previous && !previous.classList.contains('card')) {
+      previous = previous.previousElementSibling;
+    }
+    return previous ? previous.dataset.key : '';
+  }
+
   // The workflow, as the server rendered it onto the card.
   function reaches(card, column) {
     const allowed = (card.dataset.reachable || '').split('\n').filter(Boolean);
@@ -133,14 +145,12 @@
         return clearSlot();
       }
 
-      // Where the placeholder sits is where the card goes, whether or not the
-      // status changed — reordering inside a column is a legitimate no-op.
+      // Where the placeholder sits is where the card goes, in the column it
+      // came from as much as in a new one: a column somebody has arranged is
+      // arranged, and reloading the page should not undo it.
       const target = slot.parentNode ? slot : null;
-      if (card.dataset.status === status) {
-        if (target) target.replaceWith(card);
-        clearSlot();
-        return;
-      }
+      const after = precedingKey(target || card);
+      const sameColumn = card.dataset.status === status;
 
       const key = card.dataset.key;
       card.classList.add('pending');
@@ -148,11 +158,14 @@
       clearSlot();
       recount();
 
+      const change = { after, version: card.dataset.version };
+      if (!sameColumn) change.status = status;
+
       try {
         const response = await fetch('/api/tasks/' + key, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status, version: card.dataset.version }),
+          body: JSON.stringify(change),
         });
 
         if (response.status === 409) {
@@ -171,7 +184,15 @@
         const task = await response.json();
         card.dataset.status = task.status;
         card.dataset.version = task.version;
-        toast(key + ' → ' + task.status);
+        // Where it may go next depends on where it is now. Without this a card
+        // dragged twice is checked against the workflow it used to be under.
+        card.dataset.reachable = (task.reachable || []).join('\n');
+        toast(sameColumn ? key + ' moved in ' + status : key + ' → ' + task.status);
+        // A reorder that ran out of room renumbers the column, which makes the
+        // other cards' versions on this page stale. Nothing is done about that
+        // here: dragging one of them is refused with a 409 and reloads, which
+        // is the same answer as for any other change made behind this page's
+        // back, and it costs nothing until it happens.
       } catch (error) {
         toast(error.message + ' — reloading', true);
         setTimeout(() => location.reload(), 1200);

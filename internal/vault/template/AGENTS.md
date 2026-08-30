@@ -72,6 +72,8 @@ task in a column the board cannot render. Both change in the same edit.
 ## Editing a task
 
 - Set `updated` to the current UTC time on every change.
+- Leave `order` alone. It is where somebody dragged the card in its column; a task without
+  one sorts after the ones that have one, which is where a new task belongs.
 - Never edit `key` or `created`. Changing `title` renames the file too; `docket check`
   reports a name that no longer matches.
 - Append comments under `## Comments`, newest last, in the form
