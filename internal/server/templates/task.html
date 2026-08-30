@@ -87,18 +87,6 @@
   </div>
 
   <aside class="issue-side">
-    {{if $may}}
-    <section class="panel">
-      <h2>Attach a file</h2>
-      <form method="post" action="/task/{{$t.Key}}/attach" enctype="multipart/form-data"
-            class="attach">
-        <input type="file" name="file" required aria-label="File to attach">
-        <button type="submit">Attach</button>
-      </form>
-      <p class="footnote">Saved into <code>attachments/</code> and committed with the line that
-      points at it. Images embed; anything else becomes a link.</p>
-    </section>
-    {{end}}
 
     <section class="panel">
       <h2>Details</h2>
@@ -117,6 +105,18 @@
       </dl>
     </section>
 
+    {{if $may}}
+    <section class="panel">
+      <h2>Attach a file</h2>
+      <form method="post" action="/task/{{$t.Key}}/attach" enctype="multipart/form-data"
+            class="attach">
+        <input type="file" name="file" required aria-label="File to attach">
+        <button type="submit">Attach</button>
+      </form>
+      <p class="footnote">Saved into <code>attachments/</code> and committed with the line that
+      points at it. Images embed; anything else becomes a link.</p>
+    </section>
+    {{end}}
     <p class="stamps">
       Created {{$t.Created}}<br>
       Updated {{$t.Updated}}
