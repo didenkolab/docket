@@ -32,7 +32,7 @@ docket check                                         # eight rules, file:line fi
 | `docket workspace` | Assemble several project repositories into one Obsidian vault | works |
 | `docket serve` | A board and an API over the same repository | works |
 | `docket version` | Print the version | works |
-| `docket import` | Import from Jira and Confluence | planned |
+| `docket import` | Bring in an existing Jira and Confluence instance | works |
 
 Progress is tracked on the board in `docket-board`.
 

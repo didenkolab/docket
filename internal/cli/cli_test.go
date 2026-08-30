@@ -84,12 +84,28 @@ func TestUnknownCommandIsAUsageError(t *testing.T) {
 	}
 }
 
-func TestPlannedCommandsAreNotSilentlyAccepted(t *testing.T) {
-	// The help text lists commands that do not exist yet. Running one must
-	// fail loudly rather than exit zero and do nothing.
-	for _, cmd := range []string{"import"} {
-		if code, _, _ := run(t, cmd); code == exitOK {
-			t.Errorf("%s: exit code 0, but the command is not implemented", cmd)
+func TestEveryCommandInTheHelpExists(t *testing.T) {
+	// Run each command with no arguments. Whatever it does, it must not be an
+	// unknown command — the help text is a promise.
+	for _, cmd := range []string{"init", "new", "check", "workspace", "serve", "import"} {
+		_, _, stderr := run(t, cmd)
+		if strings.Contains(stderr, "unknown command") {
+			t.Errorf("%s is in the help but is not a command", cmd)
+		}
+	}
+}
+
+func TestSubcommandGroupsRejectNonsense(t *testing.T) {
+	for _, args := range [][]string{
+		{"workspace", "frobnicate"},
+		{"import", "frobnicate"},
+	} {
+		code, _, stderr := run(t, args...)
+		if code != exitUsage {
+			t.Errorf("%v: exit code = %d, want %d", args, code, exitUsage)
+		}
+		if !strings.Contains(stderr, "frobnicate") {
+			t.Errorf("%v: stderr does not name the unknown subcommand:\n%s", args, stderr)
 		}
 	}
 }

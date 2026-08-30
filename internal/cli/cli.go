@@ -36,11 +36,9 @@ Commands:
   check       Validate a vault against the specification
   workspace   Assemble several project repositories into one Obsidian vault
   serve       A board and an API over a vault
+  import      Bring in an existing Jira and Confluence instance
   version     Print the version
   help        Print this help
-
-Planned:
-  import      Import from Jira and Confluence
 
 The format and the roadmap live in
 https://github.com/vadymdidenkolab/docket-board
@@ -90,6 +88,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runWorkspace(args[1:], stdout, stderr)
 	case "serve":
 		return runServe(args[1:], stdout, stderr)
+	case "import":
+		return runImport(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, Version())
 		return exitOK
