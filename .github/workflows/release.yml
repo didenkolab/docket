@@ -16,7 +16,6 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache: false
 
       - name: Test before publishing anything
         run: go test ./...

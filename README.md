@@ -110,6 +110,25 @@ to the same files, not an owner of them: nothing is cached, every write becomes 
 attributed to whoever made it, and a write that would land on top of a change made in Obsidian
 or by an agent is refused rather than applied. Point all three at one repository at once.
 
+### Running it somewhere
+
+```bash
+docker run --rm -p 8080:8080 -v "$PWD:/vault" ghcr.io/vadymdidenkolab/docket
+```
+
+The vault is not in the image — it is your git repository, mounted. The image
+carries the binary, git and certificates, and nothing else; it keeps no state, so
+restarting it loses nothing and running two of them against one clone is only a question of
+file locking.
+
+`compose.yaml` in this repository is the same thing with the ports and the sign-in mode as
+variables. For a server other people use, put it behind TLS and set `--auth git`, so who may do
+what is a question for the git host rather than for whoever finds the port.
+
+To let a server take changes people push to the remote — and to push its own back — pull on a
+schedule beside it; docket does not fetch on its own, because a tracker that rebases your working
+copy out from under you is a tracker you stop trusting.
+
 ## An agent, over a protocol
 
 An agent can edit the files directly — that is the point of the format, and nothing here
