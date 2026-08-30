@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -115,15 +116,25 @@ func TestWhatEachRoleMay(t *testing.T) {
 
 func stub(t *testing.T, routes map[string]any) *httptest.Server {
 	t.Helper()
+
+	// Longest prefix wins, and the order is fixed. Iterating the map would let
+	// /user answer a request for /user/permissions whenever Go felt like it,
+	// which is a test that passes locally and fails in CI.
+	prefixes := make([]string, 0, len(routes))
+	for prefix := range routes {
+		prefixes = append(prefixes, prefix)
+	}
+	sort.Slice(prefixes, func(i, j int) bool { return len(prefixes[i]) > len(prefixes[j]) })
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		for prefix, body := range routes {
+		for _, prefix := range prefixes {
 			if strings.HasPrefix(r.URL.RequestURI(), prefix) {
 				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(body)
+				_ = json.NewEncoder(w).Encode(routes[prefix])
 				return
 			}
 		}
