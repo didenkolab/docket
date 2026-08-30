@@ -14,19 +14,47 @@ docket vault, and therefore the working example.
 
 ## Status
 
-Early. The format is settled and documented; the tool is not written yet. A vault is fully
-usable without it — clone, open in Obsidian, work. What the tool will add:
+Early. The format is settled and documented; the tool is a skeleton — `version` and `help` are
+the only commands that exist. A vault is fully usable without any of it: clone, open in
+Obsidian, work.
 
-| Command | What |
-|---|---|
-| `docket init` | Scaffold a new project vault |
-| `docket new` | Create a task with a valid key from the project's template |
-| `docket check` | Validate a vault against the specification |
-| `docket workspace sync` | Assemble several project repositories into one Obsidian vault |
-| `docket serve` | Web UI and HTTP API over the same repository |
-| `docket import` | Import from Jira and Confluence |
+| Command | What | State |
+|---|---|---|
+| `docket version` | Print the version | works |
+| `docket help` | Print the usage | works |
+| `docket init` | Scaffold a new project vault | planned |
+| `docket new` | Create a task with a valid key from the project's template | planned |
+| `docket check` | Validate a vault against the specification | planned |
+| `docket workspace sync` | Assemble several project repositories into one Obsidian vault | planned |
+| `docket serve` | Web UI and HTTP API over the same repository | planned |
+| `docket import` | Import from Jira and Confluence | planned |
 
 Progress is tracked on the board in `docket-board`.
+
+## Build
+
+Go 1.26 or newer. No dependencies.
+
+```bash
+go build -o docket ./cmd/docket
+./docket --version
+```
+
+Or, with Go installed:
+
+```bash
+go install github.com/vadymdidenkolab/docket/cmd/docket@latest
+```
+
+Release builds stamp the version in:
+
+```bash
+go build -ldflags "-X github.com/vadymdidenkolab/docket/internal/cli.version=$(git describe --tags)" \
+         -o docket ./cmd/docket
+```
+
+Go and the single-binary distribution were chosen for the reasons in
+[ADR-0002](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0002-go-and-a-single-binary.md).
 
 ## License
 
