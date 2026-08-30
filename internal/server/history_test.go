@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
@@ -184,4 +186,88 @@ func TestAnEmptyBoardSaysWhatToDo(t *testing.T) {
 	if !strings.Contains(body, `href="/new"`) {
 		t.Error("it does not offer to make one")
 	}
+}
+
+// Retitling renames the file, and every link that pointed at it has to move
+// too — in one commit, so no point in the history has the vault pointing at a
+// note that is not there.
+func TestRetitlingRepointsLinksInOneCommit(t *testing.T) {
+	s, h, root := newServer(t)
+	b := newBrowser(t, h)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Session model", Description: "Blocks [[ACME-1 Fix login redirect loop]].", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	git(t, root, "add", "-A")
+	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=T", "commit", "-q", "-m", "ACME-2")
+
+	b.visit("/task/ACME-1/edit")
+	if w := b.submit("/task/ACME-1/edit", url.Values{
+		"version":  {currentVersion(t, s, "ACME-1")},
+		"title":    {"Fix the login redirect for expired sessions"},
+		"type":     {"bug"},
+		"status":   {"Backlog"},
+		"priority": {"high"},
+		"assignee": {"agent/claude"},
+		"body":     {"A body."},
+	}); w.Code != http.StatusSeeOther {
+		t.Fatalf("retitle: %d %s", w.Code, w.Body)
+	}
+
+	pointing := readFile(t, filepath.Join(root, "ACME", "ACME-2 Session model.md"))
+	if !strings.Contains(pointing, "[[ACME-1 Fix the login redirect for expired sessions]]") {
+		t.Errorf("the inbound link was left pointing at nothing:\n%s", pointing)
+	}
+
+	// Both the rename and the repointing are in the same commit.
+	if dirty := gitPorcelain(t, root); dirty != "" {
+		t.Errorf("the retitle left files uncommitted:\n%s", dirty)
+	}
+	if files := commitFiles(t, root); len(files) < 3 {
+		t.Errorf("the commit carries %d paths, want the rename and the file that linked: %v",
+			len(files), files)
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+func gitPorcelain(t *testing.T, root string) string {
+	t.Helper()
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git status: %v: %s", err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func commitFiles(t *testing.T, root string) []string {
+	t.Helper()
+	cmd := exec.Command("git", "show", "--name-only", "--format=", "HEAD")
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git show: %v: %s", err, out)
+	}
+	var files []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+	return files
 }

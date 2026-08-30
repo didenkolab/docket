@@ -268,16 +268,18 @@ func (s *Server) editTask(
 		return err
 	}
 
-	// A title now lives in the file name, so changing it moves the file. Both
-	// paths go into the commit, which is what makes git record a rename rather
-	// than a deletion and an unrelated new file.
+	// A title lives in the file name, so changing it moves the file — and every
+	// link that pointed at the old name has to move with it. All of them go
+	// into one commit: git records the rename, and no point in the history has
+	// the vault pointing at a note that is not there.
 	paths := append([]string{rel}, companions...)
 	if projectKey, _, err := project.SplitKey(t.Key); err == nil {
 		if wanted := vault.PathFor(projectKey, t.Key, t.Title); wanted != rel {
-			if err := vault.Rename(s.root, rel, wanted); err != nil {
+			touched, err := vault.Retitle(s.root, rel, wanted)
+			if err != nil {
 				return err
 			}
-			paths = append(paths, wanted)
+			paths = append(paths, touched...)
 		}
 	}
 
