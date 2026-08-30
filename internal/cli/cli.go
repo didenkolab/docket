@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"runtime/debug"
+	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -31,11 +32,11 @@ Usage:
 
 Commands:
   init        Scaffold a new project vault
+  new         Create a task with a valid key
   version     Print the version
   help        Print this help
 
 Planned:
-  new         Create a task with a valid key
   check       Validate a vault against the specification
   workspace   Assemble several project repositories into one Obsidian vault
   serve       Web UI and HTTP API over a repository
@@ -81,6 +82,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "init":
 		return runInit(args[1:], stdout, stderr)
+	case "new":
+		return runNew(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, Version())
 		return exitOK
@@ -94,6 +97,51 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
+// permute moves positional arguments behind flag arguments.
+//
+// Go's flag package stops parsing at the first non-flag argument, so
+// `docket new "Title" --type bug` would quietly treat --type and bug as two more
+// positionals and reject the command. That is how everyone writes it, so the
+// arguments are reordered rather than the users.
+func permute(flags *flag.FlagSet, args []string) []string {
+	var flagArgs, positional []string
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "--" {
+			positional = append(positional, args[i+1:]...)
+			break
+		}
+		if len(arg) < 2 || arg[0] != '-' {
+			positional = append(positional, arg)
+			continue
+		}
+
+		flagArgs = append(flagArgs, arg)
+		name := strings.TrimLeft(arg, "-")
+		if strings.Contains(name, "=") {
+			continue
+		}
+		// A non-boolean flag takes the next argument as its value.
+		if !isBoolFlag(flags, name) && i+1 < len(args) {
+			i++
+			flagArgs = append(flagArgs, args[i])
+		}
+	}
+
+	return append(flagArgs, positional...)
+}
+
+func isBoolFlag(flags *flag.FlagSet, name string) bool {
+	f := flags.Lookup(name)
+	if f == nil {
+		return false
+	}
+	b, ok := f.Value.(interface{ IsBoolFlag() bool })
+	return ok && b.IsBoolFlag()
+}
+
 func runInit(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("init", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -105,7 +153,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	key := flags.String("key", "", "project key: the prefix of every task, such as ACME")
 	name := flags.String("name", "", "project name (defaults to the key)")
 
-	if err := flags.Parse(args); err != nil {
+	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
 	}
 	if flags.NArg() > 1 {

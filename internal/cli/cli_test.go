@@ -87,7 +87,7 @@ func TestUnknownCommandIsAUsageError(t *testing.T) {
 func TestPlannedCommandsAreNotSilentlyAccepted(t *testing.T) {
 	// The help text lists commands that do not exist yet. Running one must
 	// fail loudly rather than exit zero and do nothing.
-	for _, cmd := range []string{"new", "check", "workspace", "serve", "import"} {
+	for _, cmd := range []string{"check", "workspace", "serve", "import"} {
 		if code, _, _ := run(t, cmd); code == exitOK {
 			t.Errorf("%s: exit code 0, but the command is not implemented", cmd)
 		}

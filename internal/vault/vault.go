@@ -12,10 +12,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/vadymdidenkolab/docket/internal/project"
 )
 
 //go:embed all:template
@@ -36,10 +37,6 @@ type Options struct {
 	Name string
 }
 
-// keyPattern matches the shape of a project key: upper-case, starting with a
-// letter, short enough to read at the head of every task file name.
-var keyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
-
 func (o *Options) normalize() error {
 	o.Key = strings.TrimSpace(o.Key)
 	o.Name = strings.TrimSpace(o.Name)
@@ -47,7 +44,7 @@ func (o *Options) normalize() error {
 	if o.Key == "" {
 		return fmt.Errorf("a project key is required")
 	}
-	if !keyPattern.MatchString(o.Key) {
+	if !project.KeyPattern.MatchString(o.Key) {
 		return fmt.Errorf(
 			"project key %q is not usable: use 2 to 10 characters, upper-case letters and "+
 				"digits, starting with a letter — the key is the head of every task file name",
