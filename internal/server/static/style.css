@@ -35,6 +35,10 @@
   /* the one accent, and the three status hues */
   --accent: #2f5bff;
   --accent-soft: #e9edff;
+  /* What is legible on top of the accent, and on top of --ink. In dark mode
+   * the accent is a pale blue, so white on it is unreadable. */
+  --on-accent: #ffffff;
+  --on-ink: #f7f7f5;
   --todo: #8b91a0;
   --doing: #2f5bff;
   --done: #17916b;
@@ -81,6 +85,8 @@
 
     --accent: #7d9bff;
     --accent-soft: #1b2440;
+    --on-accent: #0e1117;
+    --on-ink: #101317;
     --todo: #6e7686;
     --doing: #7d9bff;
     --done: #3fbc90;
@@ -215,7 +221,7 @@ label { display: block; margin-bottom: var(--s1); }
 button {
   font-weight: 550;
   font-size: 0.875rem;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -259,7 +265,7 @@ button:active { filter: brightness(0.94); }
 }
 
 .project-tab:hover { color: var(--ink); border-color: var(--ink-faint); }
-.project-tab.on { color: #fff; background: var(--ink); border-color: var(--ink); }
+.project-tab.on { color: var(--on-ink); background: var(--ink); border-color: var(--ink); }
 .project-tab .count { opacity: 0.6; margin-left: var(--s1); }
 
 /* ---- board ---- */
@@ -356,7 +362,7 @@ body:has(.board) header .bar { max-width: none; }
   transform: translate(-50%, 0.75rem);
   font-size: 0.875rem;
   background: var(--ink);
-  color: var(--paper);
+  color: var(--on-ink);
   border-radius: 999px;
   padding: 0.5rem 1rem;
   box-shadow: var(--shadow-lift);
@@ -367,7 +373,7 @@ body:has(.board) header .bar { max-width: none; }
 }
 
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
-.toast.bad { background: var(--warn); color: #fff; }
+.toast.bad { background: var(--warn); color: var(--on-accent); }
 
 /* ---- one task ---- */
 
@@ -557,7 +563,7 @@ body:has(.board) header .bar { max-width: none; }
 
 .editor-tool:hover { color: var(--ink); background: var(--raised); border-color: var(--rule); filter: none; }
 .editor-preview-toggle { margin-left: auto; }
-.editor-preview-toggle.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+.editor-preview-toggle.on { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
 
 .editor-panes { display: grid; grid-template-columns: 1fr; }
 .editor.split .editor-panes { grid-template-columns: 1fr 1fr; }
@@ -599,7 +605,7 @@ body:has(.board) header .bar { max-width: none; }
 
 .danger { margin-top: var(--s5); display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .destructive { background: transparent; color: var(--warn); border-color: var(--warn); }
-.destructive:hover { background: var(--warn); color: #fff; filter: none; }
+.destructive:hover { background: var(--warn); color: var(--on-accent); filter: none; }
 
 .switch {
   display: flex;
@@ -622,6 +628,11 @@ table.settings td { padding: 0.15rem var(--s2) 0.15rem 0; vertical-align: middle
 table.settings td input, table.settings td select { width: 100%; }
 table.settings .pos { width: 4rem; }
 table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+/* With the workflow switched off every move is allowed, so every box is
+ * ticked — true, but it looks like a setting you made. Dimmed, it reads as
+ * what it is: not in force. */
+.switch:has(input:not(:checked)) + .matrix-wrap { opacity: 0.45; }
 
 .matrix-wrap { overflow-x: auto; margin: var(--s3) 0; }
 .matrix { width: auto; }
