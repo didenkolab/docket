@@ -157,28 +157,16 @@ or by an agent is refused rather than applied. Point all three at one repository
 
 ### Running it somewhere
 
-```bash
-docker run --rm -p 8080:8080 -v "$PWD:/vault" ghcr.io/vadymdidenkolab/docket
-```
-
-While this repository is private the image is too, so that pull needs a token first:
+Put the binary on the machine, clone the vault beside it, and run it. There is no runtime, no
+image and no state of its own — that is the whole deployment:
 
 ```bash
-echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-github-user> --password-stdin
+docket serve --addr 127.0.0.1:8080 --auth git
 ```
 
-The token needs `read:packages`. When the repository goes public the image follows and the
-login stops being necessary. Building it yourself needs no token at all — `docker build -t
-docket .` from a checkout.
-
-The vault is not in the image — it is your git repository, mounted. The image
-carries the binary, git and certificates, and nothing else; it keeps no state, so
-restarting it loses nothing and running two of them against one clone is only a question of
-file locking.
-
-`compose.yaml` in this repository is the same thing with the ports and the sign-in mode as
-variables. For a server other people use, put it behind TLS and set `--auth git`, so who may do
-what is a question for the git host rather than for whoever finds the port.
+Behind a reverse proxy that terminates TLS, add `--behind-proxy` so rate limits follow the
+client the proxy names rather than the proxy. `--auth git` makes who may do what a question for
+the git host rather than for whoever finds the port.
 
 To let a server take changes people push to the remote — and to push its own back — pull on a
 schedule beside it; docket does not fetch on its own, because a tracker that rebases your working
