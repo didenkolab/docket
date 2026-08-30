@@ -1,0 +1,30 @@
+{{template "head" .}}
+
+<h1>New task</h1>
+
+<form class="stacked" method="post" action="/new">
+  <label for="title">Title</label>
+  <input id="title" name="title" required autofocus placeholder="Fix login redirect loop">
+
+  <label for="type">Type</label>
+  <select id="type" name="type">
+    {{range .Project.Types}}<option value="{{.}}">{{.}}</option>{{end}}
+  </select>
+
+  <label for="priority">Priority</label>
+  <select id="priority" name="priority">
+    {{range .Project.Priorities}}<option value="{{.}}">{{.}}</option>{{end}}
+  </select>
+
+  <label for="assignee">Assignee</label>
+  <input id="assignee" name="assignee" placeholder="agent/claude">
+
+  <button type="submit">Create</button>
+</form>
+
+<p class="footnote">
+  The key is the highest number in <code>tasks/</code> plus one. If someone else takes the same
+  number at the same moment, the second write fails rather than replacing the first.
+</p>
+
+{{template "foot" .}}

@@ -30,8 +30,8 @@ docket check                                         # eight rules, file:line fi
 | `docket new` | Create a task with a valid key from the project's template | works |
 | `docket check` | Validate a vault against the specification | works |
 | `docket workspace` | Assemble several project repositories into one Obsidian vault | works |
+| `docket serve` | A board and an API over the same repository | works |
 | `docket version` | Print the version | works |
-| `docket serve` | Web UI and HTTP API over the same repository | planned |
 | `docket import` | Import from Jira and Confluence | planned |
 
 Progress is tracked on the board in `docket-board`.
@@ -57,6 +57,19 @@ go build -o docket ./cmd/docket
 
 Go and the single-binary distribution were chosen for the reasons in
 [ADR-0002](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0002-go-and-a-single-binary.md).
+
+## A board in the browser
+
+For people who do not run Obsidian:
+
+```bash
+docket serve --author "Your Name <you@example.com>"
+```
+
+A board grouped by status, task pages, the wiki, search, and a JSON API. It is a second client
+to the same files, not an owner of them: nothing is cached, every write becomes a git commit
+attributed to whoever made it, and a write that would land on top of a change made in Obsidian
+or by an agent is refused rather than applied. Point all three at one repository at once.
 
 ## A workspace
 

@@ -1,0 +1,35 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+{{if $data.Broken}}
+<div class="notice">
+  <strong>{{len $data.Broken}} file(s) could not be read.</strong>
+  <ul>
+    {{range $data.Broken}}<li><code>{{.Path}}</code> — {{.Err}}</li>{{end}}
+  </ul>
+  Run <code>docket check</code> for the details.
+</div>
+{{end}}
+
+<div class="board">
+  {{range $data.Columns}}
+  <section class="column {{categoryClass .Status.Category}}">
+    <h2>{{.Status.Name}} <span class="count">{{len .Cards}}</span></h2>
+    {{range .Cards}}
+    <a class="card" href="/task/{{.Key}}">
+      <span class="key">{{.Key}}</span>
+      <span class="card-title">{{.Title}}</span>
+      <span class="meta">
+        {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
+        <span class="priority p-{{.Priority}}">{{.Priority}}</span>
+        {{range .Labels}}<span class="label">{{.}}</span>{{end}}
+      </span>
+    </a>
+    {{else}}
+    <p class="empty">Nothing here.</p>
+    {{end}}
+  </section>
+  {{end}}
+</div>
+
+{{template "foot" .}}

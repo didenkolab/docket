@@ -1,0 +1,28 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">{{with .Project}}{{.Name}}{{else}}docket{{end}}</a>
+  <nav>
+    <a href="/">Board</a>
+    <a href="/pages">Pages</a>
+    <a href="/new">New task</a>
+  </nav>
+  <form class="search" action="/search" method="get">
+    <input type="search" name="q" placeholder="Search" aria-label="Search">
+  </form>
+</header>
+<main>
+{{end}}
+
+{{define "foot"}}
+</main>
+</body>
+</html>
+{{end}}

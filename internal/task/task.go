@@ -229,6 +229,26 @@ func (t *Task) LineOf(target string) int {
 	return t.bodyLine
 }
 
+// CommentsHeading is where comments are appended.
+const CommentsHeading = "## Comments"
+
+// AppendComment adds a comment at the end of the body, creating the section
+// when the task has none.
+//
+// Comments live in the task file rather than in files of their own. Two agents
+// commenting in parallel branches then conflict at the end of one file, which
+// is trivial to resolve — and the whole conversation stays readable without
+// tooling, which the alternative gives up.
+func (t *Task) AppendComment(author string, when time.Time, text string) {
+	body := strings.TrimRight(t.body, "\n")
+	if !strings.Contains(body, CommentsHeading) {
+		body += "\n\n" + CommentsHeading
+	}
+	entry := fmt.Sprintf("**%s · %s** — %s",
+		author, when.UTC().Format("2006-01-02 15:04"), strings.TrimSpace(text))
+	t.body = body + "\n\n" + entry + "\n"
+}
+
 // NestedProperties lists properties whose value is not a scalar or a list of
 // scalars. The format forbids them: Obsidian's property editor cannot edit a
 // nested value and Bases cannot filter on one.

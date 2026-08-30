@@ -1,0 +1,25 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Search</h1>
+
+<form class="stacked" action="/search" method="get">
+  <input type="search" name="q" value="{{$data.Query}}" autofocus placeholder="What are you looking for?">
+  <button type="submit">Search</button>
+</form>
+
+{{if $data.Query}}
+<p class="count-line">{{len $data.Hits}} result(s) for “{{$data.Query}}”.</p>
+<ul class="hits">
+  {{range $data.Hits}}
+  <li>
+    <a href="{{.Href}}">{{.Label}}</a>
+    <p class="context">{{.Context}}</p>
+  </li>
+  {{else}}
+  <li class="empty">Nothing matched.</li>
+  {{end}}
+</ul>
+{{end}}
+
+{{template "foot" .}}

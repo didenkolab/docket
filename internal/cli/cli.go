@@ -35,11 +35,11 @@ Commands:
   new         Create a task with a valid key
   check       Validate a vault against the specification
   workspace   Assemble several project repositories into one Obsidian vault
+  serve       A board and an API over a vault
   version     Print the version
   help        Print this help
 
 Planned:
-  serve       Web UI and HTTP API over a repository
   import      Import from Jira and Confluence
 
 The format and the roadmap live in
@@ -88,6 +88,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runCheck(args[1:], stdout, stderr)
 	case "workspace":
 		return runWorkspace(args[1:], stdout, stderr)
+	case "serve":
+		return runServe(args[1:], stdout, stderr)
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, Version())
 		return exitOK

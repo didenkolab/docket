@@ -1,0 +1,9 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<article class="page">
+  <p class="path"><code>{{$data.Path}}.md</code></p>
+  <div class="body">{{$data.Body}}</div>
+</article>
+
+{{template "foot" .}}

@@ -1,0 +1,53 @@
+{{template "head" .}}
+{{$data := .Data}}
+{{$t := $data.Task}}
+
+<article class="task">
+  <h1><span class="key">{{$t.Key}}</span> {{$t.Title}}</h1>
+  <p class="path">
+    <code>tasks/{{$t.Key}}.md</code>
+    <span class="fingerprint" title="the bytes this page was rendered from">{{$data.Version}}</span>
+  </p>
+
+  <dl class="properties">
+    <dt>Status</dt><dd><span class="pill {{categoryClass $t.StatusCategory}}">{{$t.Status}}</span></dd>
+    <dt>Type</dt><dd>{{$t.Type}}</dd>
+    <dt>Priority</dt><dd>{{$t.Priority}}</dd>
+    <dt>Assignee</dt><dd>{{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">unassigned</span>{{end}}</dd>
+    {{if $t.Parent}}<dt>Parent</dt><dd><a href="/task/{{$t.Parent}}">{{$t.Parent}}</a></dd>{{end}}
+    {{if $t.Labels}}<dt>Labels</dt><dd>{{range $t.Labels}}<span class="label">{{.}}</span>{{end}}</dd>{{end}}
+    {{if $t.Aliases}}<dt>Also known as</dt><dd>{{range $t.Aliases}}<span class="label">{{.}}</span>{{end}}</dd>{{end}}
+    <dt>Created</dt><dd>{{$t.Created}}</dd>
+    <dt>Updated</dt><dd>{{$t.Updated}}</dd>
+  </dl>
+
+  <div class="body">{{$data.Body}}</div>
+
+  <div class="actions">
+    <form method="post" action="/task/{{$t.Key}}/status">
+      <input type="hidden" name="version" value="{{$data.Version}}">
+      <label for="status">Move to</label>
+      <select id="status" name="status">
+        {{range .Project.Statuses}}
+        <option value="{{.Name}}"{{if eq .Name $t.Status}} selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+      <button type="submit">Move</button>
+    </form>
+
+    <form method="post" action="/task/{{$t.Key}}/comment">
+      <input type="hidden" name="version" value="{{$data.Version}}">
+      <label for="text">Comment</label>
+      <textarea id="text" name="text" rows="3" placeholder="What happened?"></textarea>
+      <button type="submit">Add comment</button>
+    </form>
+  </div>
+
+  <p class="footnote">
+    Every change here is written to <code>tasks/{{$t.Key}}.md</code> and committed.
+    If the file changes underneath you — in Obsidian, or by an agent — the write is refused
+    rather than applied on top of what you never saw.
+  </p>
+</article>
+
+{{template "foot" .}}

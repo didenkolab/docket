@@ -1,0 +1,350 @@
+/*
+ * docket — "the file is the record".
+ *
+ * This is a tracker whose data is Markdown files in git, and the interface says
+ * so rather than hiding it. Monospace carries the structure — keys, paths,
+ * statuses, counts, the version fingerprint — and a humanist sans carries the
+ * prose. That inverts the usual arrangement, where mono is an accent for code;
+ * here the structure of the product genuinely is text in files.
+ *
+ * Status is encoded in the weight and colour of a rule, not in a wall of
+ * coloured badges: work in flight is marked in ink blue, work not started is
+ * a plain grey rule, and finished work recedes. Nothing else is coloured, so
+ * the one accent means something wherever it appears.
+ *
+ * No web fonts. The binary is meant to run offline, and a page that waits on a
+ * font CDN would make that a lie.
+ */
+
+:root {
+  --paper: #fbfbf9;
+  --raised: #ffffff;
+  --ink: #16181d;
+  --ink-soft: #5b6069;
+  --rule: #e3e2dd;
+  --accent: #2b4eff;
+  --done: #8a8f98;
+  --warn: #8a4b12;
+  --warn-bg: #fdf3e7;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --gap: 1rem;
+  --radius: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14161a;
+    --raised: #1b1e24;
+    --ink: #e8e9ec;
+    --ink-soft: #9aa0aa;
+    --rule: #262a31;
+    --accent: #7f96ff;
+    --done: #6a707a;
+    --warn: #e8b878;
+    --warn-bg: #2a2117;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+code, .key, .count, .path, .pill, .priority, .label, .footnote code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+}
+
+/* ---- header ---- */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+header nav { display: flex; gap: 1rem; }
+
+header nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+header nav a:hover { color: var(--ink); }
+
+header .search { margin-left: auto; }
+
+input[type="search"], input[type="text"], select, textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+}
+
+main { padding: 1.5rem 1.25rem 4rem; }
+
+h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1rem; }
+
+/* ---- board ---- */
+
+.board {
+  display: flex;
+  gap: var(--gap);
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+}
+
+.column {
+  flex: 0 0 17rem;
+  border-left: 3px solid var(--rule);
+  padding-left: 0.75rem;
+}
+
+.column.doing { border-left-color: var(--accent); }
+.column.done { border-left-color: var(--done); opacity: 0.72; }
+
+.column h2 {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin: 0 0 0.75rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.column .count { color: var(--ink-soft); }
+
+.card {
+  display: block;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card:hover { border-color: var(--accent); }
+
+.card .key { display: block; color: var(--ink-soft); }
+.card-title { display: block; margin: 0.15rem 0 0.4rem; }
+
+.meta { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+
+.assignee, .label, .priority {
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0 0.3rem;
+}
+
+.priority.p-high, .priority.p-urgent { color: var(--warn); border-color: currentColor; }
+
+.empty { color: var(--ink-soft); font-style: italic; }
+
+/* ---- one task ---- */
+
+.task, .page { max-width: 62rem; }
+
+.task h1 .key { color: var(--ink-soft); margin-right: 0.4rem; }
+
+.properties {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 1rem;
+  margin: 0 0 1.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.properties dt {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+/* The property sheet is the frontmatter, so it is set in the structural face
+ * rather than the prose one. */
+.properties dd { margin: 0; font-family: var(--mono); font-size: 0.85em; }
+.properties dd .empty { font-family: var(--sans); }
+
+.pill { border-bottom: 2px solid var(--rule); padding-bottom: 1px; }
+.pill.doing { border-bottom-color: var(--accent); }
+.pill.done { border-bottom-color: var(--done); color: var(--ink-soft); }
+
+.body > :first-child { margin-top: 0; }
+.body h2 { font-size: 1.05rem; margin-top: 2rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.2rem; }
+.body h3 { font-size: 0.95rem; }
+.body pre {
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.body table { border-collapse: collapse; display: block; overflow-x: auto; }
+.body th, .body td { border: 1px solid var(--rule); padding: 0.3rem 0.6rem; text-align: left; }
+.body blockquote {
+  margin: 1rem 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-soft);
+}
+
+.dead-link {
+  color: var(--warn);
+  border-bottom: 1px dashed currentColor;
+  cursor: help;
+}
+
+/* ---- forms ---- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.actions form, .stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-width: 28rem;
+}
+
+.actions form { flex: 1 1 18rem; }
+
+label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+textarea { width: 100%; resize: vertical; }
+.stacked input, .stacked select { width: 100%; }
+
+button {
+  font: inherit;
+  font-weight: 500;
+  color: var(--paper);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+}
+
+button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---- pages, search, notices ---- */
+
+.pages, .hits { list-style: none; padding: 0; margin: 0; }
+.pages li, .hits li { padding: 0.4rem 0; border-bottom: 1px solid var(--rule); }
+.pages a { font-family: var(--mono); font-size: 0.85rem; }
+
+.hits .context { margin: 0.2rem 0 0; color: var(--ink-soft); font-size: 0.85rem; }
+.count-line { color: var(--ink-soft); }
+
+/* The path strip is the signature of this interface: every screen names the
+ * file behind it, so you always know what to open in an editor or in Obsidian.
+ * On a task it also shows the fingerprint of the bytes the page was rendered
+ * from — the same value the write check compares against, so the thing that
+ * decides whether your edit lands is visible rather than hidden. */
+.path { color: var(--ink-soft); margin: -0.5rem 0 1.25rem; }
+.page .path { margin: 0 0 1rem; }
+
+.fingerprint {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0 0.3rem;
+  margin-left: 0.4rem;
+}
+
+.footnote {
+  margin-top: 2rem;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  max-width: 46rem;
+}
+
+.notice {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-bg);
+  color: var(--warn);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.notice ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+
+.failure { max-width: 40rem; }
+.failure h1 { color: var(--warn); }
+
+@media (max-width: 40rem) {
+  header { gap: 0.5rem; }
+  header .search { margin-left: 0; width: 100%; }
+  header .search input { width: 100%; }
+  main { padding: 1rem; }
+
+  /* On a phone the columns stack. Scrolling sideways would land you on
+   * whatever the first column happens to be — usually an empty backlog —
+   * and hide the work behind a gesture. */
+  .board { flex-direction: column; overflow-x: visible; }
+  .column { flex-basis: auto; width: 100%; }
+  .properties { grid-template-columns: 1fr; gap: 0 0; }
+  .properties dt { margin-top: 0.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

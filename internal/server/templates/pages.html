@@ -1,0 +1,13 @@
+{{template "head" .}}
+
+<h1>Pages</h1>
+
+<ul class="pages">
+  {{range .Data}}
+  <li><a href="/page/{{.}}">{{.}}</a></li>
+  {{else}}
+  <li class="empty">The knowledge base is empty. Pages live under <code>docs/</code>.</li>
+  {{end}}
+</ul>
+
+{{template "foot" .}}
