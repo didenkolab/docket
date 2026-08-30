@@ -49,6 +49,11 @@ const (
 // the format rather than by a heuristic.
 func (r *Repo) History(pathspec string, limit int) ([]Change, error) {
 	args := []string{
+		// git escapes any byte outside ASCII in the paths it prints, and wraps
+		// the result in quotes: `"BETA/BETA-2 \320\237….md"`. A title may be
+		// written in any script, so almost every path in a real vault comes
+		// back mangled and nothing can be read from it afterwards.
+		"-c", "core.quotePath=false",
 		"log",
 		"--format=" + strings.Join([]string{"%H", "%an", "%ae", "%aI", "%s"}, unitFormat),
 		"--name-status",
