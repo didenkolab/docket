@@ -85,7 +85,10 @@
     try {
       const response = await fetch('/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        },
         body: new URLSearchParams({ body: textarea.value }),
       });
       preview.innerHTML = response.ok

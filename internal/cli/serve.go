@@ -1,12 +1,17 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
@@ -47,6 +52,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	recheck := flags.Duration("recheck", 5*time.Minute,
 		"how often to re-ask the host about a signed-in person, and so how long a revocation takes")
 	life := flags.Duration("session", 12*time.Hour, "how long a session lasts")
+	proxied := flags.Bool("behind-proxy", false,
+		"a reverse proxy sits in front, so rate limits follow the client it names "+
+			"rather than the proxy")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -87,6 +95,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Host:        gitHost,
 		Recheck:     *recheck,
 		SessionLife: *life,
+		BehindProxy: *proxied,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
@@ -108,10 +117,40 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 			"is attributed to %s.\n", who)
 	}
 
-	if err := http.Serve(listener, s.Handler()); err != nil {
+	// Timeouts, because the default is none: a connection that sends a header
+	// slowly and never finishes holds a goroutine until the process dies, and
+	// enough of them are the whole attack.
+	//
+	// Writes get longer than reads because one of them is a git commit, and a
+	// repository with a lot of history takes its time.
+	httpd := &http.Server{
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       2 * time.Minute,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
+	}
+
+	// A write is a file and then a commit. Killed between the two, the vault
+	// has a change git never saw — so an interrupt stops taking new requests
+	// and lets the ones in flight finish.
+	stopping := make(chan os.Signal, 1)
+	signal.Notify(stopping, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() {
+		<-stopping
+		fmt.Fprintln(stdout, "\nFinishing what is in flight, then stopping.")
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		_ = httpd.Shutdown(ctx)
+		close(done)
+	}()
+
+	if err := httpd.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
 		return exitError
 	}
+	<-done
 	return exitOK
 }
 

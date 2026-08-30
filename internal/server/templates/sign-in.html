@@ -15,6 +15,7 @@
   </p>
 
   <form method="post" action="/sign-in">
+  {{template "csrf" $}}
     <input type="hidden" name="next" value="{{$data.Next}}">
     <label for="token">{{$data.Host}} token</label>
     <input id="token" name="token" type="password" autocomplete="current-password" required

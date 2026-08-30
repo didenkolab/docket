@@ -103,6 +103,27 @@ it, so a button in this interface would appear to hand out something it cannot. 
 is in
 [ADR-0004](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0004-access-comes-from-git.md).
 
+### Standing up to the open internet
+
+A change has to come from a page this server drew. Every form carries a token that lives in a
+cookie the page cannot read, and a request that admits to coming from another origin — by
+`Sec-Fetch-Site` or by `Origin` — is refused before anything else is looked at. A client with no
+cookies at all is not asked for a token: an agent or a `curl` has no ambient session to hijack,
+and demanding a `GET` before every write would buy nothing.
+
+Requests are metered per client: generous for reading, tighter for writing, and much tighter for
+signing in, because every sign-in attempt is a call to the git host and a loop against it burns
+that host's rate limit for everyone. Behind a reverse proxy, pass `--behind-proxy` so the limit
+follows the client the proxy names rather than the proxy itself.
+
+Pages are served under a content security policy with no inline anything, and attachments are
+served sandboxed — an uploaded SVG is still embeddable as an image but cannot run as a page.
+An interrupt stops taking new requests and lets the ones in flight finish, because a write is a
+file and then a commit, and stopping between the two leaves a change git never saw.
+
+None of this replaces the git host. Anyone who can clone the repository has everything in it;
+what is here keeps a browser from being used against its owner.
+
 ### The workflow
 
 Which status may move to which is part of the vault's configuration, so it lives in

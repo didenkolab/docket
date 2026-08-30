@@ -353,6 +353,40 @@ func TestPageRendersAndResolvesLinks(t *testing.T) {
 	}
 }
 
+// A name with a space in it is the normal case here: a note is named after its
+// task and an attachment after the task it belongs to. A space inside Markdown
+// link parentheses ends the URL, so an unescaped href renders as literal text.
+func TestALinkToANameWithSpacesIsStillALink(t *testing.T) {
+	_, h, root := newServer(t)
+
+	if err := os.MkdirAll(filepath.Join(root, "attachments"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "attachments", "ACME-1 screenshot.png"),
+		[]byte("not really a png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	page := "---\ntitle: Notes\n---\n\n" +
+		"![[attachments/ACME-1 screenshot.png]]\n\n" +
+		"and [[ACME-1 Fix login redirect loop]].\n"
+	if err := os.WriteFile(filepath.Join(root, "docs", "notes.md"), []byte(page), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/page/docs/notes").Body.String()
+	if !strings.Contains(body, `src="/file/attachments/ACME-1%20screenshot.png"`) {
+		t.Errorf("the attachment did not become an image:\n%s", body)
+	}
+	if !strings.Contains(body, `href="/task/ACME-1"`) {
+		t.Errorf("the task link did not survive:\n%s", body)
+	}
+	// The literal remains of a link that failed to parse.
+	if strings.Contains(body, "screenshot.png](") {
+		t.Errorf("a link rendered as text:\n%s", body)
+	}
+}
+
 func TestPagePathCannotEscapeTheVault(t *testing.T) {
 	_, h, _ := newServer(t)
 	if w := get(t, h, "/page/../../etc/passwd"); w.Code == http.StatusOK {

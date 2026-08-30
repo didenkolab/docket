@@ -15,6 +15,7 @@
 {{end}}
 
 <form class="edit" method="post" action="/task/{{$t.Key}}/edit">
+  {{template "csrf" $}}
   <input type="hidden" name="version" value="{{$data.Version}}">
 
   <label for="title">Title</label>

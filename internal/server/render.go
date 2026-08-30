@@ -5,6 +5,7 @@ import (
 	"html"
 	"html/template"
 	"io/fs"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -138,7 +139,7 @@ func renderMarkdown(body string, ix *index) template.HTML {
 				// An embedded screenshot should not caption itself with a path.
 				display = filepath.Base(target)
 			}
-			return "[" + display + "](" + href + ")"
+			return "[" + display + "](" + escapeHref(href) + ")"
 		}
 		return `<span class="dead-link" title="resolves to nothing in this vault">` +
 			html.EscapeString(display) + `</span>`
@@ -149,6 +150,21 @@ func renderMarkdown(body string, ix *index) template.HTML {
 		return template.HTML(template.HTMLEscapeString(body))
 	}
 	return template.HTML(out.String())
+}
+
+// escapeHref makes a path safe to put inside Markdown link parentheses.
+//
+// A note is named after its task and an attachment after the task it belongs
+// to, so almost every one of these paths has a space in it — and a space inside
+// `(...)` ends the URL, which turns the whole link into literal text with a
+// stray bracket. Every segment is escaped; the slashes between them are not,
+// because they are the path.
+func escapeHref(href string) string {
+	parts := strings.Split(href, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }
 
 // replaceOutsideCode rewrites wikilinks everywhere except inside code spans and

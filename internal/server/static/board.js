@@ -8,6 +8,10 @@
   const board = document.querySelector('.board');
   if (!board) return;
 
+  // The token the server drew into this page. A change carries it back, which
+  // is what tells the server the change came from a page it served.
+  const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
   /* ---------- feedback ---------- */
 
   let toastTimer;
@@ -164,7 +168,7 @@
       try {
         const response = await fetch('/api/tasks/' + key, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
           body: JSON.stringify(change),
         });
 

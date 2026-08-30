@@ -6,6 +6,7 @@
 <title>{{.Title}}</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta name="csrf-token" content="{{.CSRF}}">
 </head>
 <body>
 <header>
@@ -38,3 +39,7 @@
 </body>
 </html>
 {{end}}
+
+{{/* The token every change must carry back. $ is the page, whatever . happens
+     to be inside a range or a with. */}}
+{{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}

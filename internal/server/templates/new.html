@@ -9,6 +9,7 @@
 {{end}}
 
 <form class="stacked" method="post" action="/new">
+  {{template "csrf" $}}
   <input type="hidden" name="parent" value="{{$data.Parent}}">
   <label for="project">Project</label>
   <select id="project" name="project">

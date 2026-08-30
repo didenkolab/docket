@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -160,5 +161,22 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	// An attachment is somebody else's file served from this server's origin.
+	// An .svg or .html among them, opened directly, is a page running script
+	// with the reader's session — anybody who may attach a file could otherwise
+	// take over the account of anybody who clicks it.
+	//
+	// The sandbox neuters the document without stopping an <img> from loading
+	// it, which is how images are embedded. Anything that is not an image the
+	// interface embeds is sent as a download rather than rendered, because
+	// there is no reason to render it and every reason not to.
+	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if !embeddable[strings.ToLower(path.Ext(rel))] {
+		w.Header().Set("Content-Disposition",
+			"attachment; filename*=UTF-8''"+url.PathEscape(path.Base(rel)))
+	}
+
 	http.ServeFile(w, r, filepath.Join(s.root, filepath.FromSlash(rel)))
 }

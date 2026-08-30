@@ -13,6 +13,7 @@
 
 {{if $may}}
 <form class="statusbar" method="post" action="/task/{{$t.Key}}/status">
+  {{template "csrf" $}}
   <input type="hidden" name="version" value="{{$data.Version}}">
   <label for="status">Status</label>
   <select id="status" name="status" class="status-select {{categoryClass $t.StatusCategory}}">
@@ -77,6 +78,7 @@
 
       {{if $may}}
       <form class="comment-form" method="post" action="/task/{{$t.Key}}/comment">
+  {{template "csrf" $}}
         <input type="hidden" name="version" value="{{$data.Version}}">
         <label for="text">Add a comment</label>
         <textarea id="text" name="text" rows="3" placeholder="What happened?"></textarea>
@@ -110,6 +112,7 @@
       <h2>Attach a file</h2>
       <form method="post" action="/task/{{$t.Key}}/attach" enctype="multipart/form-data"
             class="attach">
+  {{template "csrf" $}}
         <input type="file" name="file" required aria-label="File to attach">
         <button type="submit">Attach</button>
       </form>

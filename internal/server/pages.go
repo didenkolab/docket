@@ -28,6 +28,9 @@ type pageData struct {
 	// You is who is asking, so the interface can offer only what they may do.
 	You      access.Identity
 	SignedIn bool
+	// CSRF is what this page must send back with a change for the change to be
+	// accepted. Every form carries it; the scripts read it from the head.
+	CSRF string
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
@@ -38,6 +41,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
 		Config: c, Title: title, Data: data,
 		You:      identityOf(r),
 		SignedIn: s.auth != nil,
+		CSRF:     tokenOf(r),
 	}
 	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

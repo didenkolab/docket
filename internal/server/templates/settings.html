@@ -12,6 +12,7 @@
 {{end}}
 
 <form method="post" action="/settings">
+  {{template "csrf" $}}
   <label for="name">Vault name</label>
   <input id="name" name="name" value="{{$data.Name}}" required>
 

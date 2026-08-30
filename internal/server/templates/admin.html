@@ -54,6 +54,7 @@
 </p>
 
 <form method="post" action="/sign-out">
+  {{template "csrf" $}}
   <button type="submit">Sign out</button>
 </form>
 {{end}}

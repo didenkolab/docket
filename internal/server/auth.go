@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -196,6 +197,27 @@ func urlEscape(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "&", "%26"), "?", "%3F")
 }
 
+// backTo is where to send somebody after they sign in.
+//
+// Starting with a slash is not enough to mean "a page here". `//example.com`
+// starts with a slash and is a URL to another host — a sign-in page that
+// forwards to wherever a link says is a sign-in page an attacker can use to
+// look like this one. Only a path on this server is accepted; anything else
+// becomes the board.
+func backTo(next string) string {
+	if next == "" || next[0] != '/' {
+		return "/"
+	}
+	if len(next) > 1 && (next[1] == '/' || next[1] == '\\') {
+		return "/"
+	}
+	parsed, err := url.Parse(next)
+	if err != nil || parsed.Scheme != "" || parsed.Host != "" {
+		return "/"
+	}
+	return next
+}
+
 /* ---------- signing in and out ---------- */
 
 func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
@@ -225,10 +247,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := strings.TrimSpace(r.FormValue("token"))
-	next := r.FormValue("next")
-	if next == "" || !strings.HasPrefix(next, "/") {
-		next = "/"
-	}
+	next := backTo(r.FormValue("next"))
 
 	c, _ := loadConfigQuietly(s.root)
 	fail := func(message string) {

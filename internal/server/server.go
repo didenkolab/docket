@@ -46,6 +46,10 @@ type Options struct {
 	Recheck time.Duration
 	// SessionLife is how long a session lasts before it has to be renewed.
 	SessionLife time.Duration
+	// BehindProxy says a reverse proxy sits in front, so the client to hold to
+	// a rate limit is the one it names rather than the proxy itself. Off by
+	// default: believing the header unasked lets anybody be somebody else.
+	BehindProxy bool
 }
 
 // Server serves one vault.
@@ -60,6 +64,13 @@ type Server struct {
 	// requests cannot interleave. It says nothing about Obsidian or an agent
 	// writing the same file — that is what the version check is for.
 	writes sync.Mutex
+
+	// How fast one client may ask. Reading is cheap but not free — every board
+	// parses every task — and changing is a git commit.
+	reads       *limiter
+	changes     *limiter
+	signIns     *limiter
+	behindProxy bool
 
 	// now is injectable so tests can assert on timestamps.
 	now func() time.Time
@@ -82,12 +93,21 @@ func New(root string, opts Options) (*Server, error) {
 		return nil, err
 	}
 
+	started := time.Now()
 	s := &Server{
 		root:   root,
 		repo:   repo,
 		author: opts.Author,
 		tmpl:   tmpl,
 		now:    time.Now,
+
+		// A person clicking as fast as they can manages a few requests a
+		// second; a board with a hundred cards is one request. Signing in is
+		// held far tighter, because every attempt is a call to the git host.
+		reads:       newLimiter(600, 120, started),
+		changes:     newLimiter(120, 30, started),
+		signIns:     newLimiter(10, 5, started),
+		behindProxy: opts.BehindProxy,
 	}
 	if opts.Host != nil {
 		recheck, life := opts.Recheck, opts.SessionLife
@@ -146,7 +166,11 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.Handle("GET /static/", http.FileServerFS(assets))
 
-	return s.guard(mux)
+	// Outermost first: headers and a body cap apply to everything, including
+	// what the rate limiter refuses; the rate limit applies before any work is
+	// done; the cross-site check runs before the identity check, so a forged
+	// request is refused for what it is rather than for who sent it.
+	return s.harden(s.meter(s.checkOrigin(s.guard(mux))))
 }
 
 // version identifies the exact bytes a client saw, so a write can refuse to
