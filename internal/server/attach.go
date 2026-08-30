@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -89,7 +88,10 @@ func attachmentName(key, original string) string {
 }
 
 func (s *Server) saveAttachment(rel string, src io.Reader) (string, error) {
-	full := filepath.Join(s.root, filepath.FromSlash(rel))
+	full, err := s.abs(rel)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		return "", err
 	}
@@ -111,14 +113,16 @@ func (s *Server) saveAttachment(rel string, src io.Reader) (string, error) {
 		}
 		ext := filepath.Ext(rel)
 		name = fmt.Sprintf("%s-%d%s", strings.TrimSuffix(rel, ext), n, ext)
-		path = filepath.Join(s.root, filepath.FromSlash(name))
+		if path, err = s.abs(name); err != nil {
+			return "", err
+		}
 	}
 }
 
 // handleDeleteTask removes a task. git keeps it; the vault does not.
 func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -146,7 +150,7 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, http.StatusInternalServerError, "Not deleted", err.Error())
 		return
 	}
-	if err := s.repo.Commit([]string{rel}, "deleted "+key, s.authorFor(r)); err != nil {
+	if err := s.commit([]string{rel}, "deleted "+key, s.authorFor(r)); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Deleted, but not committed", err.Error())
 		return
 	}
@@ -178,5 +182,10 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 			"attachment; filename*=UTF-8''"+url.PathEscape(path.Base(rel)))
 	}
 
-	http.ServeFile(w, r, filepath.Join(s.root, filepath.FromSlash(rel)))
+	full, err := s.abs(rel)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, full)
 }

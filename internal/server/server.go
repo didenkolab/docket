@@ -14,15 +14,19 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -52,10 +56,9 @@ type Options struct {
 	BehindProxy bool
 }
 
-// Server serves one vault.
+// Server serves one space: a vault, or a workspace of them.
 type Server struct {
-	root   string
-	repo   *gitvcs.Repo
+	space  *space.Space
 	author gitvcs.Author
 	tmpl   *template.Template
 	auth   *authority
@@ -76,13 +79,17 @@ type Server struct {
 	now func() time.Time
 }
 
-// New opens a vault for serving.
+// New opens a vault, or a workspace of them, for serving.
 func New(root string, opts Options) (*Server, error) {
-	if _, err := project.Load(root); err != nil {
+	sp, err := space.Open(root)
+	if err != nil {
 		return nil, err
 	}
-	repo, err := gitvcs.Open(root)
-	if err != nil {
+	if _, err := sp.Config(); err != nil {
+		return nil, err
+	}
+	// Every write is a commit, so refuse a space that cannot make one.
+	if err := sp.RequireGit(); err != nil {
 		return nil, err
 	}
 
@@ -95,8 +102,7 @@ func New(root string, opts Options) (*Server, error) {
 
 	started := time.Now()
 	s := &Server{
-		root:   root,
-		repo:   repo,
+		space:  sp,
 		author: opts.Author,
 		tmpl:   tmpl,
 		now:    time.Now,
@@ -122,9 +128,125 @@ func New(root string, opts Options) (*Server, error) {
 	return s, nil
 }
 
-// loadConfigQuietly is for pages that must render even when the vault will not
-// load — the sign-in page has to be reachable before anything else works.
-func loadConfigQuietly(root string) (*project.Config, error) { return project.Load(root) }
+// config is the vocabulary of the whole space: one vault's own, or the union of
+// several. See space.Config for why it is a union rather than a shared file.
+func (s *Server) config() (*project.Config, error) { return s.space.Config() }
+
+// entries is every task in the space, with paths said from the space root.
+func (s *Server) entries() ([]vault.Entry, error) { return s.space.Entries() }
+
+// abs turns a path in the space into a path on disk, refusing one that belongs
+// to no repository.
+func (s *Server) abs(inSpace string) (string, error) { return s.space.Path(inSpace) }
+
+// configFor is the vocabulary that decides what may happen to one task: its own
+// project's, not the space's.
+//
+// The space's configuration is a union, so that a board can draw a column for
+// every status any project uses. Validating against the union would let a task
+// move to a status its project has never heard of, which is a board deciding
+// something a repository is supposed to decide about itself.
+func (s *Server) configFor(key string) (*project.Config, error) {
+	projectKey, _, err := project.SplitKey(key)
+	if err != nil {
+		return nil, err
+	}
+	c, _, err := s.space.ConfigOf(projectKey)
+	return c, err
+}
+
+// index is what every wikilink in the space can point at.
+//
+// Built across every repository, so a link from one project to a page in
+// another resolves here exactly as it does in Obsidian, where the workspace is
+// one vault. It is rebuilt per request: a cache here would start serving a
+// vault that no longer exists.
+func (s *Server) index() (*index, error) {
+	ix := &index{targets: map[string]string{}}
+	for _, v := range s.space.Vaults() {
+		c, err := project.Load(v.Root)
+		if err != nil {
+			return nil, err
+		}
+		if err := buildIndex(ix, v.Root, v.Prefix, c); err != nil {
+			return nil, err
+		}
+	}
+	return ix, nil
+}
+
+// create writes a new task into the repository that owns its project, and
+// answers with the path said from the space root.
+//
+// Which repository is not a choice the caller makes: a project lives in exactly
+// one, and putting a task anywhere else would make the project something you
+// could no longer hand over as a clone.
+func (s *Server) create(opts vault.NewOptions) (string, *task.Task, error) {
+	c, err := s.config()
+	if err != nil {
+		return "", nil, err
+	}
+	if opts.Project == "" {
+		if keys := c.ProjectKeys(); len(keys) > 0 {
+			opts.Project = keys[0]
+		}
+	}
+
+	owner, v, err := s.space.ConfigOf(opts.Project)
+	if err != nil {
+		return "", nil, err
+	}
+	rel, t, err := vault.Create(v.Root, owner, opts)
+	if err != nil {
+		return "", nil, err
+	}
+	return v.PathIn(rel), t, nil
+}
+
+// pages is every page in the space, said from the space root.
+func (s *Server) pages() []string {
+	var paths []string
+	for _, v := range s.space.Vaults() {
+		docs := filepath.Join(v.Root, vault.DocsDir)
+		_ = filepath.WalkDir(docs, func(full string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(full, ".md") {
+				return nil
+			}
+			rel, err := filepath.Rel(v.Root, full)
+			if err != nil {
+				return nil
+			}
+			paths = append(paths, strings.TrimSuffix(v.PathIn(filepath.ToSlash(rel)), ".md"))
+			return nil
+		})
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// commit records a change, putting each path in the repository that owns it.
+//
+// A change can touch two repositories at once — a retitle in one project
+// repointing a link in another — and each of them gets its own commit, because
+// each of them is its own history.
+func (s *Server) commit(paths []string, message string, author gitvcs.Author) error {
+	byVault := map[*space.Vault][]string{}
+	for _, p := range paths {
+		v, rel, err := s.space.Resolve(p)
+		if err != nil {
+			return err
+		}
+		byVault[v] = append(byVault[v], rel)
+	}
+	for _, v := range s.space.Vaults() {
+		if in := byVault[v]; len(in) > 0 {
+			if err := v.Repo.Commit(in, message, author); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 // Handler routes every request the server answers.
 func (s *Server) Handler() http.Handler {
@@ -184,18 +306,16 @@ func version(content []byte) string {
 // keyOf is the task key from the URL.
 func keyOf(r *http.Request) string { return r.PathValue("key") }
 
-// locate finds a task's file. The key stopped being the path in ADR-0005, so
-// this is a lookup — kept in one place so nothing else has to know.
+// locate finds a task's file: where it is in the space, and where it is on
+// disk. The key stopped being the path in ADR-0005, and with a workspace it is
+// not even in a known repository, so this is a lookup — kept in one place so
+// nothing else has to know.
 func (s *Server) locate(key string) (rel, full string, err error) {
-	c, err := project.Load(s.root)
+	v, inVault, inSpace, err := s.space.Locate(key)
 	if err != nil {
 		return "", "", err
 	}
-	rel, err = vault.Find(s.root, c, key)
-	if err != nil {
-		return "", "", err
-	}
-	return rel, filepath.Join(s.root, filepath.FromSlash(rel)), nil
+	return inSpace, v.Abs(inVault), nil
 }
 
 func (s *Server) loadTask(key string) (*task.Task, string, error) {
@@ -232,10 +352,11 @@ func (s *Server) editTask(
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	rel, path, err := s.locate(key)
+	owner, wasIn, rel, err := s.space.Locate(key)
 	if err != nil {
 		return err
 	}
+	path := owner.Abs(wasIn)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -272,18 +393,25 @@ func (s *Server) editTask(
 	// link that pointed at the old name has to move with it. All of them go
 	// into one commit: git records the rename, and no point in the history has
 	// the vault pointing at a note that is not there.
+	//
+	// Repointing is confined to the repository that owns the task. A link from
+	// another project is a link across repositories, and rewriting somebody
+	// else's file because a title changed here is not a rename, it is an edit
+	// to a project this one does not own. `docket check` reports it there.
 	paths := append([]string{rel}, companions...)
 	if projectKey, _, err := project.SplitKey(t.Key); err == nil {
-		if wanted := vault.PathFor(projectKey, t.Key, t.Title); wanted != rel {
-			touched, err := vault.Retitle(s.root, rel, wanted)
+		if wanted := vault.PathFor(projectKey, t.Key, t.Title); wanted != wasIn {
+			touched, err := vault.Retitle(owner.Root, wasIn, wanted)
 			if err != nil {
 				return err
 			}
-			paths = append(paths, touched...)
+			for _, p := range touched {
+				paths = append(paths, owner.PathIn(p))
+			}
 		}
 	}
 
-	return s.repo.Commit(paths, message, author)
+	return s.commit(paths, message, author)
 }
 
 func categoryClass(category string) string {

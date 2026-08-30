@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/vadymdidenkolab/docket/internal/check"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/space"
 )
 
 const checkUsage = `docket check — validate a vault against the specification.
@@ -48,14 +48,14 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	if flags.NArg() == 1 {
 		start = flags.Arg(0)
 	}
-	root, err := project.FindRoot(start)
+	sp, err := space.Open(start)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket check: %v\n", err)
 		return exitError
 	}
 
 	if *fix {
-		renamed, err := repair(root, stdout)
+		renamed, err := repairAcross(sp, stdout)
 		if err != nil {
 			fmt.Fprintf(stderr, "docket check: %v\n", err)
 			return exitError
@@ -65,7 +65,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	findings, err := check.Run(root)
+	findings, err := runAcross(sp)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket check: %v\n", err)
 		return exitError
@@ -84,6 +84,57 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "\n%s.\n", plural(len(findings), "finding", "findings"))
 	}
 	return exitError
+}
+
+// runAcross checks every repository in the space.
+//
+// Each is a project and is valid or not by itself, so each is checked on its
+// own and its findings are reported under its own path. Links are the one thing
+// that crosses: a link from one project to a note in another resolves when the
+// workspace is opened in Obsidian, so every repository's names are known to
+// every check. A repository taken away on its own would report those, which is
+// true — the note really is not there any more.
+func runAcross(sp *space.Space) ([]check.Finding, error) {
+	vaults := sp.Vaults()
+
+	known := map[string]bool{}
+	if len(vaults) > 1 {
+		for _, v := range vaults {
+			names, err := check.Resolvable(v.Root)
+			if err != nil {
+				return nil, err
+			}
+			for name := range names {
+				known[name] = true
+			}
+		}
+	}
+
+	var all []check.Finding
+	for _, v := range vaults {
+		findings, err := check.RunIn(v.Root, known)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", v.Prefix, err)
+		}
+		for _, f := range findings {
+			f.Path = v.PathIn(f.Path)
+			all = append(all, f)
+		}
+	}
+	return all, nil
+}
+
+// repairAcross fixes what can be fixed, in every repository.
+func repairAcross(sp *space.Space, stdout io.Writer) (int, error) {
+	total := 0
+	for _, v := range sp.Vaults() {
+		n, err := repair(v.Root, stdout)
+		if err != nil {
+			return total, fmt.Errorf("%s: %w", v.Prefix, err)
+		}
+		total += n
+	}
+	return total, nil
 }
 
 // repair renames what can be renamed and says what it did. The renames are

@@ -149,3 +149,7 @@ func needsLinking(raw []string) bool {
 	}
 	return false
 }
+
+// Resolvable is every name a wikilink in this vault can point at, for a caller
+// assembling the names of a whole workspace. See RunIn.
+func Resolvable(root string) (map[string]bool, error) { return resolvable(root) }

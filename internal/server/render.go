@@ -28,12 +28,12 @@ type index struct {
 
 var skipDirs = map[string]bool{".git": true, ".obsidian": true, ".trash": true}
 
-func buildIndex(root string, c *project.Config) (*index, error) {
-	ix := &index{targets: map[string]string{}}
-
+// buildIndex indexes one vault into ix, prefixing every path with where that
+// vault sits in the space. A space of one has no prefix and nothing changes.
+func buildIndex(ix *index, root, prefix string, c *project.Config) error {
 	entries, err := vault.List(root, c)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Indexed by note name, which is what Obsidian resolves — not by key, and
 	// not by alias. A link this page renders as live and Obsidian renders as
@@ -59,8 +59,9 @@ func buildIndex(root string, c *project.Config) (*index, error) {
 			if rel, err := filepath.Rel(root, path); err == nil {
 				rel = filepath.ToSlash(rel)
 				if strings.HasPrefix(rel, vault.Attachments+"/") {
-					ix.put(rel, "/file/"+rel)
-					ix.put(filepath.Base(rel), "/file/"+rel)
+					href := "/file/" + join(prefix, rel)
+					ix.put(rel, href)
+					ix.put(filepath.Base(rel), href)
 				}
 			}
 			return nil
@@ -75,12 +76,12 @@ func buildIndex(root string, c *project.Config) (*index, error) {
 			return nil // already indexed as a task
 		}
 
-		href := "/page/" + withoutExt
+		href := "/page/" + join(prefix, withoutExt)
 		ix.put(withoutExt, href)
 		ix.put(filepath.Base(withoutExt), href)
 		return nil
 	})
-	return ix, err
+	return err
 }
 
 // keyHead is the first word of a note name, which is where a task's key sits.
@@ -207,4 +208,12 @@ func rewriteLinks(s string, rewrite func(target string) string) string {
 	return wikilink.ReplaceAllStringFunc(s, func(m string) string {
 		return rewrite(strings.TrimSuffix(strings.TrimPrefix(m, "[["), "]]"))
 	})
+}
+
+// join puts a vault's prefix in front of a path inside it.
+func join(prefix, rel string) string {
+	if prefix == "" {
+		return rel
+	}
+	return prefix + "/" + rel
 }

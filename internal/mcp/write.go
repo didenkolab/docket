@@ -38,19 +38,23 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("which task?")
 	}
 
-	c, err := project.Load(s.Root)
-	if err != nil {
-		return nil, err
-	}
-
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	rel, err := vault.Find(s.Root, c, args.Key)
+	owner, inVault, rel, err := s.Space.Locate(args.Key)
 	if err != nil {
 		return nil, err
 	}
-	full := filepath.Join(s.Root, filepath.FromSlash(rel))
+	// What may happen to a task is its own project's business, not the space's.
+	projectKey, _, err := project.SplitKey(args.Key)
+	if err != nil {
+		return nil, err
+	}
+	c, _, err := s.Space.ConfigOf(projectKey)
+	if err != nil {
+		return nil, err
+	}
+	full := owner.Abs(inVault)
 
 	content, err := os.ReadFile(full)
 	if err != nil {
@@ -131,20 +135,18 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 	// A title lives in the file name, so changing it moves the file, and every
 	// link that pointed at the old name moves with it. One commit for all of
 	// them, so no point in the history has the vault pointing at nothing.
-	paths := []string{rel}
-	if projectKey, _, err := project.SplitKey(t.Key); err == nil {
-		if wanted := vault.PathFor(projectKey, t.Key, t.Title); wanted != rel {
-			touched, err := vault.Retitle(s.Root, rel, wanted)
-			if err != nil {
-				return nil, err
-			}
-			paths = append(paths, touched...)
-			rel = wanted
+	paths := []string{inVault}
+	if wanted := vault.PathFor(projectKey, t.Key, t.Title); wanted != inVault {
+		touched, err := vault.Retitle(owner.Root, inVault, wanted)
+		if err != nil {
+			return nil, err
 		}
+		paths = append(paths, touched...)
+		rel = owner.PathIn(wanted)
 	}
 
 	message := args.Key + ": " + strings.Join(changed, ", ")
-	if err := s.Repo.Commit(paths, message, s.Author); err != nil {
+	if err := owner.Repo.Commit(paths, message, s.Author); err != nil {
 		return nil, err
 	}
 	return textResult("%s. Now at %s.", message, rel)
@@ -160,11 +162,7 @@ func (s *Server) search(raw json.RawMessage) (any, error) {
 		return nil, fmt.Errorf("search for what?")
 	}
 
-	c, err := project.Load(s.Root)
-	if err != nil {
-		return nil, err
-	}
-	entries, err := vault.List(s.Root, c)
+	entries, err := s.Space.Entries()
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +183,11 @@ func (s *Server) search(raw json.RawMessage) (any, error) {
 		}
 	}
 	for _, page := range s.pages() {
-		raw, err := os.ReadFile(filepath.Join(s.Root, filepath.FromSlash(page)))
+		full, err := s.Space.Path(page)
+		if err != nil {
+			continue
+		}
+		raw, err := os.ReadFile(full)
 		if err == nil && strings.Contains(strings.ToLower(string(raw)), needle) {
 			hits = append(hits, hit{Path: page})
 		}
@@ -193,18 +195,22 @@ func (s *Server) search(raw json.RawMessage) (any, error) {
 	return jsonText(hits)
 }
 
+// pages is every page in the space, said from the space root — so two
+// repositories can each have a docs/ without one hiding the other.
 func (s *Server) pages() []string {
 	var out []string
-	docs := filepath.Join(s.Root, vault.DocsDir)
-	_ = filepath.Walk(docs, func(p string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || !strings.HasSuffix(p, ".md") {
+	for _, v := range s.Space.Vaults() {
+		docs := filepath.Join(v.Root, vault.DocsDir)
+		_ = filepath.Walk(docs, func(p string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() || !strings.HasSuffix(p, ".md") {
+				return nil
+			}
+			if rel, err := filepath.Rel(v.Root, p); err == nil {
+				out = append(out, v.PathIn(filepath.ToSlash(rel)))
+			}
 			return nil
-		}
-		if rel, err := filepath.Rel(s.Root, p); err == nil {
-			out = append(out, filepath.ToSlash(rel))
-		}
-		return nil
-	})
+		})
+	}
 	return out
 }
 
@@ -217,9 +223,13 @@ func (s *Server) readPage(raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	content, err := os.ReadFile(filepath.Join(s.Root, filepath.FromSlash(rel)))
+	full, err := s.Space.Path(rel)
 	if err != nil {
-		return nil, fmt.Errorf("%s is not in this vault", rel)
+		return nil, err
+	}
+	content, err := os.ReadFile(full)
+	if err != nil {
+		return nil, fmt.Errorf("%s is not in this space", rel)
 	}
 	return textResult("%s", content)
 }
@@ -240,7 +250,11 @@ func (s *Server) writePage(raw json.RawMessage) (any, error) {
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	full := filepath.Join(s.Root, filepath.FromSlash(rel))
+	v, inVault, err := s.Space.Resolve(rel)
+	if err != nil {
+		return nil, err
+	}
+	full := v.Abs(inVault)
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		return nil, err
 	}
@@ -250,7 +264,7 @@ func (s *Server) writePage(raw json.RawMessage) (any, error) {
 	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 		return nil, err
 	}
-	if err := s.Repo.Commit([]string{rel}, "wrote "+strings.TrimSuffix(rel, ".md"), s.Author); err != nil {
+	if err := v.Repo.Commit([]string{inVault}, "wrote "+strings.TrimSuffix(inVault, ".md"), s.Author); err != nil {
 		return nil, err
 	}
 	return textResult("Wrote %s. Link to it with [[%s]].", rel, strings.TrimSuffix(rel, ".md"))
@@ -273,9 +287,16 @@ func pagePath(raw string) (string, error) {
 }
 
 func (s *Server) check() (any, error) {
-	findings, err := check.Run(s.Root)
-	if err != nil {
-		return nil, err
+	var findings []check.Finding
+	for _, v := range s.Space.Vaults() {
+		found, err := check.Run(v.Root)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range found {
+			f.Path = v.PathIn(f.Path)
+			findings = append(findings, f)
+		}
 	}
 	if len(findings) == 0 {
 		return textResult("No findings.")

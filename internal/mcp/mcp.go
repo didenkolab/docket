@@ -19,6 +19,7 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -28,25 +29,34 @@ const Protocol = "2024-11-05"
 
 // Server answers MCP calls against one vault.
 type Server struct {
-	Root   string
-	Repo   *gitvcs.Repo
+	// Space is what the agent was pointed at: a vault, or a workspace of them.
+	// A task is found by key across all of them, and a write goes to the
+	// repository that owns it.
+	Space  *space.Space
 	Author gitvcs.Author
 	Now    func() time.Time
 
 	writes sync.Mutex
 }
 
-// New opens a vault for an agent.
+// New opens a vault, or a workspace of them, for an agent.
 func New(root string, author gitvcs.Author) (*Server, error) {
-	if _, err := project.Load(root); err != nil {
-		return nil, err
-	}
-	repo, err := gitvcs.Open(root)
+	sp, err := space.Open(root)
 	if err != nil {
 		return nil, err
 	}
-	return &Server{Root: root, Repo: repo, Author: author, Now: time.Now}, nil
+	if _, err := sp.Config(); err != nil {
+		return nil, err
+	}
+	// Every write is a commit, so refuse a space that cannot make one.
+	if err := sp.RequireGit(); err != nil {
+		return nil, err
+	}
+	return &Server{Space: sp, Author: author, Now: time.Now}, nil
 }
+
+// Root is where the space is, for anything that has to say so.
+func (s *Server) Root() string { return s.Space.Root }
 
 /* ---------- JSON-RPC ---------- */
 
@@ -301,11 +311,7 @@ func (s *Server) listTasks(raw json.RawMessage) (any, error) {
 	}
 	_ = json.Unmarshal(raw, &args)
 
-	c, err := project.Load(s.Root)
-	if err != nil {
-		return nil, err
-	}
-	entries, err := vault.List(s.Root, c)
+	entries, err := s.Space.Entries()
 	if err != nil {
 		return nil, err
 	}
@@ -338,15 +344,14 @@ func (s *Server) getTask(raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 
-	c, err := project.Load(s.Root)
+	if _, _, _, err := s.Space.Locate(args.Key); err != nil {
+		return nil, err
+	}
+	c, err := s.Space.Config()
 	if err != nil {
 		return nil, err
 	}
-	rel, err := vault.Find(s.Root, c, args.Key)
-	if err != nil {
-		return nil, err
-	}
-	entries, err := vault.List(s.Root, c)
+	entries, err := s.Space.Entries()
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +374,7 @@ func (s *Server) getTask(raw json.RawMessage) (any, error) {
 			Reachable:   statusNames(c.Reachable(e.Task.Status)),
 		})
 	}
-	return nil, fmt.Errorf("%s is at %s but could not be read", args.Key, rel)
+	return nil, fmt.Errorf("%s is in this space but could not be read", args.Key)
 }
 
 func statusNames(statuses []project.Status) []string {
@@ -389,7 +394,7 @@ func (s *Server) createTask(raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 
-	c, err := project.Load(s.Root)
+	c, err := s.Space.Config()
 	if err != nil {
 		return nil, err
 	}
@@ -397,17 +402,30 @@ func (s *Server) createTask(raw json.RawMessage) (any, error) {
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	rel, t, err := vault.Create(s.Root, c, vault.NewOptions{
-		Project: args.Project, Title: args.Title, Type: args.Type,
+	projectKey := args.Project
+	if projectKey == "" {
+		if keys := c.ProjectKeys(); len(keys) > 0 {
+			projectKey = keys[0]
+		}
+	}
+	// A project lives in exactly one repository, and that is where its tasks go.
+	own, v, err := s.Space.ConfigOf(projectKey)
+	if err != nil {
+		return nil, err
+	}
+
+	inVault, t, err := vault.Create(v.Root, own, vault.NewOptions{
+		Project: projectKey, Title: args.Title, Type: args.Type,
 		Priority: args.Priority, Assignee: args.Assignee, Parent: args.Parent,
 		Description: args.Description, Labels: args.Labels, Now: s.Now(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Repo.Commit([]string{rel}, t.Key+": "+t.Title, s.Author); err != nil {
+	if err := v.Repo.Commit([]string{inVault}, t.Key+": "+t.Title, s.Author); err != nil {
 		return nil, err
 	}
+	rel := v.PathIn(inVault)
 	return textResult("Created %s at %s. Link to it with [[%s]].",
 		t.Key, rel, strings.TrimSuffix(relBase(rel), ".md"))
 }

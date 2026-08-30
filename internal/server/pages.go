@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
-	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -49,7 +47,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
 }
 
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, title, message string) {
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 	w.WriteHeader(code)
 	s.render(w, r, "error.html", c, title, message)
 }
@@ -136,12 +134,12 @@ type projectTab struct {
 // Work crosses projects constantly, so the default is all of them and the
 // project is a chip on the card rather than a separate board to go and find.
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return
@@ -157,6 +155,23 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 	view := boardView{Selected: selected}
 	for _, status := range c.Statuses {
 		view.Columns = append(view.Columns, column{Status: status})
+	}
+
+	// Where a card may go is its own project's business, and in a workspace the
+	// projects disagree — a column drawn because one project has it is a column
+	// another project's cards must not be draggable into. Read once per
+	// project rather than once per card.
+	vocabulary := map[string]*project.Config{}
+	configOf := func(projectKey string) *project.Config {
+		if known, ok := vocabulary[projectKey]; ok {
+			return known
+		}
+		own, _, err := s.space.ConfigOf(projectKey)
+		if err != nil {
+			own = c
+		}
+		vocabulary[projectKey] = own
+		return own
 	}
 
 	counts := map[string]int{}
@@ -176,7 +191,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 					Title: e.Task.Title, Status: e.Task.Status,
 					Assignee: e.Task.Assignee, Priority: e.Task.Priority,
 					Labels: e.Task.Labels, Version: version(e.Raw),
-					Reachable: reachableList(c, e.Task.Status),
+					Reachable: reachableList(configOf(e.Project), e.Task.Status),
 					order:     e.Task.Order,
 				})
 				view.Total++
@@ -216,7 +231,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -233,7 +248,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	projectKey, _, _ := project.SplitKey(key)
-	ix, err := buildIndex(s.root, c)
+	ix, err := s.index()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot index the vault", err.Error())
 		return
@@ -296,7 +311,7 @@ func renderComments(comments []task.Comment, ix *index) []renderedComment {
 // childrenOf lists the tasks that name this one as their parent. A hierarchy
 // written only downwards is a hierarchy you can only read from the wrong end.
 func (s *Server) childrenOf(c *project.Config, key string) []childTask {
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		return nil
 	}
@@ -314,9 +329,10 @@ func (s *Server) childrenOf(c *project.Config, key string) []childTask {
 
 func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
-	c, err := project.Load(s.root)
+	// Its own project's vocabulary decides where it may go — see configFor.
+	c, err := s.configFor(key)
 	if err != nil {
-		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		s.fail(w, r, http.StatusNotFound, "No such task", err.Error())
 		return
 	}
 
@@ -390,7 +406,7 @@ func (s *Server) afterEdit(w http.ResponseWriter, r *http.Request, key string, e
 // ---- creating a task ----
 
 func (s *Server) handleNewForm(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -410,7 +426,7 @@ func (s *Server) handleNewForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	_, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -418,7 +434,7 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 
 	author := s.authorFor(r)
 	s.writes.Lock()
-	rel, t, err := vault.Create(s.root, c, vault.NewOptions{
+	rel, t, err := s.create(vault.NewOptions{
 		Project:     r.FormValue("project"),
 		Title:       r.FormValue("title"),
 		Type:        r.FormValue("type"),
@@ -429,7 +445,7 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 		Now:         s.now(),
 	})
 	if err == nil {
-		err = s.repo.Commit([]string{rel}, t.Key+": "+t.Title, author)
+		err = s.commit([]string{rel}, t.Key+": "+t.Title, author)
 	}
 	s.writes.Unlock()
 
@@ -443,28 +459,15 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 // ---- knowledge base ----
 
 func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 
-	var paths []string
-	docs := filepath.Join(s.root, vault.DocsDir)
-	_ = filepath.WalkDir(docs, func(full string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(full, ".md") {
-			return nil
-		}
-		rel, err := filepath.Rel(s.root, full)
-		if err != nil {
-			return nil
-		}
-		paths = append(paths, strings.TrimSuffix(filepath.ToSlash(rel), ".md"))
-		return nil
-	})
-	sort.Strings(paths)
+	paths := s.pages()
 
 	s.render(w, r, "pages.html", c, "Pages", paths)
 }
 
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 
 	rel := path.Clean("/" + r.PathValue("path"))[1:]
 	if rel == "" || strings.HasPrefix(rel, "..") {
@@ -472,12 +475,17 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raw, err := os.ReadFile(filepath.Join(s.root, filepath.FromSlash(rel)+".md"))
+	full, err := s.abs(rel + ".md")
+	if err != nil {
+		s.fail(w, r, http.StatusNotFound, "No such page", err.Error())
+		return
+	}
+	raw, err := os.ReadFile(full)
 	if err != nil {
 		s.fail(w, r, http.StatusNotFound, "No such page", rel+" is not in this vault")
 		return
 	}
-	ix, err := buildIndex(s.root, c)
+	ix, err := s.index()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot index the vault", err.Error())
 		return
@@ -557,7 +565,7 @@ type searchView struct {
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -573,7 +581,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Label:    r.FormValue("label"),
 	}
 
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return
@@ -660,23 +668,19 @@ func (s *Server) search(f filters, entries []vault.Entry) []hit {
 		return hits
 	}
 
-	docs := filepath.Join(s.root, vault.DocsDir)
-	_ = filepath.WalkDir(docs, func(full string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(full, ".md") {
-			return nil
+	for _, page := range s.pages() {
+		full, err := s.abs(page + ".md")
+		if err != nil {
+			continue
 		}
 		raw, err := os.ReadFile(full)
 		if err != nil || !strings.Contains(strings.ToLower(string(raw)), needle) {
-			return nil
+			continue
 		}
-		rel, err := filepath.Rel(s.root, full)
-		if err != nil {
-			return nil
-		}
-		rel = strings.TrimSuffix(filepath.ToSlash(rel), ".md")
-		hits = append(hits, hit{Href: "/page/" + rel, Label: rel, Context: excerpt(string(raw), needle)})
-		return nil
-	})
+		hits = append(hits, hit{
+			Href: "/page/" + page, Label: page, Context: excerpt(string(raw), needle),
+		})
+	}
 	return hits
 }
 

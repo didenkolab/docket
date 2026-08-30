@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
@@ -35,7 +36,7 @@ type parentChoice struct {
 // interface is: it has to work with JavaScript switched off.
 func (s *Server) handleEditForm(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -67,7 +68,7 @@ func (s *Server) editView(c *project.Config, t *task.Task, version, rel, message
 
 	// Any task but this one, and not one of its own descendants — a task
 	// cannot be its own ancestor, and offering the choice invites the cycle.
-	entries, _ := vault.List(s.root, c)
+	entries, _ := s.entries()
 	descendants := descendantsOf(entries, t.Key)
 	for _, e := range entries {
 		if e.Task == nil || e.Key == t.Key || descendants[e.Key] {
@@ -107,7 +108,8 @@ func descendantsOf(entries []vault.Entry, key string) map[string]bool {
 // handleEdit applies the form.
 func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
-	c, err := project.Load(s.root)
+	// Its own project's vocabulary decides what it may become — see configFor.
+	c, err := s.configFor(key)
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -176,10 +178,12 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 				t.SetParent("")
 			default:
 				// A parent is a link, and a link resolves by note name.
-				note, err := vault.Note(s.root, c, parent)
+				owner, inVault, _, err := s.space.Locate(parent)
 				if err != nil {
 					return "", nil, fmt.Errorf("parent %s does not exist", parent)
 				}
+				note := strings.TrimSuffix(path.Base(inVault), ".md")
+				_ = owner
 				t.SetParent(note)
 			}
 			changed = append(changed, "parent")

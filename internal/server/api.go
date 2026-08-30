@@ -64,12 +64,12 @@ func apiError(w http.ResponseWriter, code int, message string) {
 }
 
 func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -104,7 +104,7 @@ func (s *Server) apiGetTask(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 	writeJSON(w, http.StatusOK, toJSON(c, t, version, true))
 }
 
@@ -125,7 +125,7 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -133,14 +133,14 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 
 	author := s.authorFor(r)
 	s.writes.Lock()
-	rel, t, err := vault.Create(s.root, c, vault.NewOptions{
+	rel, t, err := s.create(vault.NewOptions{
 		Project: req.Project,
 		Title:   req.Title, Type: req.Type, Status: req.Status,
 		Priority: req.Priority, Assignee: req.Assignee, Parent: req.Parent,
 		Labels: req.Labels, Now: s.now(),
 	})
 	if err == nil {
-		err = s.repo.Commit([]string{rel}, t.Key+": "+t.Title, author)
+		err = s.commit([]string{rel}, t.Key+": "+t.Title, author)
 	}
 	s.writes.Unlock()
 
@@ -177,9 +177,11 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	c, err := project.Load(s.root)
+	// What may happen to this task is its own project's business, not the
+	// space's — see configFor.
+	c, err := s.configFor(key)
 	if err != nil {
-		apiError(w, http.StatusInternalServerError, err.Error())
+		apiError(w, http.StatusNotFound, err.Error())
 		return
 	}
 

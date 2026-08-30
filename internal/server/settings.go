@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,7 +57,7 @@ type projectUsage struct {
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -111,7 +110,7 @@ func (s *Server) settingsView(c *project.Config, message, saved string) settings
 func (s *Server) usage(c *project.Config) (byStatus, byProject map[string]int) {
 	byStatus, byProject = map[string]int{}, map[string]int{}
 
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		return byStatus, byProject
 	}
@@ -127,7 +126,7 @@ func (s *Server) usage(c *project.Config) (byStatus, byProject map[string]int) {
 // handleSaveSettings rewrites docket.yaml, moves the tasks that sit on a renamed
 // status, regenerates the boards and commits the lot.
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -179,18 +178,28 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
-	if err := updated.Save(s.root); err != nil {
+	// The vocabulary belongs to a repository, and in a workspace there is one
+	// per project. Editing them together here would write a merged vocabulary
+	// into every repository and make each of them wrong about itself.
+	home := s.space.Single()
+	if home == nil {
+		s.rejectSettings(w, r, c, "This is a workspace, and a vocabulary belongs to a "+
+			"repository. Open the project on its own to change its statuses, types and "+
+			"priorities.")
+		return
+	}
+	if err := updated.Save(home.Root); err != nil {
 		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
-	boards, err := vault.WriteBoards(s.root, &updated)
+	boards, err := vault.WriteBoards(home.Root, &updated)
 	if err != nil {
 		s.rejectSettings(w, r, c, err.Error())
 		return
 	}
 
 	changed := append([]string{project.FileName}, boards...)
-	if err := s.repo.Commit(changed, "Settings: the vault's vocabulary", author); err != nil {
+	if err := s.commit(changed, "Settings: the vault's vocabulary", author); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Saved, but not committed", err.Error())
 		return
 	}
@@ -324,7 +333,7 @@ func (s *Server) applyRenames(c *project.Config, renames map[string]project.Stat
 		return 0, nil
 	}
 
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		return 0, err
 	}
@@ -351,10 +360,14 @@ func (s *Server) applyRenames(c *project.Config, renames map[string]project.Stat
 		if err != nil {
 			return moved, err
 		}
-		if err := os.WriteFile(filepath.Join(s.root, filepath.FromSlash(e.Path)), content, 0o644); err != nil {
+		full, err := s.abs(e.Path)
+		if err != nil {
 			return moved, err
 		}
-		if err := s.repo.Commit([]string{e.Path},
+		if err := os.WriteFile(full, content, 0o644); err != nil {
+			return moved, err
+		}
+		if err := s.commit([]string{e.Path},
 			fmt.Sprintf("%s: %s → %s", e.Key, from, to.Name), author); err != nil {
 			return moved, err
 		}

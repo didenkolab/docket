@@ -101,7 +101,7 @@ func (s *Server) renumber(column []vault.Entry, moved *task.Task, at int) ([]str
 // column is the tasks in one status, in the order the board draws them, without
 // the task being moved.
 func (s *Server) column(c *project.Config, status, without string) ([]vault.Entry, error) {
-	entries, err := vault.List(s.root, c)
+	entries, err := s.entries()
 	if err != nil {
 		return nil, err
 	}

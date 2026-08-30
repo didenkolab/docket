@@ -96,7 +96,7 @@ func (s *Server) tooLarge(w http.ResponseWriter, r *http.Request, limit int64) {
 		apiError(w, http.StatusRequestEntityTooLarge, why)
 		return
 	}
-	c, _ := loadConfigQuietly(s.root)
+	c, _ := s.config()
 	w.WriteHeader(http.StatusRequestEntityTooLarge)
 	s.render(w, r, "error.html", c, "Too large", why)
 }
@@ -231,7 +231,7 @@ func (s *Server) refuseCrossSite(w http.ResponseWriter, r *http.Request, why str
 		apiError(w, http.StatusForbidden, why)
 		return
 	}
-	c, _ := loadConfigQuietly(s.root)
+	c, _ := s.config()
 	w.WriteHeader(http.StatusForbidden)
 	s.render(w, r, "error.html", c, "Refused", why)
 }
@@ -330,7 +330,7 @@ func (s *Server) meter(next http.Handler) http.Handler {
 			apiError(w, http.StatusTooManyRequests, "too fast — wait a few seconds and try again")
 			return
 		}
-		c, _ := loadConfigQuietly(s.root)
+		c, _ := s.config()
 		w.WriteHeader(http.StatusTooManyRequests)
 		s.render(w, r, "error.html", c, "Too fast",
 			"That was a great many requests at once. Wait a few seconds and try again.")

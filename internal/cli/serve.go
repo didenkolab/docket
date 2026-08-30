@@ -16,8 +16,8 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/server"
+	"github.com/vadymdidenkolab/docket/internal/space"
 )
 
 const serveUsage = `docket serve — a board and an API over a vault.
@@ -64,13 +64,24 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 
-	root, err := project.FindRoot(start)
+	// A vault or a workspace of them — the server reads both, so this only has
+	// to find which one is here.
+	sp, err := space.Open(start)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
 		return exitError
 	}
+	root := sp.Root
 
-	gitHost, code := resolveHost(*auth, *host, *api, root, stdout, stderr)
+	// Signing in asks the repository's git host who somebody is. A workspace is
+	// not a repository, so the question goes to the first project in it: they
+	// are the team's repositories, and one of them is as good as another for
+	// asking who the team is.
+	askHost := root
+	if sp.Workspace {
+		askHost = sp.Vaults()[0].Root
+	}
+	gitHost, code := resolveHost(*auth, *host, *api, askHost, stdout, stderr)
 	if code != exitOK {
 		return code
 	}
@@ -108,7 +119,15 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	fmt.Fprintf(stdout, "Serving %s on http://%s\n", root, listener.Addr())
+	what := "vault"
+	if sp.Workspace {
+		what = fmt.Sprintf("workspace of %d", len(sp.Vaults()))
+	}
+	fmt.Fprintf(stdout, "Serving %s (%s) on http://%s\n", root, what, listener.Addr())
+	if len(sp.Missing) > 0 {
+		fmt.Fprintf(stdout, "Not cloned, so not served: %s. Run docket workspace sync.\n",
+			strings.Join(sp.Missing, ", "))
+	}
 	if gitHost != nil {
 		fmt.Fprintf(stdout, "Sign in with a %s token for %s. Access is whatever that host says "+
 			"it is, re-checked every %s.\n", gitHost.Name(), gitHost.Repository(), recheck.String())

@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -29,7 +28,7 @@ type pageForm struct {
 }
 
 func (s *Server) handlePageNewForm(w http.ResponseWriter, r *http.Request) {
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 	s.render(w, r, "page-edit.html", c, "New page", pageForm{
 		Path: strings.TrimPrefix(r.URL.Query().Get("in"), "/"),
 		New:  true,
@@ -37,14 +36,19 @@ func (s *Server) handlePageNewForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePageEditForm(w http.ResponseWriter, r *http.Request) {
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 
 	rel, err := pagePath(r.PathValue("path"))
 	if err != nil {
 		s.fail(w, r, http.StatusBadRequest, "Not a page", err.Error())
 		return
 	}
-	raw, err := os.ReadFile(filepath.Join(s.root, filepath.FromSlash(rel)))
+	full, err := s.abs(rel)
+	if err != nil {
+		s.fail(w, r, http.StatusNotFound, "No such page", err.Error())
+		return
+	}
+	raw, err := os.ReadFile(full)
 	if err != nil {
 		s.fail(w, r, http.StatusNotFound, "No such page", rel+" is not in this vault")
 		return
@@ -64,7 +68,7 @@ func (s *Server) handlePageEditForm(w http.ResponseWriter, r *http.Request) {
 
 // handlePageSave writes a page, new or existing.
 func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
-	c, _ := project.Load(s.root)
+	c, _ := s.config()
 	if err := r.ParseForm(); err != nil {
 		s.fail(w, r, http.StatusBadRequest, "Cannot read the form", err.Error())
 		return
@@ -99,7 +103,11 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	full := filepath.Join(s.root, filepath.FromSlash(rel))
+	full, err := s.abs(rel)
+	if err != nil {
+		s.fail(w, r, http.StatusBadRequest, "Nowhere to write that", err.Error())
+		return
+	}
 	author := s.authorFor(r)
 
 	s.writes.Lock()
@@ -136,7 +144,7 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 	if form.New {
 		verb = "wrote"
 	}
-	if err := s.repo.Commit([]string{rel}, verb+" "+strings.TrimSuffix(rel, ".md"), author); err != nil {
+	if err := s.commit([]string{rel}, verb+" "+strings.TrimSuffix(rel, ".md"), author); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Saved, but not committed", err.Error())
 		return
 	}
@@ -157,11 +165,16 @@ func (s *Server) handlePageDelete(w http.ResponseWriter, r *http.Request) {
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	if err := os.Remove(filepath.Join(s.root, filepath.FromSlash(rel))); err != nil {
+	full, err := s.abs(rel)
+	if err != nil {
+		s.fail(w, r, http.StatusNotFound, "No such page", err.Error())
+		return
+	}
+	if err := os.Remove(full); err != nil {
 		s.fail(w, r, http.StatusNotFound, "No such page", rel+" is not in this vault")
 		return
 	}
-	if err := s.repo.Commit([]string{rel}, "deleted "+strings.TrimSuffix(rel, ".md"),
+	if err := s.commit([]string{rel}, "deleted "+strings.TrimSuffix(rel, ".md"),
 		s.authorFor(r)); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Deleted, but not committed", err.Error())
 		return
@@ -198,12 +211,7 @@ func yamlScalar(s string) string {
 // It exists so the editor's preview cannot disagree with the real thing: there
 // is one Markdown implementation, on the server, and the preview asks it.
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
-	c, err := project.Load(s.root)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ix, err := buildIndex(s.root, c)
+	ix, err := s.index()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -7,6 +7,7 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/task"
 )
 
@@ -47,7 +48,7 @@ type fieldChange struct {
 
 func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
-	c, err := project.Load(s.root)
+	c, err := s.config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
@@ -70,9 +71,15 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Every file this task has ever had. The key is in the name, so this is the
-	// task's whole life and nothing else — see gitvcs.History.
-	changes, err := s.repo.History(projectKey+"/"+key+" *.md", historyDepth)
+	// Every file this task has ever had, from the repository that owns it. The
+	// key is in the name, so this is the task's whole life and nothing else —
+	// see gitvcs.History.
+	owner, _, _, err := s.space.Locate(key)
+	if err != nil {
+		s.fail(w, r, http.StatusNotFound, "No such task", key+" is not in this space")
+		return
+	}
+	changes, err := owner.Repo.History(projectKey+"/"+key+" *.md", historyDepth)
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the history", err.Error())
 		return
@@ -82,7 +89,7 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		Key:     key,
 		Title:   t.Title,
 		Path:    rel,
-		Entries: s.describe(changes),
+		Entries: s.describe(owner, changes),
 	})
 }
 
@@ -93,7 +100,7 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 // rather than a commit and its git parent. They are the same thing whenever the
 // history is a line, and when it is not — a merge — the older of the two is
 // still the last state anybody saw, which is the useful comparison.
-func (s *Server) describe(changes []gitvcs.Change) []entry {
+func (s *Server) describe(owner *space.Vault, changes []gitvcs.Change) []entry {
 	entries := make([]entry, 0, len(changes))
 
 	for i, ch := range changes {
@@ -110,11 +117,11 @@ func (s *Server) describe(changes []gitvcs.Change) []entry {
 
 		// The state after this commit, and the state after the previous one —
 		// which is this task's previous version, whatever it was called then.
-		after := s.versionAt(ch.Hash, ch.Path)
+		after := s.versionAt(owner, ch.Hash, ch.Path)
 		var before *task.Task
 		if i+1 < len(changes) {
 			previous := changes[i+1]
-			before = s.versionAt(previous.Hash, previous.Path)
+			before = s.versionAt(owner, previous.Hash, previous.Path)
 		}
 
 		switch {
@@ -137,11 +144,11 @@ func (s *Server) describe(changes []gitvcs.Change) []entry {
 // versionAt parses the task as it stood at one commit. A version that will not
 // parse is not an error worth stopping a history for — it simply cannot be
 // compared, and the commit still shows with its message.
-func (s *Server) versionAt(hash, path string) *task.Task {
+func (s *Server) versionAt(owner *space.Vault, hash, path string) *task.Task {
 	if path == "" {
 		return nil
 	}
-	raw, err := s.repo.Blob(hash, path)
+	raw, err := owner.Repo.Blob(hash, path)
 	if err != nil || len(raw) == 0 {
 		return nil
 	}

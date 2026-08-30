@@ -183,7 +183,7 @@ func (s *Server) refuse(w http.ResponseWriter, identity access.Identity, r *http
 		apiError(w, http.StatusForbidden, message)
 		return
 	}
-	c, _ := loadConfigQuietly(s.root)
+	c, _ := s.config()
 	w.WriteHeader(http.StatusForbidden)
 	s.render(w, r, "error.html", c, "Not yours to change", message)
 }
@@ -225,7 +225,7 @@ func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	c, _ := loadConfigQuietly(s.root)
+	c, _ := s.config()
 	s.render(w, r, "sign-in.html", c, "Sign in", signInView{
 		Host:       s.auth.checker.Host.Name(),
 		Repository: s.auth.checker.Host.Repository(),
@@ -249,7 +249,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimSpace(r.FormValue("token"))
 	next := backTo(r.FormValue("next"))
 
-	c, _ := loadConfigQuietly(s.root)
+	c, _ := s.config()
 	fail := func(message string) {
 		w.WriteHeader(http.StatusUnauthorized)
 		s.render(w, r, "sign-in.html", c, "Sign in", signInView{
@@ -315,7 +315,7 @@ type adminView struct {
 // a button here would appear to hand out something it cannot, because what
 // matters is a clone, and that is the host's to give.
 func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
-	c, _ := loadConfigQuietly(s.root)
+	c, _ := s.config()
 
 	if s.auth == nil {
 		s.render(w, r, "admin.html", c, "Access", adminView{

@@ -8,7 +8,6 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/mcp"
-	"github.com/vadymdidenkolab/docket/internal/project"
 )
 
 const mcpUsage = `docket mcp — serve a vault to an agent over the Model Context Protocol.
@@ -49,13 +48,7 @@ func runMCP(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docket mcp: %v\n", err)
 		return exitUsage
 	}
-	root, err := project.FindRoot(start)
-	if err != nil {
-		fmt.Fprintf(stderr, "docket mcp: %v\n", err)
-		return exitError
-	}
-
-	server, err := mcp.New(root, who)
+	server, err := mcp.New(start, who)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket mcp: %v\n", err)
 		return exitError
@@ -63,7 +56,7 @@ func runMCP(args []string, stdout, stderr io.Writer) int {
 
 	// Progress goes to stderr: stdout is the protocol, and a stray line on it
 	// is a parse error at the other end.
-	fmt.Fprintf(stderr, "docket mcp: serving %s as %s\n", root, who)
+	fmt.Fprintf(stderr, "docket mcp: serving %s as %s\n", server.Root(), who)
 
 	if err := server.Serve(os.Stdin, stdout); err != nil {
 		fmt.Fprintf(stderr, "docket mcp: %v\n", err)

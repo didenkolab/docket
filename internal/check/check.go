@@ -61,7 +61,17 @@ var skipDirs = map[string]bool{
 // The returned error means the vault could not be read at all. Problems inside
 // a readable vault come back as findings, because a validator that stops at the
 // first broken file makes fixing a batch of them a game of whack-a-mole.
-func Run(root string) ([]Finding, error) {
+func Run(root string) ([]Finding, error) { return RunIn(root, nil) }
+
+// RunIn checks one vault, treating alsoKnown as resolvable in addition to what
+// the vault itself holds.
+//
+// It exists for a workspace. Each repository is checked on its own, because
+// each is a project and is valid or not by itself — but a link from one project
+// to a note in another resolves when the workspace is opened in Obsidian, which
+// is the only place both are present. Checking the repository alone would
+// report it as dead; checking it inside the workspace should not.
+func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 	c, err := project.Load(root)
 	if err != nil {
 		return nil, err
@@ -75,6 +85,9 @@ func Run(root string) ([]Finding, error) {
 	names, err := resolvable(root)
 	if err != nil {
 		return nil, err
+	}
+	for name := range alsoKnown {
+		names[name] = true
 	}
 
 	// key → the note name a link has to use, for the suggestion below.
