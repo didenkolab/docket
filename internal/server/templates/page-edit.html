@@ -1,0 +1,54 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/pages">Pages</a>
+  <span aria-hidden="true">/</span>
+  <span>{{if $data.New}}New{{else}}{{$data.Path}}{{end}}</span>
+</nav>
+
+<h1 class="issue-title">{{if $data.New}}New page{{else}}Edit page{{end}}</h1>
+
+{{if $data.Error}}
+<div class="notice"><strong>Nothing was written.</strong> {{$data.Error}}</div>
+{{end}}
+
+<form class="edit" method="post" action="/pages/save">
+  <input type="hidden" name="version" value="{{$data.Version}}">
+  <input type="hidden" name="new" value="{{if $data.New}}1{{else}}0{{end}}">
+
+  <label for="path">Path</label>
+  <input id="path" name="path" value="{{$data.Path}}" required
+         placeholder="docs/auth/session-model"{{if not $data.New}} readonly{{end}}>
+  <p class="footnote inline">Under <code>docs/</code>, without <code>.md</code>. Folders are
+  made as needed.</p>
+
+  <label for="title">Title</label>
+  <input id="title" name="title" value="{{$data.Title}}" required>
+
+  <label for="body">Page</label>
+  <textarea id="body" name="body" rows="22" spellcheck="true" data-editor>{{$data.Body}}</textarea>
+  <p class="footnote inline">Markdown. Connect pages with <code>[[wikilinks]]</code> — a page
+  nothing links to is a page nobody finds.</p>
+
+  <div class="edit-actions">
+    <button type="submit">Save</button>
+    {{if $data.New}}
+    <a class="cancel" href="/pages">Cancel</a>
+    {{else}}
+    <a class="cancel" href="/page/{{$data.Path}}">Cancel</a>
+    {{end}}
+  </div>
+</form>
+
+{{if not $data.New}}
+<form class="danger" method="post" action="/pages/delete"
+      onsubmit="return confirm('Delete {{$data.Path}}? The history keeps it, but the page goes.')">
+  <input type="hidden" name="path" value="{{$data.Path}}">
+  <button type="submit" class="destructive">Delete this page</button>
+  <span class="footnote inline">git keeps it; the vault does not.</span>
+</form>
+{{end}}
+
+<script src="/static/editor.js" defer></script>
+{{template "foot" .}}

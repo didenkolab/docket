@@ -21,6 +21,8 @@
     {{end}}
   </select>
   <button type="submit">Move</button>
+  <a class="button-link" href="/task/{{$t.Key}}/edit">Edit</a>
+  <a class="button-link" href="/new?parent={{$t.Key}}">Add child</a>
   {{if lt (len $data.Reachable) (len .Config.Statuses)}}
   <span class="footnote inline">The workflow limits where this can go.</span>
   {{end}}
@@ -85,6 +87,19 @@
   </div>
 
   <aside class="issue-side">
+    {{if $may}}
+    <section class="panel">
+      <h2>Attach a file</h2>
+      <form method="post" action="/task/{{$t.Key}}/attach" enctype="multipart/form-data"
+            class="attach">
+        <input type="file" name="file" required aria-label="File to attach">
+        <button type="submit">Attach</button>
+      </form>
+      <p class="footnote">Saved into <code>attachments/</code> and committed with the line that
+      points at it. Images embed; anything else becomes a link.</p>
+    </section>
+    {{end}}
+
     <section class="panel">
       <h2>Details</h2>
       <dl class="properties">

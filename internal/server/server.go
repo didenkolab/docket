@@ -114,10 +114,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /task/{key}", s.handleTask)
 	mux.HandleFunc("POST /task/{key}/status", s.handleMove)
 	mux.HandleFunc("POST /task/{key}/comment", s.handleComment)
+	mux.HandleFunc("GET /task/{key}/edit", s.handleEditForm)
+	mux.HandleFunc("POST /task/{key}/edit", s.handleEdit)
+	mux.HandleFunc("POST /task/{key}/attach", s.handleAttach)
+	mux.HandleFunc("POST /task/{key}/delete", s.handleDeleteTask)
+	mux.HandleFunc("GET /file/{path...}", s.handleFile)
 	mux.HandleFunc("GET /new", s.handleNewForm)
 	mux.HandleFunc("POST /new", s.handleNew)
 	mux.HandleFunc("GET /pages", s.handlePages)
+	mux.HandleFunc("GET /pages/new", s.handlePageNewForm)
+	mux.HandleFunc("POST /pages/save", s.handlePageSave)
+	mux.HandleFunc("POST /preview", s.handlePreview)
 	mux.HandleFunc("GET /page/{path...}", s.handlePage)
+	mux.HandleFunc("GET /edit/page/{path...}", s.handlePageEditForm)
+	mux.HandleFunc("POST /pages/delete", s.handlePageDelete)
 	mux.HandleFunc("GET /search", s.handleSearch)
 	mux.HandleFunc("GET /settings", s.handleSettings)
 	mux.HandleFunc("POST /settings", s.handleSaveSettings)
@@ -188,6 +198,7 @@ func (s *Server) editTask(
 	key, expected string,
 	author gitvcs.Author,
 	mutate func(*task.Task) (message string, err error),
+	companions ...string,
 ) error {
 	s.writes.Lock()
 	defer s.writes.Unlock()
@@ -212,7 +223,13 @@ func (s *Server) editTask(
 	if err != nil {
 		return err
 	}
+	if message == "" {
+		return nil // nothing was asked for
+	}
 	t.Touch(s.now())
+	if err := t.Sync(); err != nil {
+		return err
+	}
 
 	content, err := t.Bytes()
 	if err != nil {
@@ -222,7 +239,20 @@ func (s *Server) editTask(
 		return err
 	}
 
-	return s.repo.Commit([]string{rel}, message, author)
+	// A title now lives in the file name, so changing it moves the file. Both
+	// paths go into the commit, which is what makes git record a rename rather
+	// than a deletion and an unrelated new file.
+	paths := append([]string{rel}, companions...)
+	if projectKey, _, err := project.SplitKey(t.Key); err == nil {
+		if wanted := vault.PathFor(projectKey, t.Key, t.Title); wanted != rel {
+			if err := vault.Rename(s.root, rel, wanted); err != nil {
+				return err
+			}
+			paths = append(paths, wanted)
+		}
+	}
+
+	return s.repo.Commit(paths, message, author)
 }
 
 func categoryClass(category string) string {

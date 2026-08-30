@@ -2,6 +2,8 @@
 
 <h1>Pages</h1>
 
+{{if .You.CanWrite}}<p><a class="button-link" href="/pages/new">New page</a></p>{{end}}
+
 <ul class="pages">
   {{range .Data}}
   <li><a href="/page/{{.}}">{{.}}</a></li>

@@ -2,7 +2,10 @@
 {{$data := .Data}}
 
 <article class="page">
-  <p class="path"><code>{{$data.Path}}.md</code></p>
+  <p class="path">
+    <code>{{$data.Path}}.md</code>
+    {{if .You.CanWrite}}<a class="button-link" href="/edit/page/{{$data.Path}}">Edit</a>{{end}}
+  </p>
   <div class="body">{{$data.Body}}</div>
 </article>
 

@@ -350,7 +350,18 @@ func (s *Server) handleNewForm(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	s.render(w, r, "new.html", c, "New task", r.URL.Query().Get("project"))
+	parent := r.URL.Query().Get("parent")
+	selected := r.URL.Query().Get("project")
+	if selected == "" && parent != "" {
+		// A child belongs where its parent does, unless told otherwise.
+		if key, _, err := project.SplitKey(parent); err == nil {
+			selected = key
+		}
+	}
+	s.render(w, r, "new.html", c, "New task", struct {
+		Project string
+		Parent  string
+	}{selected, parent})
 }
 
 func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
@@ -363,12 +374,14 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 	author := s.authorFor(r)
 	s.writes.Lock()
 	rel, t, err := vault.Create(s.root, c, vault.NewOptions{
-		Project:  r.FormValue("project"),
-		Title:    r.FormValue("title"),
-		Type:     r.FormValue("type"),
-		Priority: r.FormValue("priority"),
-		Assignee: strings.TrimSpace(r.FormValue("assignee")),
-		Now:      s.now(),
+		Project:     r.FormValue("project"),
+		Title:       r.FormValue("title"),
+		Type:        r.FormValue("type"),
+		Priority:    r.FormValue("priority"),
+		Assignee:    strings.TrimSpace(r.FormValue("assignee")),
+		Parent:      strings.TrimSpace(r.FormValue("parent")),
+		Description: normaliseNewlines(r.FormValue("body")),
+		Now:         s.now(),
 	})
 	if err == nil {
 		err = s.repo.Commit([]string{rel}, t.Key+": "+t.Title, author)

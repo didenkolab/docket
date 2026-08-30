@@ -8,6 +8,7 @@
 </head>
 <body>
 <header>
+  <div class="shell bar">
   <a class="brand" href="/">{{with .Config}}{{.Name}}{{else}}docket{{end}}</a>
   <nav>
     <a href="/">Board</a>
@@ -24,11 +25,14 @@
     {{.You.DisplayName}} <span class="role">{{.You.Role}}</span>
   </span>
   {{end}}
+  </div>
 </header>
 <main>
+<div class="shell">
 {{end}}
 
 {{define "foot"}}
+</div>
 </main>
 </body>
 </html>

@@ -52,6 +52,16 @@ func buildIndex(root string, c *project.Config) (*index, error) {
 			return nil
 		}
 		if !strings.HasSuffix(path, ".md") {
+			// Attachments are linked and embedded by their path, so they have
+			// to be resolvable too — otherwise every screenshot renders as a
+			// dead link.
+			if rel, err := filepath.Rel(root, path); err == nil {
+				rel = filepath.ToSlash(rel)
+				if strings.HasPrefix(rel, vault.Attachments+"/") {
+					ix.put(rel, "/file/"+rel)
+					ix.put(filepath.Base(rel), "/file/"+rel)
+				}
+			}
 			return nil
 		}
 		rel, err := filepath.Rel(root, path)
@@ -124,6 +134,10 @@ func renderMarkdown(body string, ix *index) template.HTML {
 			target = target[:hash]
 		}
 		if href, ok := ix.resolve(target); ok {
+			if display == target && strings.HasPrefix(href, "/file/") {
+				// An embedded screenshot should not caption itself with a path.
+				display = filepath.Base(target)
+			}
 			return "[" + display + "](" + href + ")"
 		}
 		return `<span class="dead-link" title="resolves to nothing in this vault">` +

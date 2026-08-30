@@ -268,6 +268,72 @@ func (t *Task) Description() string {
 	return strings.TrimSpace(t.body)
 }
 
+// AttachmentsHeading is where attachments are listed.
+const AttachmentsHeading = "## Attachments"
+
+// AppendAttachment records a file against the task.
+//
+// An attachment is a file in the vault and a line in the task, which is all it
+// needs to be: Obsidian embeds an image from that line, git versions the file,
+// and nothing needs a database row to say the two belong together.
+func (t *Task) AppendAttachment(link string, embed bool) {
+	entry := "- [[" + link + "]]"
+	if embed {
+		entry = "![[" + link + "]]"
+	}
+
+	at := strings.Index(t.body, AttachmentsHeading)
+	if at < 0 {
+		// Before the comments, if there are any: attachments belong to the
+		// description, not to the conversation.
+		if comments := strings.Index(t.body, CommentsHeading); comments >= 0 {
+			t.body = strings.TrimRight(t.body[:comments], "\n") +
+				"\n\n" + AttachmentsHeading + "\n\n" + entry + "\n\n" + t.body[comments:]
+			return
+		}
+		t.body = strings.TrimRight(t.body, "\n") + "\n\n" + AttachmentsHeading + "\n\n" + entry + "\n"
+		return
+	}
+
+	end := len(t.body)
+	if comments := strings.Index(t.body[at:], CommentsHeading); comments >= 0 {
+		end = at + comments
+	}
+	section := strings.TrimRight(t.body[at:end], "\n")
+	t.body = t.body[:at] + section + "\n" + entry + "\n\n" + t.body[end:]
+}
+
+// Attachments lists the files the task points at.
+func (t *Task) Attachments() []string {
+	at := strings.Index(t.body, AttachmentsHeading)
+	if at < 0 {
+		return nil
+	}
+	end := len(t.body)
+	if comments := strings.Index(t.body[at:], CommentsHeading); comments >= 0 {
+		end = at + comments
+	}
+
+	var out []string
+	for _, m := range wikilink.FindAllStringSubmatch(t.body[at:end], -1) {
+		out = append(out, m[1])
+	}
+	return out
+}
+
+// SetDescription replaces the body above the comment section, leaving the
+// conversation underneath it untouched.
+func (t *Task) SetDescription(description string) {
+	description = strings.TrimRight(description, "\n")
+
+	at := strings.Index(t.body, CommentsHeading)
+	if at < 0 {
+		t.body = "\n" + description + "\n"
+		return
+	}
+	t.body = "\n" + description + "\n\n" + t.body[at:]
+}
+
 // Comments reads the comment section back into its entries.
 //
 // They are stored as text in the task file rather than as structured data, so

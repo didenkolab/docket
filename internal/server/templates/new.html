@@ -1,9 +1,15 @@
 {{template "head" .}}
-{{$selected := .Data}}
+{{$data := .Data}}
+{{$selected := $data.Project}}
 
 <h1>New task</h1>
 
+{{if $data.Parent}}
+<p class="footnote">A child of <a href="/task/{{$data.Parent}}">{{$data.Parent}}</a>.</p>
+{{end}}
+
 <form class="stacked" method="post" action="/new">
+  <input type="hidden" name="parent" value="{{$data.Parent}}">
   <label for="project">Project</label>
   <select id="project" name="project">
     {{range .Config.Projects}}
@@ -27,6 +33,9 @@
   <label for="assignee">Assignee</label>
   <input id="assignee" name="assignee" placeholder="agent/claude">
 
+  <label for="body">Description</label>
+  <textarea id="body" name="body" rows="6" data-editor placeholder="What needs to happen, and why."></textarea>
+
   <button type="submit">Create</button>
 </form>
 
@@ -35,4 +44,5 @@
   the same moment, the second write fails rather than replacing the first.
 </p>
 
+<script src="/static/editor.js" defer></script>
 {{template "foot" .}}

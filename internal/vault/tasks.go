@@ -240,15 +240,16 @@ func NextKey(root, projectKey string) (string, error) {
 // NewOptions describes the task to create. Empty fields fall back to the
 // vault's defaults.
 type NewOptions struct {
-	Project  string
-	Title    string
-	Type     string
-	Status   string
-	Priority string
-	Assignee string
-	Parent   string
-	Labels   []string
-	Now      time.Time
+	Project     string
+	Title       string
+	Description string
+	Type        string
+	Status      string
+	Priority    string
+	Assignee    string
+	Parent      string
+	Labels      []string
+	Now         time.Time
 }
 
 // Create writes a new task and returns its path relative to the vault root.
@@ -322,6 +323,9 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 	t.SetPlain("updated", stamp)
 	t.SetList("labels", opts.Labels)
 	t.SetList("aliases", nil)
+	if opts.Description != "" {
+		t.SetDescription(opts.Description)
+	}
 	if opts.Parent != "" {
 		t.Set("parent", opts.Parent)
 	} else {
@@ -368,4 +372,26 @@ func taskTemplate(root string) []byte {
 		return []byte(builtinTaskTemplate)
 	}
 	return raw
+}
+
+// Rename moves a task's file, which is what a change of title amounts to now
+// that the name carries it. Both paths come back so the caller can commit the
+// rename as a rename rather than as a delete and an add.
+func Rename(root, from, to string) error {
+	if from == to {
+		return nil
+	}
+	target := filepath.Join(root, filepath.FromSlash(to))
+	if _, err := os.Stat(target); err == nil {
+		return fmt.Errorf("%s already exists", to)
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	return os.Rename(filepath.Join(root, filepath.FromSlash(from)), target)
+}
+
+// PathFor is where a task with this key and title belongs.
+func PathFor(projectKey, key, title string) string {
+	return filepath.ToSlash(filepath.Join(projectKey, FileName(key, title)))
 }

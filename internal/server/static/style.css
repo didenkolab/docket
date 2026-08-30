@@ -32,6 +32,14 @@
 
   --gap: 1rem;
   --radius: 3px;
+
+  /* The page has a width. Without one, a description on a wide monitor runs
+   * fifteen hundred pixels wide and the details panel is stranded a screen
+   * away from what it describes. */
+  --shell: 76rem;
+  --measure: 44rem;   /* how wide prose is allowed to get */
+  --side: 19rem;      /* the details panel */
+  --edge: 1.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -74,16 +82,25 @@ code, .key, .count, .path, .pill, .priority, .label, .footnote code {
 
 /* ---- header ---- */
 
+.shell {
+  max-width: var(--shell);
+  margin: 0 auto;
+  width: 100%;
+}
+
 header {
-  display: flex;
-  align-items: center;
-  gap: var(--gap);
-  padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--rule);
   background: var(--paper);
   position: sticky;
   top: 0;
   z-index: 10;
+  padding: 0.75rem var(--edge);
+}
+
+header .bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
   flex-wrap: wrap;
 }
 
@@ -138,7 +155,7 @@ input[type="search"], input[type="text"], select, textarea {
   padding: 0.35rem 0.5rem;
 }
 
-main { padding: 1.5rem 1.25rem 4rem; }
+main { padding: 1.5rem var(--edge) 4rem; }
 
 h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1rem; }
 
@@ -175,6 +192,10 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
 .project-tab .count { opacity: 0.65; margin-left: 0.2rem; }
 
 /* ---- board ---- */
+
+/* The board is the one page that may exceed the shell — columns scroll
+ * sideways, and cutting them off at the reading width would waste a monitor. */
+main:has(.board) > .shell { max-width: none; }
 
 .board {
   display: flex;
@@ -324,6 +345,7 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
   margin: 0 0 1.5rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--rule);
@@ -348,12 +370,13 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
 
 .issue {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 19rem;
-  gap: 2rem;
+  grid-template-columns: minmax(0, var(--measure)) minmax(0, var(--side));
+  gap: 2.5rem;
   align-items: start;
 }
 
 .issue-main { min-width: 0; }
+.issue-title { max-width: var(--measure); }
 
 .block { margin-bottom: 2rem; }
 
@@ -382,6 +405,7 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
 }
 
 .children .child-title { flex: 1; min-width: 0; }
+.children li .pill { flex: none; }
 
 /* A comment is a person saying something, so it is shaped like one rather than
  * like another paragraph of the description. */
@@ -419,7 +443,8 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
   margin-top: 1rem;
 }
 
-.comment-form textarea { width: 100%; max-width: 42rem; }
+.comment-form textarea { width: 100%; }
+.comment-form { width: 100%; }
 
 .panel {
   border: 1px solid var(--rule);
@@ -451,6 +476,7 @@ h1 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 1
 .pill.done { border-bottom-color: var(--done); color: var(--ink-soft); }
 
 .stamps {
+  overflow-wrap: anywhere;
   font-family: var(--mono);
   font-size: 0.75rem;
   color: var(--ink-soft);
@@ -526,6 +552,133 @@ button {
 }
 
 button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* A link that acts like a button — Edit and Add child sit beside Move, and
+ * should look like they belong there. */
+.button-link {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.7rem;
+}
+
+.button-link:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+/* ---- the Markdown editor ---- */
+
+.editor {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--raised);
+  margin-top: 0.35rem;
+}
+
+.editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.editor-gap { width: 0.75rem; }
+
+.editor-tool {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  min-width: 1.9rem;
+}
+
+.editor-tool:hover {
+  color: var(--ink);
+  background: var(--paper);
+  border-color: var(--rule);
+}
+
+.editor-preview-toggle { margin-left: auto; }
+.editor-preview-toggle.on { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+
+.editor-panes { display: grid; grid-template-columns: 1fr; }
+.editor.split .editor-panes { grid-template-columns: 1fr 1fr; }
+
+.editor-panes textarea {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.75rem;
+  resize: vertical;
+  min-height: 12rem;
+}
+
+.editor-panes textarea:focus { outline: 0; }
+
+.editor-preview {
+  padding: 0.75rem 1rem;
+  border-left: 1px solid var(--rule);
+  overflow-y: auto;
+  font-size: 0.95rem;
+}
+
+.editor-preview.loading { opacity: 0.5; }
+.editor-preview > :first-child { margin-top: 0; }
+
+@media (max-width: 46rem) {
+  .editor.split .editor-panes { grid-template-columns: 1fr; }
+  .editor-preview { border-left: 0; border-top: 1px solid var(--rule); }
+}
+
+/* ---- editing a task ---- */
+
+.edit { max-width: 52rem; }
+.edit label { display: block; margin-top: 1rem; }
+/* The settings form caps its inputs at 28rem; an editor's title field should
+ * be as wide as the editor under it, so the cap is lifted here explicitly. */
+.edit > input { width: 100%; max-width: none; }
+.edit textarea, .editor textarea { font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; width: 100%; }
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0 1rem;
+  margin-top: 0.5rem;
+}
+
+.edit-grid select, .edit-grid input { width: 100%; }
+
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.edit-actions .cancel { color: var(--ink-soft); font-size: 0.9rem; }
+
+.danger { margin-top: 2rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+.attach { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+.attach input[type="file"] { font: inherit; font-size: 0.8rem; max-width: 100%; }
+
+.issue-side .panel + .panel, .issue-side .panel { margin-bottom: 1rem; }
+.body img { max-width: 100%; height: auto; border-radius: var(--radius); }
+
+.destructive {
+  background: transparent;
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.destructive:hover { background: var(--warn); border-color: var(--warn); color: #fff; }
 
 /* ---- pages, search, notices ---- */
 
@@ -640,19 +793,32 @@ form > button { margin-top: 1.5rem; }
 .failure { max-width: 40rem; }
 .failure h1 { color: var(--warn); }
 
+/* Between a phone and a laptop there is no room for two columns, but there is
+ * room for the details to sit under the work rather than above it. */
+@media (max-width: 62rem) {
+  .issue { grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+  .issue-side { max-width: 34rem; }
+}
+
 @media (max-width: 40rem) {
-  header { gap: 0.5rem; }
+  :root { --edge: 1rem; }
+  header .bar { gap: 0.5rem; }
   header .search { margin-left: 0; width: 100%; }
   header .search input { width: 100%; }
-  main { padding: 1rem; }
 
   /* On a phone the columns stack. Scrolling sideways would land you on
    * whatever the first column happens to be — usually an empty backlog —
    * and hide the work behind a gesture. */
   .board { flex-direction: column; overflow-x: visible; }
   .column { flex: 0 0 auto; width: 100%; }
-  .issue { grid-template-columns: 1fr; gap: 1.5rem; }
-  .issue-side { order: -1; }
+
+  .issue-title { font-size: 1.3rem; }
+  .statusbar { gap: 0.4rem; }
+  .statusbar .button-link { padding: 0.3rem 0.55rem; }
+
+  /* The note about how writes are committed is reassurance, not instruction.
+   * It is the first thing to go when there is no room. */
+  .issue-side .footnote { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

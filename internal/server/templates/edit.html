@@ -1,0 +1,81 @@
+{{template "head" .}}
+{{$data := .Data}}
+{{$t := $data.Task}}
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/task/{{$t.Key}}">{{$t.Key}}</a>
+  <span aria-hidden="true">/</span>
+  <span>Edit</span>
+</nav>
+
+<h1 class="issue-title">Edit {{$t.Key}}</h1>
+
+{{if $data.Error}}
+<div class="notice"><strong>Nothing was changed.</strong> {{$data.Error}}</div>
+{{end}}
+
+<form class="edit" method="post" action="/task/{{$t.Key}}/edit">
+  <input type="hidden" name="version" value="{{$data.Version}}">
+
+  <label for="title">Title</label>
+  <input id="title" name="title" value="{{$t.Title}}" required>
+
+  <label for="body">Description</label>
+  <textarea id="body" name="body" rows="14" spellcheck="true" data-editor>{{$data.Body}}</textarea>
+  <p class="footnote inline">Markdown. Link to another task by its whole note name:
+  <code>[[{{$t.Key}} …]]</code>.</p>
+
+  <div class="edit-grid">
+    <div>
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        {{range $data.Reachable}}
+        <option value="{{.Name}}"{{if eq .Name $t.Status}} selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label for="type">Type</label>
+      <select id="type" name="type">
+        {{range .Config.Types}}<option value="{{.}}"{{if eq . $t.Type}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label for="priority">Priority</label>
+      <select id="priority" name="priority">
+        {{range .Config.Priorities}}<option value="{{.}}"{{if eq . $t.Priority}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
+    <div>
+      <label for="assignee">Assignee</label>
+      <input id="assignee" name="assignee" value="{{$t.Assignee}}" placeholder="agent/claude">
+    </div>
+    <div>
+      <label for="parent">Parent</label>
+      <select id="parent" name="parent">
+        <option value="">— none —</option>
+        {{range $data.Parents}}
+        <option value="{{.Key}}"{{if .Selected}} selected{{end}}>{{.Key}} {{.Title}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div>
+      <label for="labels">Labels</label>
+      <input id="labels" name="labels" value="{{$data.Labels}}" placeholder="auth, regression">
+    </div>
+  </div>
+
+  <div class="edit-actions">
+    <button type="submit">Save</button>
+    <a class="cancel" href="/task/{{$t.Key}}">Cancel</a>
+  </div>
+</form>
+
+<p class="footnote">
+  Saving writes <code>{{$data.Path}}</code> and commits it. Changing the title renames the file,
+  because the name carries the title — git records that as a rename, and links to this task are
+  rewritten.
+</p>
+
+<script src="/static/editor.js" defer></script>
+{{template "foot" .}}
