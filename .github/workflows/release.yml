@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Test before publishing anything
+        run: go test ./...
+
+      - name: Build for every platform
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          stamp="-s -w -X github.com/vadymdidenkolab/docket/internal/cli.version=${TAG}"
+
+          for target in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/arm64 windows/amd64; do
+            goos=${target%/*}
+            goarch=${target#*/}
+            name="docket_${TAG}_${goos}_${goarch}"
+            work="dist/${name}"
+
+            mkdir -p "$work"
+            binary="$work/docket"
+            [ "$goos" = windows ] && binary="$work/docket.exe"
+
+            GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 \
+              go build -trimpath -ldflags "$stamp" -o "$binary" ./cmd/docket
+
+            cp LICENSE README.md "$work/"
+            if [ "$goos" = windows ]; then
+              (cd dist && zip -qr "${name}.zip" "$name")
+            else
+              tar -czf "dist/${name}.tar.gz" -C dist "$name"
+            fi
+            rm -rf "$work"
+          done
+
+          (cd dist && sha256sum * > checksums.txt)
+          ls -la dist
+
+      - name: Check the binary reports the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # A release whose binary reports a pseudo-version instead of its tag
+          # is a release nobody can identify. Verify on the native platform.
+          tar -xzf "dist/docket_${TAG}_linux_amd64.tar.gz" -C /tmp
+          reported=$(/tmp/docket_${TAG}_linux_amd64/docket --version)
+          echo "reported: $reported"
+          test "$reported" = "$TAG"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --title "$TAG" \
+            --generate-notes
