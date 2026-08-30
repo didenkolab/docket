@@ -12,6 +12,22 @@
   // is what tells the server the change came from a page it served.
   const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
+  /* ---------- how much of the board is off-screen ---------- */
+
+  // A board wider than its window is cut off at the edge, and nothing about a
+  // half-visible column says "scroll". Marking which way there is more to see
+  // lets the stylesheet fade that edge. Measured rather than assumed, because
+  // it depends on the window and on how many statuses the vault has.
+  function markEdges() {
+    const slack = board.scrollWidth - board.clientWidth;
+    board.classList.toggle('scrolls-left', board.scrollLeft > 4);
+    board.classList.toggle('scrolls-right', board.scrollLeft < slack - 4);
+  }
+
+  markEdges();
+  board.addEventListener('scroll', markEdges, { passive: true });
+  addEventListener('resize', markEdges);
+
   /* ---------- feedback ---------- */
 
   let toastTimer;

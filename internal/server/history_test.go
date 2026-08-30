@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
 // A history is read from git and says what moved, in the tracker's words.
@@ -151,5 +154,34 @@ func TestDeletingAParentIsRefused(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "ACME", "ACME-1 Fix login redirect loop.md")); err != nil {
 		t.Error("the parent was deleted anyway")
+	}
+}
+
+/* ---------- a board with nothing on it ---------- */
+
+// A vault nobody has written to yet is somebody's first minute with this.
+func TestAnEmptyBoardSaysWhatToDo(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "vault")
+	if _, err := vault.Init(root, vault.Options{Key: "NEW", Name: "A New Thing"}); err != nil {
+		t.Fatal(err)
+	}
+	git(t, root, "init", "-q", "-b", "main")
+	git(t, root, "add", "-A")
+	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=T", "commit", "-q", "-m", "vault")
+
+	s, err := New(root, Options{Author: gitvcs.Author{Name: "T", Email: "t@example.com"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, s.Handler(), "/").Body.String()
+	if !strings.Contains(body, "No tasks yet") {
+		t.Errorf("an empty board says nothing about being empty:\n%s", body)
+	}
+	if !strings.Contains(body, "NEW-1 Its title.md") {
+		t.Error("it does not say where a first task would go")
+	}
+	if !strings.Contains(body, `href="/new"`) {
+		t.Error("it does not offer to make one")
 	}
 }

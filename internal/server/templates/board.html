@@ -21,6 +21,21 @@
 </nav>
 {{end}}
 
+{{if eq $data.Total 0}}
+<div class="opening">
+  <h1>{{.Config.Name}}</h1>
+  <p>
+    No tasks yet. {{if .You.CanWrite}}<a href="/new">Write the first one</a>, or create it as a
+    file — <code>{{$data.FirstKey}}-1 Its title.md</code> in <code>{{$data.FirstProject}}/</code>
+    — and it is on this board.{{else}}Whoever can write to this repository can add one.{{end}}
+  </p>
+  <p class="footnote">
+    The same folder opens in Obsidian as a board and a wiki. Neither view is an export of the
+    other; there is one set of files.
+  </p>
+</div>
+{{end}}
+
 <div class="board">
   {{range $data.Columns}}
   <section class="column {{categoryClass .Status.Category}}" data-status="{{.Status.Name}}">

@@ -284,7 +284,27 @@ main:has(.board) > .shell { max-width: none; }
  * right of the first column. */
 body:has(.board) header .bar { max-width: none; }
 
-.board { display: flex; gap: var(--s4); align-items: flex-start; overflow-x: auto; padding-bottom: var(--s4); }
+.board {
+  display: flex;
+  gap: var(--s4);
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: var(--s4);
+  scroll-snap-type: x proximity;
+}
+
+.column { scroll-snap-align: start; }
+
+/* A vault with more statuses than fit scrolls sideways. Cut off with no sign of
+ * it, the last column reads as a rendering fault rather than as an invitation,
+ * so the edge fades — but only once something has measured that there is
+ * anything to scroll to. The class comes from the board script; without it the
+ * board still scrolls, it just does not advertise it. */
+.board.scrolls-right { mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
+.board.scrolls-left { mask-image: linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); }
+.board.scrolls-left.scrolls-right {
+  mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+}
 
 /* A column is a box, not a hint of one, and its body keeps a floor height so
  * an empty column is somewhere you can aim rather than a line of text.
@@ -296,7 +316,7 @@ body:has(.board) header .bar { max-width: none; }
  * board scrolls sideways from there. */
 .column {
   flex: 1 1 0;
-  min-width: 13rem;
+  min-width: 12rem;
   max-width: 22rem;
   display: flex;
   flex-direction: column;
@@ -655,6 +675,14 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .matrix td { text-align: center; padding: 0.15rem var(--s1); }
 .matrix td input { width: auto; }
 .matrix .self { color: var(--ink-faint); }
+
+/* ---- an empty board ---- */
+
+/* A vault with no tasks is somebody's first minute with this. Six empty columns
+ * saying "nothing here" is true and useless; this says what to do next. */
+.opening { max-width: var(--measure); margin: 0 0 var(--s6); }
+.opening h1 { margin-bottom: var(--s2); }
+.opening p { margin: 0 0 var(--s2); color: var(--ink-soft); }
 
 /* ---- history ---- */
 

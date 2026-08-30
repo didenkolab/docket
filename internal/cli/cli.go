@@ -192,8 +192,16 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 
 	fmt.Fprintf(stdout, "Created a vault for %s in %s — %d files.\n\n", *key, dir, len(written))
 	fmt.Fprint(stdout, "Next:\n")
-	fmt.Fprintf(stdout, "  open %s in Obsidian, then open boards/board.base\n", dir)
-	fmt.Fprintf(stdout, "  copy templates/task.md to tasks/%s-1.md to write the first task\n", *key)
-	fmt.Fprint(stdout, "  read AGENTS.md before letting an agent loose in it\n")
+	if dir != "." {
+		fmt.Fprintf(stdout, "  cd %s\n", dir)
+	}
+	for _, step := range [][2]string{
+		{`docket new "Its title"`, "the first task, as " + *key + "/" + *key + "-1 Its title.md"},
+		{"docket serve", "a board in a browser"},
+		{"open " + dir + " in Obsidian", "the same files, as a board and a wiki"},
+	} {
+		fmt.Fprintf(stdout, "  %-26s %s\n", step[0], step[1])
+	}
+	fmt.Fprint(stdout, "\nRead AGENTS.md before letting an agent loose in it.\n")
 	return exitOK
 }

@@ -88,6 +88,11 @@ type boardView struct {
 	Projects []projectTab
 	Selected string
 	Total    int
+	// Where a first task would go, for a vault that has none yet. A board with
+	// nothing on it should say what to do rather than repeat "nothing here"
+	// once per column.
+	FirstProject string
+	FirstKey     string
 }
 
 // sortCards puts a column in the order somebody dragged it into.
@@ -191,6 +196,13 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 			Key: p.Key, Name: p.Name, Count: counts[p.Key],
 			Href: "/?project=" + url.QueryEscape(p.Key), On: selected == p.Key,
 		})
+	}
+
+	if keys := c.ProjectKeys(); len(keys) > 0 {
+		view.FirstProject, view.FirstKey = keys[0], keys[0]
+		if selected != "" {
+			view.FirstProject, view.FirstKey = selected, selected
+		}
 	}
 
 	title := c.Name
