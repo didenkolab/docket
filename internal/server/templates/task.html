@@ -47,6 +47,27 @@
       {{end}}
     </section>
 
+    {{if $data.Backlinks}}
+    <section class="block">
+      <h2>Referenced by <span class="count">{{len $data.Backlinks}}</span></h2>
+      <ul class="mentions">
+        {{range $data.Backlinks}}
+        <li>
+          <a class="hit-link" href="{{.Href}}">
+            {{if .Task}}<span class="key">{{.Task.Key}}</span>
+            <span class="hit-title">{{.Task.Title}}</span>
+            {{else}}<span class="hit-link page">{{.Label}}</span>{{end}}
+          </a>
+          {{with .Task}}<span class="pill {{.Category}}">{{.Status}}</span>{{end}}
+          {{if .Context}}<p class="context">{{.Context}}</p>{{end}}
+        </li>
+        {{end}}
+      </ul>
+      <p class="footnote">Everything that links here — which is Obsidian's backlinks pane, and
+      is why a relationship is written as a link rather than declared as a field.</p>
+    </section>
+    {{end}}
+
     {{if $data.Children}}
     <section class="block">
       <h2>Child tasks <span class="count">{{len $data.Children}}</span></h2>

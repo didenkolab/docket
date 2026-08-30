@@ -699,6 +699,15 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .opening h1 { margin-bottom: var(--s2); }
 .opening p { margin: 0 0 var(--s2); color: var(--ink-soft); }
 
+/* ---- what links here ---- */
+
+.mentions { list-style: none; margin: 0; padding: 0; }
+.mentions li { padding: var(--s2) 0; border-bottom: 1px solid var(--rule-soft); }
+.mentions li:last-child { border-bottom: 0; }
+.mentions .hit-link { display: inline-flex; }
+.mentions .pill { margin-left: var(--s2); }
+.mentions .context { margin: var(--s1) 0 0; color: var(--ink-soft); font-size: 0.85rem; }
+
 /* ---- callouts ---- */
 
 /* Obsidian's, so they read the same in both. One hue per kind, taken from the

@@ -1,8 +1,13 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
 func render(t *testing.T, body string) string {
@@ -88,5 +93,84 @@ func TestAPlainQuoteIsUntouched(t *testing.T) {
 	}
 	if !strings.Contains(html, "<blockquote>") {
 		t.Errorf("a plain quote stopped being one:\n%s", html)
+	}
+}
+
+/* ---------- what links here ---------- */
+
+// Obsidian shows every note that links to this one. For a tracker that is the
+// answer to "what else refers to this task", and it needs no relationship to
+// have been declared in advance — a link written in a sentence is one.
+func TestATaskShowsWhatLinksToIt(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title:       "Session model",
+		Description: "Blocked by [[ACME-1 Fix login redirect loop]] until the cookie is fixed.",
+		Now:         noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	page := "---\ntitle: Auth\n---\n\nSee [[ACME-1 Fix login redirect loop]] for the redirect bug.\n"
+	if err := os.WriteFile(filepath.Join(root, "docs", "auth.md"), []byte(page), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/task/ACME-1").Body.String()
+
+	if !strings.Contains(body, "Referenced by") {
+		t.Fatalf("no backlinks section:\n%s", body)
+	}
+	for _, want := range []string{"ACME-2", "Session model", "docs/auth", "until the cookie is fixed"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the backlinks do not mention %q", want)
+		}
+	}
+}
+
+// The note's name appearing in a sentence is a coincidence until somebody makes
+// it a link. Obsidian calls that an unlinked mention and keeps it separate.
+func TestAnUnlinkedMentionIsNotABacklink(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title:       "Session model",
+		Description: "Related to ACME-1 Fix login redirect loop, but not linked to it.",
+		Now:         noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if body := get(t, h, "/task/ACME-1").Body.String(); strings.Contains(body, "Referenced by") {
+		t.Errorf("a plain mention was counted as a link:\n%s", body)
+	}
+}
+
+// A parent is a link, so an epic is referenced by its children without anything
+// else being written down.
+func TestAParentLinkIsABacklink(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "A child", Parent: "ACME-1", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/task/ACME-1").Body.String()
+	if !strings.Contains(body, "Referenced by") || !strings.Contains(body, "A child") {
+		t.Errorf("a child does not reference its parent:\n%s", body)
 	}
 }

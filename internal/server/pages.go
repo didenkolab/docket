@@ -263,6 +263,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		Description: renderMarkdown(t.Description(), ix),
 		Comments:    renderComments(t.Comments(), ix),
 		Children:    s.childrenOf(c, key),
+		Backlinks:   s.backlinks(strings.TrimSuffix(path.Base(rel), ".md"), rel),
 		Version:     ver,
 		Path:        rel,
 	})
@@ -276,6 +277,7 @@ type taskView struct {
 	Description template.HTML
 	Comments    []renderedComment
 	Children    []childTask
+	Backlinks   []mention
 	Version     string
 	Path        string
 }
