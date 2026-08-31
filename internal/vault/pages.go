@@ -181,6 +181,31 @@ func sectionsOf(body string) []string {
 	return out
 }
 
+// OutOfOrder reports the first required section that appears after one that
+// should follow it, or empty when the order holds.
+//
+// Order is checked because the drift started with it: a decision written by
+// glancing at whichever other one was open picks up its headings in whatever
+// sequence that one had, and by the third document nobody can tell which
+// sequence was meant.
+func (p Page) OutOfOrder(required []string) (section, after string) {
+	at := -1
+	seen := ""
+	for _, want := range required {
+		for i, got := range p.Sections {
+			if !strings.EqualFold(got, want) {
+				continue
+			}
+			if i < at {
+				return want, seen
+			}
+			at, seen = i, got
+			break
+		}
+	}
+	return "", ""
+}
+
 // Has reports whether the page has a section by that name, ignoring case.
 func (p Page) Has(section string) bool {
 	for _, got := range p.Sections {

@@ -44,6 +44,10 @@ func TestDocuments(t *testing.T) {
 	decision("0006-gone-nowhere.md", "status: superseded\ndate: 2026-08-01\n", whole)
 	decision("0006-same-number.md", "status: accepted\ndate: 2026-08-01\n", whole)
 	decision("unnumbered.md", "status: accepted\ndate: 2026-08-01\n", whole)
+	// Every section present, in the wrong sequence — the way the drift began.
+	decision("0007-out-of-order.md", "status: accepted\ndate: 2026-08-01\n",
+		"## Context\n\nWhy.\n\n## Alternatives considered\n\nThose.\n\n"+
+			"## Decision\n\nWhat.\n\n## What this costs\n\nThis.\n")
 	write("docs/decisions/0008-a-string.md",
 		"---\ntitle: A choice\ntype: decision\nstatus: superseded\ndate: 2026-08-01\n"+
 			"supersedes: 0001-a-good-one\n---\n\n"+whole)
@@ -70,6 +74,7 @@ func TestDocuments(t *testing.T) {
 		{"0006-gone-nowhere", "does not say by what"},
 		{"0006-same-number", "is already"},
 		{"unnumbered", "named NNNN-kebab-title.md"},
+		{"0007-out-of-order", "## Alternatives considered is above ## What this costs and belongs below it"},
 		{"0008-a-string", "is a string, so the two decisions are not joined"},
 		{"notes", "does not say what kind of document it is"},
 	} {

@@ -45,11 +45,25 @@ func checkDocuments(pages []vault.Page) []Finding {
 			continue
 		}
 
-		for _, want := range vault.RequiredSections(p.Type) {
+		required := vault.RequiredSections(p.Type)
+		missing := false
+		for _, want := range required {
 			if !p.Has(want) {
+				missing = true
 				findings = append(findings, Finding{p.Path, 0, RuleDocuments,
 					fmt.Sprintf("a %s needs a ## %s section, and this one has %s",
 						p.Type, want, listOf(p.Sections))})
+			}
+		}
+		// Only when they are all there. Telling somebody the order is wrong
+		// while a section is missing is telling them about the wrong problem.
+		if !missing {
+			if out, after := p.OutOfOrder(required); out != "" {
+				findings = append(findings, Finding{p.Path, 0, RuleDocuments,
+					fmt.Sprintf("## %s is above ## %s and belongs below it: a %s reads %s. "+
+						"The order is what drifts first — a document written by glancing "+
+						"at another picks up whatever sequence that one had",
+						out, after, p.Type, strings.Join(required, ", then "))})
 			}
 		}
 
