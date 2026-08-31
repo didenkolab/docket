@@ -149,6 +149,16 @@ type column struct {
 	// Unsized is how many of its cards nobody has estimated, so the total is
 	// never read as the whole.
 	Unsized int
+	// Count is how many cards are in the column, which is not always how many
+	// are drawn. The head says this one: a number that shrank because the page
+	// decided not to draw something is a number that lies.
+	Count int
+	// Hidden is how many of them are not drawn, and MoreHref is where the whole
+	// column is. LessHref is the way back, set only on a column being shown
+	// whole.
+	Hidden   int
+	MoreHref string
+	LessHref string
 }
 
 type card struct {
@@ -184,6 +194,9 @@ type card struct {
 	// order is where somebody put this card in its column, if anybody has.
 	// Cards without one follow the ones with, in key order.
 	order *int
+	// updated is when the file last changed, as written. It decides which of a
+	// finished column's cards are the ones still worth drawing.
+	updated string
 	// Version is the fingerprint of the file this card was rendered from. The
 	// board hands it back when a card is dragged, so a drop lands on the file
 	// the person actually saw.
@@ -250,6 +263,57 @@ func totalOf(cards []card, c *project.Config) (total string, unsized int) {
 		return "", unsized
 	}
 	return project.Amount(sum), unsized
+}
+
+// recentlyDone is how much of a finished column a board draws.
+//
+// A real board arrived with 573 cards in "Готово" out of 1096 — half the page,
+// a megabyte of it, spent on work nobody is going to pick up. A board is for
+// the work that is moving; the archive is a thing you go and ask for. Twenty
+// five is about a screen of scrolling, which is as far as anybody reads back
+// before they would rather search.
+const recentlyDone = 25
+
+// holdBack draws only the recently finished part of a finished column.
+//
+// Only the done category, because that is the only column whose contents stop
+// changing: a long "In progress" is a fact about the team and hiding it would
+// be hiding the fact. And only ever a default — the column says how many it is
+// not drawing and links to the rest, so nothing is quietly gone.
+func holdBack(col *column, whole string, href func(string) string) {
+	if col.Status.Category != project.CategoryDone || col.Count <= recentlyDone {
+		return
+	}
+	if whole == col.Status.Name {
+		col.LessHref = href("")
+		return
+	}
+
+	// By when it last changed rather than by the order somebody dragged it
+	// into: nobody arranges an archive, and the part of it worth seeing is the
+	// part that happened this week. A task nobody has dated sorts last, which
+	// is where "no idea when" belongs.
+	kept := append([]card(nil), col.Cards...)
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].updated > kept[j].updated })
+
+	col.Cards = kept[:recentlyDone]
+	col.Hidden = col.Count - recentlyDone
+	col.MoreHref = href(col.Status.Name)
+}
+
+// elsewhere is this address with one query parameter set, or removed when the
+// value is empty.
+func elsewhere(at *url.URL, key, value string) string {
+	q := at.Query()
+	if value == "" {
+		q.Del(key)
+	} else {
+		q.Set(key, value)
+	}
+	if len(q) == 0 {
+		return at.Path
+	}
+	return at.Path + "?" + q.Encode()
 }
 
 // reachableList is the workflow, flattened for an attribute.
@@ -364,6 +428,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 					Labels: e.Task.Labels, Tags: e.Task.Tags, Version: version(e.Raw),
 					Reachable: reachableList(configOf(e.Project), e.Task.Status),
 					order:     e.Task.Order,
+					updated:   e.Task.Updated,
 					Blocked:   blocked(e.Task, known),
 					Epic:      epic, EpicTitle: epicTitle,
 					Sprint: e.Task.Sprint,
@@ -378,9 +443,16 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		}
 	}
 
+	whole := r.URL.Query().Get("full")
 	for i := range view.Columns {
 		sortCards(view.Columns[i].Cards)
+		// Counted and added up before anything is put aside, so the head is
+		// about the column and not about the page.
 		view.Columns[i].Size, view.Columns[i].Unsized = totalOf(view.Columns[i].Cards, c)
+		view.Columns[i].Count = len(view.Columns[i].Cards)
+		holdBack(&view.Columns[i], whole, func(status string) string {
+			return elsewhere(r.URL, "full", status)
+		})
 	}
 
 	view.Projects = append(view.Projects, projectTab{

@@ -52,7 +52,7 @@
     <header class="column-head">
       <span class="pip"></span>
       <b>{{.Status.Name}}</b>
-      <span class="count">{{len .Cards}}</span>
+      <span class="count">{{.Count}}</span>
       {{if .Size}}<span class="size"
         title="{{if .Unsized}}{{plural .Unsized "card" "cards"}} here nobody has sized{{else}}every card here is sized{{end}}"
         >{{.Size}}{{if .Unsized}}+{{end}}</span>{{end}}
@@ -77,6 +77,12 @@
       </a>
       {{end}}
       <p class="empty"{{if .Cards}} hidden{{end}}>Nothing here</p>
+      {{if .Hidden}}
+      <a class="rest" href="{{.MoreHref}}">{{.Hidden}} more, finished earlier</a>
+      {{end}}
+      {{if .LessHref}}
+      <a class="rest" href="{{.LessHref}}">Show only the recent ones</a>
+      {{end}}
     </div>
   </section>
   {{end}}

@@ -654,6 +654,18 @@ a.label { text-decoration: none; }
 
 .empty { color: var(--ink-faint); font-size: 0.875rem; margin: var(--s2) var(--s1); }
 
+/* The rest of a finished column. Quiet, and not a card: it is the way to the
+ * archive, not a thing in it. */
+.rest {
+  display: block;
+  color: var(--ink-faint);
+  font-size: 0.8125rem;
+  padding: var(--s2) var(--s1);
+  text-decoration: none;
+  border-top: 1px dashed var(--rule);
+}
+.rest:hover { color: var(--ink); text-decoration: underline; }
+
 /* A drop lands as a git commit, so it deserves the confirmation a commit
  * would get: what moved, and where to. */
 .toast {
