@@ -54,6 +54,11 @@ type Options struct {
 	// a rate limit is the one it names rather than the proxy itself. Off by
 	// default: believing the header unasked lets anybody be somebody else.
 	BehindProxy bool
+	// DeviceClientID identifies this application to the host, so it can hand
+	// over a token without anybody pasting one. It is public — there is no
+	// secret in this flow — and empty means the sign-in page offers the token
+	// field alone. See access/device.go.
+	DeviceClientID string
 }
 
 // Server serves one space: a vault, or a workspace of them.
@@ -74,6 +79,10 @@ type Server struct {
 	changes     *limiter
 	signIns     *limiter
 	behindProxy bool
+
+	// deviceClientID is what this application calls itself when asking the
+	// host for a sign-in code. Empty turns the button off.
+	deviceClientID string
 
 	// now is injectable so tests can assert on timestamps.
 	now func() time.Time
@@ -117,6 +126,8 @@ func New(root string, opts Options) (*Server, error) {
 		changes:     newLimiter(120, 30, started),
 		signIns:     newLimiter(10, 5, started),
 		behindProxy: opts.BehindProxy,
+
+		deviceClientID: strings.TrimSpace(opts.DeviceClientID),
 	}
 	if opts.Host != nil {
 		recheck, life := opts.Recheck, opts.SessionLife
@@ -283,6 +294,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /admin", s.handleAdmin)
 	mux.HandleFunc("GET /sign-in", s.handleSignInForm)
 	mux.HandleFunc("POST /sign-in", s.handleSignIn)
+	mux.HandleFunc("POST /sign-in/device", s.handleDeviceStart)
+	mux.HandleFunc("GET /sign-in/device", s.handleDeviceWait)
+	mux.HandleFunc("POST /sign-in/device/stop", s.handleDeviceStop)
 	mux.HandleFunc("POST /sign-out", s.handleSignOut)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)

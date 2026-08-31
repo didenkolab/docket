@@ -30,21 +30,51 @@ type pageData struct {
 	// CSRF is what this page must send back with a change for the change to be
 	// accepted. Every form carries it; the scripts read it from the head.
 	CSRF string
+	// Refresh, when set, makes the page reload itself after that many seconds.
+	// One page needs it — the one waiting for somebody to type a code on
+	// GitHub — and it is a meta tag rather than a script so that waiting works
+	// in a browser with scripting off, like everything else here.
+	Refresh int
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string,
 	c *project.Config, title string, data any) {
+	s.renderEvery(0, w, r, name, c, title, data)
+}
+
+// renderEvery is render for a page that has to keep looking: after seconds, the
+// browser asks for it again.
+func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request, name string,
+	c *project.Config, title string, data any) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	you, signedIn := s.whoIsAsking(r)
 	page := pageData{
 		Config: c, Title: title, Data: data,
-		You:      identityOf(r),
-		SignedIn: s.auth != nil,
+		You:      you,
+		SignedIn: signedIn,
 		CSRF:     tokenOf(r),
+		Refresh:  seconds,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// whoIsAsking is what the page should assume about the person reading it.
+//
+// The sign-in page is reachable without a session, and it used to be drawn as
+// though whoever loaded it were an administrator: the guard puts no identity on
+// an open path, and the default for "nobody said" is the widest role, which is
+// right for a server with no authority and wrong here. So on a server that does
+// sign people in, no identity means no role — an empty nav and no claim about
+// who you are — and only a real session says otherwise.
+func (s *Server) whoIsAsking(r *http.Request) (access.Identity, bool) {
+	if s.auth == nil {
+		return identityOf(r), false
+	}
+	identity, ok := r.Context().Value(identityKey{}).(access.Identity)
+	return identity, ok
 }
 
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, title, message string) {

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <meta name="csrf-token" content="{{.CSRF}}">
+{{if .Refresh}}<meta http-equiv="refresh" content="{{.Refresh}}">{{end}}
 </head>
 <body>
 <header>

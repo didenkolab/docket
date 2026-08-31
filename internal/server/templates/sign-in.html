@@ -10,21 +10,41 @@
 
   <p>
     This board is <code>{{$data.Repository}}</code> on {{$data.Host}}. It keeps no accounts of
-    its own: paste a {{$data.Host}} token and it asks {{$data.Host}} who you are and what you
-    may do with that repository. What it answers is what you get here.
+    its own: it asks {{$data.Host}} who you are and what you may do with that repository, and
+    what {{$data.Host}} answers is what you get here.
   </p>
+
+  {{if $data.Device}}
+  <form method="post" action="/sign-in/device">
+  {{template "csrf" $}}
+    <input type="hidden" name="next" value="{{$data.Next}}">
+    <button type="submit" class="primary">Sign in with {{$data.Host}}</button>
+  </form>
+
+  <p class="footnote">
+    {{$data.Host}} shows you a code to confirm, on its own site. Nothing secret is typed here.
+  </p>
+
+  <details class="alternative">
+    <summary>Use a token instead</summary>
+  {{end}}
 
   <form method="post" action="/sign-in">
   {{template "csrf" $}}
     <input type="hidden" name="next" value="{{$data.Next}}">
     <label for="token">{{$data.Host}} token</label>
     <input id="token" name="token" type="password" autocomplete="current-password" required
-           autofocus placeholder="a token with read access to {{$data.Repository}}">
+           {{if not $data.Device}}autofocus{{end}}
+           placeholder="a token with read access to {{$data.Repository}}">
     <button type="submit">Sign in</button>
   </form>
 
+  {{if $data.Device}}
+  </details>
+  {{end}}
+
   <p class="footnote">
-    The token stays in this server's memory for the length of your session and is never written
+    Your token stays in this server's memory for the length of your session and is never written
     anywhere — not to a cookie, not to disk. Restarting the server signs everyone out.
   </p>
   <p class="footnote">

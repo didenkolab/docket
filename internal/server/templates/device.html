@@ -1,0 +1,34 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<div class="sign-in device">
+  <h1>Sign in</h1>
+
+  <p>
+    Open <a href="{{$data.VerificationURI}}" target="_blank" rel="noopener noreferrer"><code>{{$data.VerificationURI}}</code></a>
+    and enter this code:
+  </p>
+
+  <p class="user-code" aria-label="Your code is {{$data.UserCode}}">{{$data.UserCode}}</p>
+
+  <p class="waiting" role="status">Waiting for {{$data.Host}}</p>
+
+  <p class="footnote">
+    This page checks every few seconds and will let you in by itself. The code is good for
+    {{$data.Left}}.
+  </p>
+
+  <form method="post" action="/sign-in/device/stop">
+  {{template "csrf" $}}
+    <button type="submit" class="quiet">Cancel</button>
+  </form>
+
+  <p class="footnote">
+    {{$data.Host}} will ask you to approve access to your repositories for
+    <code>{{$data.Scope}}</code>. What you can do here is still whatever
+    {{$data.Host}} says you can do with <code>{{$data.Repository}}</code> — approving this does
+    not grant anything, it only lets this board ask.
+  </p>
+</div>
+
+{{template "foot" .}}

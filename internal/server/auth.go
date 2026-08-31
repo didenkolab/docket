@@ -35,6 +35,9 @@ type authority struct {
 
 	mu       sync.Mutex
 	sessions map[string]*session
+	// pending are sign-ins that have been started and not finished: a code the
+	// host issued, waiting for somebody to type it. See device.go.
+	pending map[string]*waiting
 }
 
 func newAuthority(host access.Host, recheck, life time.Duration) *authority {
@@ -42,6 +45,7 @@ func newAuthority(host access.Host, recheck, life time.Duration) *authority {
 		checker:  access.NewChecker(host, recheck),
 		life:     life,
 		sessions: map[string]*session{},
+		pending:  map[string]*waiting{},
 	}
 }
 
@@ -142,7 +146,8 @@ func (s *Server) guard(next http.Handler) http.Handler {
 // open lists what is reachable without signing in: the sign-in page itself,
 // the stylesheet it needs, and the health check.
 func open(path string) bool {
-	return path == "/sign-in" || path == "/healthz" || strings.HasPrefix(path, "/static/")
+	return path == "/sign-in" || strings.HasPrefix(path, "/sign-in/") ||
+		path == "/healthz" || strings.HasPrefix(path, "/static/")
 }
 
 func allowed(identity access.Identity, r *http.Request) bool {
@@ -226,11 +231,8 @@ func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, _ := s.config()
-	s.render(w, r, "sign-in.html", c, "Sign in", signInView{
-		Host:       s.auth.checker.Host.Name(),
-		Repository: s.auth.checker.Host.Repository(),
-		Next:       r.URL.Query().Get("next"),
-	})
+	s.render(w, r, "sign-in.html", c, "Sign in",
+		s.signInPage(r.URL.Query().Get("next"), ""))
 }
 
 type signInView struct {
@@ -238,6 +240,26 @@ type signInView struct {
 	Repository string
 	Next       string
 	Error      string
+	// Device says the host can hand over a token without anybody pasting one,
+	// so the page leads with a button and keeps the token field as the way out
+	// for a host that cannot, or a person who would rather.
+	Device bool
+	Scope  string
+}
+
+// signInPage is everything the sign-in screen needs, in one place, so the four
+// callers that render it cannot drift from each other.
+func (s *Server) signInPage(next, problem string) signInView {
+	view := signInView{
+		Host:       s.auth.checker.Host.Name(),
+		Repository: s.auth.checker.Host.Repository(),
+		Next:       next,
+		Error:      problem,
+	}
+	if host, ok := s.deviceHost(); ok {
+		view.Device, view.Scope = true, host.DeviceScope()
+	}
+	return view
 }
 
 func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
@@ -252,12 +274,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
 	fail := func(message string) {
 		w.WriteHeader(http.StatusUnauthorized)
-		s.render(w, r, "sign-in.html", c, "Sign in", signInView{
-			Host:       s.auth.checker.Host.Name(),
-			Repository: s.auth.checker.Host.Repository(),
-			Next:       next,
-			Error:      message,
-		})
+		s.render(w, r, "sign-in.html", c, "Sign in", s.signInPage(next, message))
 	}
 
 	if token == "" {
@@ -293,8 +310,12 @@ func (s *Server) handleSignOut(w http.ResponseWriter, r *http.Request) {
 		if cookie, err := r.Cookie(sessionCookie); err == nil {
 			s.auth.close(cookie.Value)
 		}
+		if cookie, err := r.Cookie(deviceCookie); err == nil {
+			s.auth.stopWaiting(cookie.Value)
+		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", MaxAge: -1})
+	clearCookie(w, sessionCookie)
+	clearCookie(w, deviceCookie)
 	http.Redirect(w, r, "/sign-in", http.StatusSeeOther)
 }
 

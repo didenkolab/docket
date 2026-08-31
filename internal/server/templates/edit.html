@@ -38,7 +38,7 @@
     <div>
       <label for="type">Type</label>
       <select id="type" name="type">
-        {{range .Config.Types}}<option value="{{.}}"{{if eq . $t.Type}} selected{{end}}>{{.}}</option>{{end}}
+        {{range .Config.TypeNames}}<option value="{{.}}"{{if eq . $t.Type}} selected{{end}}>{{.}}</option>{{end}}
       </select>
     </div>
     <div>

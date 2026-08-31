@@ -55,6 +55,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	proxied := flags.Bool("behind-proxy", false,
 		"a reverse proxy sits in front, so rate limits follow the client it names "+
 			"rather than the proxy")
+	clientID := flags.String("device-client-id", "",
+		"the OAuth application id to sign people in with, so nobody has to paste a token\n"+
+			"    \t(public, not a secret; defaults to docket's own, or $DOCKET_DEVICE_CLIENT_ID)")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -107,6 +110,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Recheck:     *recheck,
 		SessionLife: *life,
 		BehindProxy: *proxied,
+
+		DeviceClientID: deviceClientID(*clientID),
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)
@@ -201,3 +206,26 @@ func resolveHost(auth, kind, api, root string, stdout, stderr io.Writer) (access
 		return nil, exitUsage
 	}
 }
+
+// deviceClientID is which OAuth application to sign people in as.
+//
+// The flag wins, then the environment, then the one built in. It is public —
+// the device flow has no client secret, which is the whole reason it fits a
+// program anybody can run — so shipping one costs nothing and means signing in
+// works out of the box. Somebody who would rather use their own says so.
+func deviceClientID(flag string) string {
+	if flag = strings.TrimSpace(flag); flag != "" {
+		return flag
+	}
+	if env := strings.TrimSpace(os.Getenv("DOCKET_DEVICE_CLIENT_ID")); env != "" {
+		return env
+	}
+	return builtInClientID
+}
+
+// builtInClientID is docket's own OAuth application on github.com.
+//
+// Empty until one is registered, and empty is a working state: the sign-in
+// page offers the token field alone and says nothing about a button that is
+// not there.
+const builtInClientID = ""

@@ -988,6 +988,46 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 .sign-in form { display: flex; flex-direction: column; align-items: stretch; gap: var(--s2); }
 .sign-in button { align-self: flex-start; margin-top: var(--s3); }
 
+/* Signing in with the host is the way in; pasting a token is the way out of
+ * a host that cannot do it. The layout says which is which. */
+.sign-in .alternative { margin-top: var(--s5); border-top: 1px solid var(--rule); padding-top: var(--s3); }
+.sign-in .alternative summary { color: var(--ink-soft); cursor: pointer; font-size: 0.9rem; }
+.sign-in .alternative[open] summary { margin-bottom: var(--s2); }
+.sign-in button.quiet {
+  background: none; color: var(--ink-soft); border: 1px solid var(--rule);
+}
+.sign-in button.quiet:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* The code is the whole page. It is read off a screen and typed on a phone,
+ * so it is set as large and as unambiguous as the face allows. */
+.device .user-code {
+  font-family: var(--mono);
+  font-size: clamp(2rem, 9vw, 3.25rem);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  text-align: center;
+  margin: var(--s5) 0;
+  padding: var(--s4) var(--s3);
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  user-select: all;
+}
+
+/* Three dots that say the page is still looking, without a script to move
+ * them: the animation is the whole of it, and it stops when motion is not
+ * wanted. */
+.device .waiting { color: var(--ink-soft); text-align: center; }
+.device .waiting::after {
+  content: " \2026";
+  animation: think 1.2s steps(4, end) infinite;
+}
+@keyframes think { 0% { opacity: 0.25; } 50% { opacity: 1; } 100% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .device .waiting::after { animation: none; } }
+.device form { align-items: center; }
+.device .footnote { text-align: center; }
+
 /* ---- narrow ---- */
 
 /* Between a phone and a laptop there is no room for two columns, but there is
