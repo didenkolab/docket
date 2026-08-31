@@ -46,13 +46,17 @@
   {{if .Pushes}}
   <details class="unsent">
     <summary title="what is not yet sent, and what has arrived and is not here">
-      {{range $i, $p := .Pushes}}{{if $i}} · {{end}}{{if $p.Trouble}}⚠{{else if $p.Waiting}}↑ {{$p.Waiting}}{{end}}{{if and $p.Waiting $p.Arrived}} {{end}}{{if $p.Arrived}}↓ {{$p.Arrived}}{{end}}{{end}}
+      {{range $i, $p := .Pushes}}{{if $i}} · {{end}}{{if $p.NoRemote}}⚠{{else if $p.Trouble}}⚠{{else if $p.Waiting}}↑ {{$p.Waiting}}{{end}}{{if and $p.Waiting $p.Arrived}} {{end}}{{if $p.Arrived}}↓ {{$p.Arrived}}{{end}}{{end}}
     </summary>
     <div class="unsent-list">
       {{range .Pushes}}
       <p>
         <strong>{{if .Name}}{{.Name}}{{else}}This vault{{end}}</strong>
-        {{if .NoUpstream}}
+        {{if .NoRemote}}
+          — {{plural .Wrote "change" "changes"}} written here, and this vault has no remote, so
+          nothing has left this folder. Give it one and the board sends every change by itself:
+          <code>git remote add origin &lt;url&gt;</code>, then <code>git push -u origin HEAD</code>.
+        {{else if .NoUpstream}}
           — this branch tracks nothing, so there is nowhere to send it. Set an upstream:
           <code>git push -u origin HEAD</code>.
         {{else if .Moved}}

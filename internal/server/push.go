@@ -62,6 +62,18 @@ type pushState struct {
 	Moved bool
 	// NoUpstream says the branch tracks nothing, so there is nowhere to push.
 	NoUpstream bool
+	// NoRemote says the repository has no remote at all, so nothing the board
+	// writes will ever leave this folder.
+	//
+	// It used to say nothing whatsoever. A vault with no remote was skipped
+	// before the panel was drawn, so the board committed, published nothing and
+	// reported neither — which is the silence IGL-37 was written against, only
+	// one step earlier in the chain. Reported once the board has actually
+	// written something, because a local-only vault nobody has touched is a
+	// normal thing to have and not something to nag about.
+	NoRemote bool
+	// Wrote is how many changes the board has made here this run.
+	Wrote int
 
 	// Waiting the other way: how many commits the remote has that this clone
 	// does not.
@@ -81,7 +93,7 @@ type pushState struct {
 
 // Settled reports whether there is nothing to say.
 func (p pushState) Settled() bool {
-	return p.Waiting == 0 && p.Arrived == 0 && p.Trouble == "" && !p.NoUpstream
+	return p.Waiting == 0 && p.Arrived == 0 && p.Trouble == "" && !p.NoUpstream && !p.NoRemote
 }
 
 func newPushing() *pushing {
@@ -101,6 +113,14 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 		return
 	}
 	if !v.Repo.HasRemote() {
+		// Nowhere to send it, which is a fact worth saying rather than a
+		// reason to say nothing.
+		s.pushes.mu.Lock()
+		state := s.pushes.state[v.Prefix]
+		state.NoRemote = true
+		state.Wrote++
+		s.pushes.state[v.Prefix] = state
+		s.pushes.mu.Unlock()
 		return
 	}
 
@@ -180,7 +200,15 @@ func (s *Server) pushNotes() []pushNote {
 
 	var notes []pushNote
 	for _, v := range s.sp().Vaults() {
-		if v.Repo == nil || !v.Repo.HasRemote() {
+		if v.Repo == nil {
+			continue
+		}
+		if !v.Repo.HasRemote() {
+			// Only once it has written something. Until then there is nothing
+			// stranded, and a permanent badge is a badge nobody reads.
+			if state, wrote := s.pushes.state[v.Prefix]; wrote && state.NoRemote {
+				notes = append(notes, pushNote{Name: s.nameOf(v), pushState: state})
+			}
 			continue
 		}
 		state, known := s.pushes.state[v.Prefix]
