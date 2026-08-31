@@ -447,3 +447,39 @@ func (r *Repo) Distance(base, ref string) (behind, ahead int, err error) {
 	ahead, err = strconv.Atoi(fields[1])
 	return behind, ahead, err
 }
+
+// PropertyHistory is every value a frontmatter property has held, oldest first.
+//
+// A task carries one sprint. Where it has been before is not a second field —
+// it is the history, which is the whole argument for keeping a tracker in git:
+// "this was carried over twice" is a question about the past, and a field that
+// answered it would be a field somebody has to maintain and can get wrong.
+//
+// One `git log -p` per file rather than a read per commit. The patch already
+// contains every version of the line, so the diff is the index.
+func (r *Repo) PropertyHistory(path, name string) ([]string, error) {
+	out, err := r.output("-c", "core.quotePath=false", "log", "-p", "--follow",
+		"--format=%x00", "--", path)
+	if err != nil {
+		return nil, err
+	}
+
+	prefix := "+" + name + ":"
+	var newestFirst []string
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		// The property as written: a quoted wikilink, a number, a word. Left as
+		// it is, because the caller knows what it asked for.
+		newestFirst = append(newestFirst, value)
+	}
+
+	// git log is newest first; a history reads the other way.
+	values := make([]string, 0, len(newestFirst))
+	for i := len(newestFirst) - 1; i >= 0; i-- {
+		values = append(values, newestFirst[i])
+	}
+	return values, nil
+}

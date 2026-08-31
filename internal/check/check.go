@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
@@ -32,6 +33,8 @@ const (
 	RuleProjects    = 9  // docket.yaml, the folders and the boards agree
 	RuleRelations   = 10 // a relationship is a link, not a string
 	RuleTags        = 11 // a tag is a set somebody asks for, said once
+	RuleEstimates   = 12 // an estimate is on the scale, and not on a container
+	RuleSprints     = 13 // a sprint is a page, said as a link, and owns its days
 )
 
 // Finding is one problem, located.
@@ -105,10 +108,17 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 	exists := map[string]bool{}
 
 	typeOf := map[string]string{}
+	// hasChildren is which tasks are containers, which is a fact about the
+	// other files rather than about the task, so it is worked out before any
+	// of them is judged.
+	hasChildren := map[string]bool{}
 	for _, e := range entries {
 		exists[e.Key] = true
 		if e.Task != nil {
 			typeOf[e.Key] = e.Task.Type
+			if e.Task.Parent != "" {
+				hasChildren[e.Task.Parent] = true
+			}
 		}
 	}
 
@@ -140,6 +150,7 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 
 		checkStatus(add, e, c)
 		checkVocabulary(add, e, c)
+		checkEstimate(add, e, c, hasChildren[e.Key])
 
 		if t.Parent != "" {
 			parents[e.Key] = t.Parent
@@ -180,6 +191,13 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 	findings = append(findings, checkProjects(root, c)...)
 	findings = append(findings, checkTags(entries)...)
 
+	// A vault that has no sprints is the ordinary case, and reading none is not
+	// a failure — a walk that cannot be done says so about the vault, not about
+	// the sprints.
+	if sprints, err := vault.Sprints(root); err == nil {
+		findings = append(findings, checkSprints(entries, sprints, time.Now().UTC())...)
+	}
+
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].Path != findings[j].Path {
 			return findings[i].Path < findings[j].Path
@@ -203,6 +221,51 @@ func checkStatus(add func(Finding), e vault.Entry, c *project.Config) {
 			fmt.Sprintf("status %q is in category %q, but the task says %q — they move together",
 				t.Status, category, t.StatusCategory)})
 	}
+}
+
+// checkEstimate holds the two things an estimate can be wrong about.
+//
+// Off the declared scale is the ordinary one: a vault that said 1, 2, 3, 5, 8,
+// 13 meant it, the same way it meant its statuses.
+//
+// The other is the interesting one. A container's estimate is the sum of its
+// children, computed on the way past — so a container carrying its own number
+// is a second record of a fact that is already written down, and the two will
+// disagree the first time a child is re-estimated. That is what purpose §4
+// refuses, and it is refused here rather than reconciled.
+func checkEstimate(add func(Finding), e vault.Entry, c *project.Config, parents bool) {
+	t := e.Task
+	if !t.Sized() {
+		return
+	}
+	line := t.PropertyLine("estimate")
+
+	if !c.Sizes() {
+		add(Finding{e.Path, line, RuleEstimates,
+			fmt.Sprintf("estimate %s, but %s says nothing about estimates — give it a unit "+
+				"or take the property off", project.Amount(t.Size()), project.FileName)})
+		return
+	}
+	if parents {
+		add(Finding{e.Path, line, RuleEstimates,
+			fmt.Sprintf("estimate %s on a task that has children: a container's size is what "+
+				"its children add up to, and a number here is a second answer to the "+
+				"same question", project.Amount(t.Size()))})
+	}
+	if !c.OnScale(t.Size()) {
+		add(Finding{e.Path, line, RuleEstimates,
+			fmt.Sprintf("estimate %s is not on the scale %s",
+				project.Amount(t.Size()), amounts(c.EstimateScale()))})
+	}
+}
+
+// amounts writes a scale the way the configuration says it.
+func amounts(scale []float64) string {
+	out := make([]string, 0, len(scale))
+	for _, v := range scale {
+		out = append(out, project.Amount(v))
+	}
+	return strings.Join(out, ", ")
 }
 
 func checkVocabulary(add func(Finding), e vault.Entry, c *project.Config) {
@@ -325,10 +388,42 @@ func checkProjects(root string, c *project.Config) []Finding {
 //
 // Only files still carrying vault.Marker are checked. Removing that line is how
 // a vault says a board is its own.
+// generatedFor is what this vault's boards should hold, including the ones that
+// exist only because of what is in it — the sprint board, which a vault without
+// sprint pages does not get and must not be told it is missing.
+func generatedFor(root string, c *project.Config) map[string]string {
+	sprints, err := vault.Sprints(root)
+	if err != nil {
+		sprints = nil
+	}
+	return vault.GeneratedIn(c, len(sprints) > 0)
+}
+
 func checkGeneratedBoards(root string, c *project.Config) []Finding {
 	var findings []Finding
-	for rel, want := range vault.Generated(c) {
+	for rel, want := range generatedFor(root, c) {
 		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+
+		// A board that is not there at all. Only the sprint board can get into
+		// this state: the other three are written by `docket init`, so their
+		// absence is somebody having removed them. The sprint board appears
+		// when a vault starts working in sprints, which is a thing that happens
+		// long after init — and a vault with sprint pages and no sprint board
+		// has a board it does not know it could have.
+		//
+		// The escape is the same as for the others, and it is the marker rather
+		// than the file: write your own sprint.base without that first line and
+		// nothing here has an opinion about it again.
+		if os.IsNotExist(err) {
+			if rel != vault.SprintFile {
+				continue
+			}
+			findings = append(findings, Finding{rel, 0, RuleProjects,
+				"this vault has sprint pages and no sprint board — run docket check --fix " +
+					"to write one. It is the only way a sprint is visible in Obsidian, " +
+					"because Bases can only filter on what a note itself says"})
+			continue
+		}
 		if err != nil || !strings.HasPrefix(string(got), vault.Marker) || string(got) == want {
 			continue
 		}

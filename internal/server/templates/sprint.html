@@ -1,0 +1,34 @@
+{{template "head" .}}
+{{$data := .Data}}
+{{with $data.Running}}
+
+<nav class="crumbs"><a href="/sprints">Sprints</a> <span>/</span> <span>{{.Title}}</span></nav>
+
+<h1>{{.Title}}</h1>
+
+<p class="release-where">
+  <time>{{.When}}</time>
+  {{if eq .State "running"}}<span class="pill doing">running</span>{{end}}
+  {{if eq .State "over"}}<span class="pill done">over</span>{{end}}
+  {{if eq .State "ahead"}}<span class="pill todo">not started</span>{{end}}
+  {{if .Left}}<span class="left">{{plural .Left "day" "days"}} left</span>{{end}}
+  {{if .Days}}<span class="since">{{plural .Days "day" "days"}} long</span>{{end}}
+  <a href="/page/{{.PagePath}}">The page itself</a>
+</p>
+
+{{if .Trouble}}<p class="notice warn">{{.Trouble}}</p>{{end}}
+{{if .Says}}<p class="says">{{range $i, $s := .Says}}{{if $i}} · {{end}}{{$s}}{{end}}</p>{{end}}
+
+{{if .Goal}}<div class="prose sprint-goal">{{.Goal}}</div>{{end}}
+
+<h2 class="section">{{plural (len .Tasks) "task" "tasks"}}</h2>
+{{template "sprint-tasks" .}}
+
+<p class="footnote">
+  “Carried” is read out of git, not out of a field. A task holds one sprint; where it has been
+  before is what the history is for, and a field that answered it would be a field somebody has
+  to keep right.
+</p>
+
+{{end}}
+{{template "foot" .}}

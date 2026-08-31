@@ -198,6 +198,8 @@ var tools = []map[string]any{
 			"parent":      str("Key of the parent task"),
 			"description": str("Markdown body"),
 			"labels":      list("Labels"),
+			"estimate":    number("How big it is, in the unit docket.yaml declares; must be on its scale"),
+			"sprint":      str("Title of a sprint page to put it in"),
 		}, []string{"title"}),
 	},
 	{
@@ -214,6 +216,8 @@ var tools = []map[string]any{
 			"description": str("New Markdown body, replacing the old one"),
 			"comment":     str("Text to append as a comment"),
 			"labels":      list("Labels, replacing the old ones"),
+			"estimate":    number("How big it is, in the unit docket.yaml declares; must be on its scale. Not offered for a task with children — a container's size is what they add up to"),
+			"sprint":      str("Title of a sprint page, or an empty string to take it out of every sprint"),
 		}, []string{"key"}),
 	},
 	{
@@ -244,6 +248,12 @@ var tools = []map[string]any{
 
 func str(description string) map[string]any {
 	return map[string]any{"type": "string", "description": description}
+}
+
+// number is a schema for an amount. Not an integer: a vault counting days wants
+// halves, and a scale is a list of numbers rather than of whole ones.
+func number(description string) map[string]any {
+	return map[string]any{"type": "number", "description": description}
 }
 
 func list(description string) map[string]any {
@@ -394,6 +404,8 @@ func (s *Server) createTask(raw json.RawMessage) (any, error) {
 	var args struct {
 		Project, Title, Type, Priority, Assignee, Parent, Description string
 		Labels, Tags                                                  []string
+		Estimate                                                      *float64
+		Sprint                                                        string
 	}
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, err
@@ -422,7 +434,8 @@ func (s *Server) createTask(raw json.RawMessage) (any, error) {
 	inVault, t, err := vault.Create(v.Root, own, vault.NewOptions{
 		Project: projectKey, Title: args.Title, Type: args.Type,
 		Priority: args.Priority, Assignee: args.Assignee, Parent: args.Parent,
-		Description: args.Description, Labels: args.Labels, Tags: args.Tags, Now: s.Now(),
+		Description: args.Description, Labels: args.Labels, Tags: args.Tags,
+		Estimate: args.Estimate, Sprint: sprintNote(s.Space, args.Sprint), Now: s.Now(),
 	})
 	if err != nil {
 		return nil, err
@@ -433,6 +446,22 @@ func (s *Server) createTask(raw json.RawMessage) (any, error) {
 	rel := v.PathIn(inVault)
 	return textResult("Created %s at %s. Link to it with [[%s]].",
 		t.Key, rel, strings.TrimSuffix(relBase(rel), ".md"))
+}
+
+// sprintNote resolves a sprint by title to the note a link has to name, or
+// leaves it as given so vault.Create writes what was asked and `docket check`
+// reports a sprint page that does not exist.
+func sprintNote(sp *space.Space, title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return ""
+	}
+	for _, found := range sp.Sprints() {
+		if strings.EqualFold(found.Note, title) {
+			return found.Note
+		}
+	}
+	return title
 }
 
 func relBase(rel string) string {

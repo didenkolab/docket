@@ -1985,3 +1985,82 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 @media (max-width: 40rem) {
   .save-bar .hint { flex-basis: 100%; }
 }
+
+/* An estimate, wherever a number stands for an amount of work: on a card, in a
+   column head, in a sprint's list. One shape everywhere, because it is one
+   thing everywhere — and tabular numerals so a column of them lines up. */
+.size {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  background: var(--sunken);
+  border-radius: var(--radius-sm);
+  padding: 0.05rem 0.35rem;
+  white-space: nowrap;
+}
+.card-head .size { margin-left: auto; }
+/* In a column head the total is the second number, so it is set apart from the
+   card count rather than reading as a continuation of it. */
+.column-head .size { background: none; border: 1px solid var(--rule); }
+
+/* A task dragged in from an earlier sprint. Said quietly: it is a fact about
+   the plan, not about the task. */
+.carried {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+/* ---- sprints ---- */
+
+/* The running sprint is the page's subject; the others are context. Same shape
+   as a release, for the same reason. */
+.sprint.now { margin: 0 0 var(--s5); max-width: 60rem; }
+.sprint.now > header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule);
+}
+.sprint.now h2 { margin: 0; font-size: 1.15rem; font-weight: 650; text-transform: none; }
+.sprint.now h2 a { color: var(--ink); text-decoration: none; }
+.sprint.now h2 a:hover { color: var(--accent); }
+.sprint time { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.sprint .left { color: var(--warn); font-size: 0.85rem; }
+.says { color: var(--ink-soft); font-size: 0.85rem; margin: var(--s2) 0 0; }
+
+details.sprint { margin: 0 0 var(--s3); max-width: 60rem; border-bottom: 1px solid var(--rule); }
+details.sprint > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s3) 0;
+  cursor: pointer;
+  list-style: none;
+}
+details.sprint > summary::-webkit-details-marker { display: none; }
+details.sprint > summary::before {
+  content: "\203A";
+  color: var(--ink-faint);
+  transition: transform 120ms ease;
+  display: inline-block;
+}
+details.sprint[open] > summary::before { transform: rotate(90deg); }
+details.sprint > summary .says { margin: 0 0 0 auto; }
+details.sprint > summary:hover .version { color: var(--accent); }
+.sprint-body { padding: 0 0 var(--s4) var(--s4); }
+.sprint-goal { margin: var(--s4) 0; max-width: var(--measure); }
+
+@media (max-width: 40rem) {
+  details.sprint > summary .says { margin-left: 0; flex-basis: 100%; }
+  .sprint-body { padding-left: 0; }
+}

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
@@ -364,4 +365,36 @@ func (v *Vault) Abs(rel string) string {
 func (v *Vault) Exists(rel string) bool {
 	_, err := os.Stat(v.Abs(rel))
 	return err == nil
+}
+
+// Sprints is every sprint page in the space, newest first.
+//
+// A workspace of several repositories has several sets of them, because a
+// sprint is a commitment a team makes and two teams do not share a fortnight.
+// Which repository a sprint came from is kept, so a page showing several can
+// say.
+func (s *Space) Sprints() []SprintIn {
+	var all []SprintIn
+	for _, v := range s.vaults {
+		found, err := vault.Sprints(v.Root)
+		if err != nil {
+			continue // a vault with no readable sprints has none
+		}
+		for _, sp := range found {
+			all = append(all, SprintIn{Sprint: sp, Vault: v})
+		}
+	}
+	sort.SliceStable(all, func(a, b int) bool {
+		if !all[a].Starts.Equal(all[b].Starts) {
+			return all[a].Starts.After(all[b].Starts)
+		}
+		return all[a].Note > all[b].Note
+	})
+	return all
+}
+
+// SprintIn is a sprint and the repository it belongs to.
+type SprintIn struct {
+	vault.Sprint
+	Vault *Vault
 }

@@ -187,6 +187,23 @@ func (t *Task) SetParent(note string) {
 	t.Parent, t.rawParent = KeyOf(note), link
 }
 
+// SetSprint puts the task in a sprint, by note name — `Sprint 24`, which is
+// what the page is called.
+//
+// An empty note takes it out of every sprint, which is a real state: work that
+// is not committed to a fortnight. `sprint:` with no value would be a sprint
+// that does not exist, and the validator would be right to say so.
+func (t *Task) SetSprint(note string) {
+	if strings.TrimSpace(note) == "" {
+		t.Remove("sprint")
+		t.Sprint, t.rawSprint = "", ""
+		return
+	}
+	link := Link(note)
+	t.setNode("sprint", quoted(link))
+	t.Sprint, t.rawSprint = labelName(note), link
+}
+
 // SetLabels writes the labels as links, so each one is an edge in the graph and
 // each one can be a page that says what it means.
 func (t *Task) SetLabels(names []string) {

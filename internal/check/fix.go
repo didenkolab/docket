@@ -23,10 +23,12 @@ func Boards(root string) ([]string, error) {
 		return nil, err
 	}
 
+	want := generatedFor(root, c)
+
 	var written []string
 	for _, f := range checkGeneratedBoards(root, c) {
 		full := filepath.Join(root, filepath.FromSlash(f.Path))
-		if err := os.WriteFile(full, []byte(vault.Generated(c)[f.Path]), 0o644); err != nil {
+		if err := os.WriteFile(full, []byte(want[f.Path]), 0o644); err != nil {
 			return written, err
 		}
 		written = append(written, f.Path)

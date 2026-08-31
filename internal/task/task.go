@@ -60,12 +60,39 @@ type Task struct {
 	Parent string   `yaml:"-"`
 	Labels []string `yaml:"-"`
 
+	// Sprint is the sprint page this task is in, by note name, or empty.
+	//
+	// A link, not a field, and for the opposite reason to Estimate: standing at
+	// a task, which commitment it is part of is worth knowing, and standing at
+	// a sprint, its contents are the whole point. A sprint page is a legitimate
+	// hub in time the way a label is a hub in theme — see
+	// docs/design/how-things-connect.md.
+	//
+	// One at a time. A task carried into the next sprint names the sprint it is
+	// in now; the one it came from says so in its retrospective, which is prose
+	// and belongs in prose.
+	Sprint string `yaml:"-"`
+
 	rawParent string
 	rawLabels []string
+	rawSprint string
 	// Order is where the task sits among the others in its column, when
 	// somebody has said. Absent — the usual case — the task sorts after every
 	// task that has one. See SetOrder.
 	Order *int `yaml:"order,omitempty"`
+
+	// Estimate is how big the work is said to be, in the unit the vault chose.
+	//
+	// A pointer because absent and nought are different answers: nought is a
+	// claim that there is no work in it, and absent is nobody having said. A
+	// board that showed them the same way would report an unestimated backlog
+	// as a backlog of no work.
+	//
+	// It is a field rather than a link on purpose: nobody standing at a task
+	// needs to know what else was estimated at three. See
+	// docs/design/how-things-connect.md — this is the case that is supposed to
+	// fail its test, and priority is the precedent.
+	Estimate *float64 `yaml:"estimate,omitempty"`
 
 	front yaml.Node
 	body  string
@@ -107,11 +134,13 @@ func (t *Task) resolve() {
 	var raw struct {
 		Parent string   `yaml:"parent"`
 		Labels []string `yaml:"labels"`
+		Sprint string   `yaml:"sprint"`
 	}
 	_ = t.front.Decode(&raw)
 
-	t.rawParent, t.rawLabels = raw.Parent, raw.Labels
+	t.rawParent, t.rawLabels, t.rawSprint = raw.Parent, raw.Labels, raw.Sprint
 	t.Parent = KeyOf(NoteOf(raw.Parent))
+	t.Sprint = labelName(raw.Sprint)
 	t.Labels = t.Labels[:0]
 	for _, l := range raw.Labels {
 		if name := labelName(l); name != "" {
@@ -131,10 +160,11 @@ func labelName(value string) string {
 	return strings.TrimSpace(note)
 }
 
-// RawParent and RawLabels are the values exactly as the file has them, for
-// `docket check` to say which are still strings rather than links.
+// RawParent, RawLabels and RawSprint are the values exactly as the file has
+// them, for `docket check` to say which are still strings rather than links.
 func (t *Task) RawParent() string   { return t.rawParent }
 func (t *Task) RawLabels() []string { return t.rawLabels }
+func (t *Task) RawSprint() string   { return t.rawSprint }
 
 // split separates the frontmatter block from the body.
 func split(data []byte) (front []byte, body string, err error) {
@@ -275,6 +305,33 @@ func (t *Task) SetStatus(status, category string) {
 func (t *Task) SetOrder(order int) {
 	t.Order = &order
 	t.SetPlain("order", strconv.Itoa(order))
+}
+
+// SetEstimate writes how big the work is said to be.
+//
+// Written unquoted, so Obsidian shows it as a number and a Base can sum it.
+func (t *Task) SetEstimate(value float64) {
+	t.Estimate = &value
+	t.SetPlain("estimate", strconv.FormatFloat(value, 'f', -1, 64))
+}
+
+// ClearEstimate removes the estimate, which is not the same as setting it to
+// nought: it is nobody having said.
+func (t *Task) ClearEstimate() {
+	t.Estimate = nil
+	t.Remove("estimate")
+}
+
+// Sized reports whether anybody has said how big this is.
+func (t *Task) Sized() bool { return t.Estimate != nil }
+
+// Size is the estimate, or nought when nobody has said. For adding up, where
+// absent contributes nothing.
+func (t *Task) Size() float64 {
+	if t.Estimate == nil {
+		return 0
+	}
+	return *t.Estimate
 }
 
 // ClearOrder returns the task to the default order, which is by key.

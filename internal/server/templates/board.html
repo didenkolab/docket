@@ -53,6 +53,9 @@
       <span class="pip"></span>
       <b>{{.Status.Name}}</b>
       <span class="count">{{len .Cards}}</span>
+      {{if .Size}}<span class="size"
+        title="{{if .Unsized}}{{plural .Unsized "card" "cards"}} here nobody has sized{{else}}every card here is sized{{end}}"
+        >{{.Size}}{{if .Unsized}}+{{end}}</span>{{end}}
     </header>
     <div class="cards">
       {{range .Cards}}
@@ -62,6 +65,7 @@
         <span class="card-head">
           <span class="key">{{.Key}}</span>
           {{if .Blocked}}<span class="blocked" title="waiting on something unfinished">blocked</span>{{end}}
+          {{if .Size}}<span class="size">{{.Size}}</span>{{end}}
         </span>
         <span class="card-title">{{.Title}}</span>
         <span class="meta">

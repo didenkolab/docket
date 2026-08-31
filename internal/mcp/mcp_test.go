@@ -449,3 +449,126 @@ func lastAuthor(t *testing.T, root string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// An agent sizes a task and puts it in a sprint, and is refused the two things
+// `docket check` would report. Refused in the same turn rather than written and
+// reported later: an agent told "4 is not on the scale" fixes it, and one given
+// a silent success leaves a vault that fails validation.
+func TestUpdateTaskSizesAndSchedules(t *testing.T) {
+	s, root := newVault(t)
+
+	// A vault that sizes work, and one sprint page. Written straight to disk,
+	// because this is a vault as somebody would have set it up.
+	sized := `name: Acme Platform
+projects:
+  - key: ACME
+    name: Acme Platform
+statuses:
+  - {name: Backlog, category: todo}
+  - {name: In progress, category: doing}
+  - {name: Done, category: done}
+types:
+  - {name: epic, level: 1}
+  - {name: bug, level: 0}
+  - {name: task, level: 0}
+priorities: [low, normal, high]
+estimates:
+  unit: points
+  scale: [1, 2, 3, 5, 8, 13]
+`
+	if err := os.WriteFile(filepath.Join(root, "docket.yaml"), []byte(sized), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "docs", "sprints"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docs", "sprints", "Sprint 1.md"),
+		[]byte("---\ntitle: Sprint 1\ntype: sprint\nstarts: 2026-08-31\nends: 2026-09-11\n---\n"),
+		0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A container, so the rule that refuses one an estimate has something to
+	// refuse.
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Sessions", Type: "epic", Priority: "normal", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "Rotate the key", Type: "task", Priority: "normal",
+		Parent: "ACME-2", Now: noon,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	commit(t, root, "sized")
+
+	version := func(key string) string {
+		t.Helper()
+		answers := exchange(t, s, callTool(1, "get_task", map[string]any{"key": key}))
+		var got struct{ Version string }
+		if err := json.Unmarshal([]byte(answer(t, answers[0])), &got); err != nil {
+			t.Fatalf("get_task %s: %v", key, err)
+		}
+		return got.Version
+	}
+
+	out := answer(t, exchange(t, s, callTool(2, "update_task", map[string]any{
+		"key": "ACME-1", "version": version("ACME-1"), "estimate": 5.0, "sprint": "Sprint 1",
+	}))[0])
+	for _, want := range []string{"estimate 5", "into Sprint 1"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("did not say %q: %s", want, out)
+		}
+	}
+
+	written, err := os.ReadFile(filepath.Join(root, "ACME", "ACME-1 Fix login redirect loop.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(written), "estimate: 5") {
+		t.Errorf("the estimate is not in the file:\n%s", written)
+	}
+	// Written as a link, or it is not an edge in the graph.
+	if !strings.Contains(string(written), `sprint: "[[Sprint 1]]"`) {
+		t.Errorf("the sprint is not a link:\n%s", written)
+	}
+
+	for _, c := range []struct {
+		what string
+		key  string
+		args map[string]any
+		says string
+	}{
+		{"off the scale", "ACME-1", map[string]any{"estimate": 4.0}, "not on the scale"},
+		{"below nothing", "ACME-1", map[string]any{"estimate": -1.0}, "smaller than nothing"},
+		{"a sprint nobody wrote", "ACME-1", map[string]any{"sprint": "Sprint 9"}, "not a sprint page"},
+		{"a container", "ACME-2", map[string]any{"estimate": 8.0}, "add up to"},
+	} {
+		args := map[string]any{"key": c.key, "version": version(c.key)}
+		for k, v := range c.args {
+			args[k] = v
+		}
+		answers := exchange(t, s, callTool(3, "update_task", args))
+		if answers[0].Error == nil {
+			t.Errorf("%s: accepted, and it should not have been", c.what)
+			continue
+		}
+		if !strings.Contains(answers[0].Error.Message, c.says) {
+			t.Errorf("%s: said %q, want something about %q",
+				c.what, answers[0].Error.Message, c.says)
+		}
+	}
+
+	// Out of every sprint is a real thing to do: work nobody has committed to a
+	// fortnight is most of a backlog.
+	out = answer(t, exchange(t, s, callTool(4, "update_task", map[string]any{
+		"key": "ACME-1", "version": version("ACME-1"), "sprint": "",
+	}))[0])
+	if !strings.Contains(out, "out of Sprint 1") {
+		t.Errorf("did not say it came out: %s", out)
+	}
+}

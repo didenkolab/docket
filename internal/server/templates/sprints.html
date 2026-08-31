@@ -1,0 +1,92 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Sprints</h1>
+
+{{if $data.None}}
+<p class="empty">
+  No sprint pages in this vault. A sprint is a page — <code>docs/sprints/Sprint 1.md</code> with
+  <code>type: sprint</code>, a <code>starts</code> and an <code>ends</code> — and a task is in it
+  by carrying <code>sprint: "[[Sprint 1]]"</code>. There is no state to set: a sprint runs
+  between two dates, so whether it is on is a question about today.
+</p>
+{{else}}
+
+{{if $data.Running}}
+{{with $data.Running}}
+<section class="sprint now">
+  <header>
+    <h2><a href="{{.Href}}">{{.Title}}</a></h2>
+    <span class="pill doing">running</span>
+    <time>{{.When}}</time>
+    {{if .Left}}<span class="left">{{plural .Left "day" "days"}} left</span>{{end}}
+    {{if .Repo}}<span class="repo">{{.Repo}}</span>{{end}}
+  </header>
+
+  {{if .Trouble}}<p class="notice warn">{{.Trouble}}</p>{{end}}
+  {{if .Says}}<p class="says">{{range $i, $s := .Says}}{{if $i}} · {{end}}{{$s}}{{end}}</p>{{end}}
+
+  {{template "sprint-tasks" .}}
+</section>
+{{end}}
+{{else if $data.Gap}}
+<p class="empty">
+  No sprint is running today. That is a real state — between two of them, or before the first —
+  and it is what the dates say rather than something anybody forgot to close.
+</p>
+{{end}}
+
+{{if $data.Others}}
+<h2 class="section">{{plural (len $data.Others) "other sprint" "other sprints"}}</h2>
+{{range $data.Others}}
+<details class="sprint">
+  <summary>
+    <span class="version">{{.Title}}</span>
+    <time>{{.When}}</time>
+    {{if eq .State "ahead"}}<span class="pill todo">not started</span>{{end}}
+    {{if .Says}}<span class="says">{{range $i, $s := .Says}}{{if $i}} · {{end}}{{$s}}{{end}}</span>{{end}}
+  </summary>
+  <div class="sprint-body">
+    {{if .Trouble}}<p class="notice warn">{{.Trouble}}</p>{{end}}
+    <p class="release-where"><a href="{{.Href}}">The sprint, and what it said it was for</a></p>
+    {{template "sprint-tasks" .}}
+  </div>
+</details>
+{{end}}
+{{end}}
+
+{{if $data.Loose}}
+<p class="footnote">
+  {{plural $data.Loose "task" "tasks"}} in no sprint at all. Not a fault: work that nobody has
+  committed to a fortnight is most of a backlog, and a tracker that made every task belong to a
+  sprint would be a tracker that made you invent one.
+</p>
+{{end}}
+
+<p class="footnote">
+  A sprint is a page, so the goal is as long as it needs to be and the retrospective lives next
+  to the work rather than in a different tool. A total adds up what each task says about itself,
+  which is why a container — whose size is what its children add to — contributes nothing to
+  one, and why the number of unsized tasks is said beside it.
+</p>
+{{end}}
+
+{{template "foot" .}}
+
+{{define "sprint-tasks"}}
+<ul class="shipped">
+  {{range .Tasks}}
+  <li>
+    <a class="hit-link" href="/task/{{.Key}}">
+      <span class="key">{{.Key}}</span>
+      <span class="hit-title">{{.Title}}</span>
+    </a>
+    <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+    {{if .Size}}<span class="size">{{.Size}}</span>{{end}}
+    {{if .Carried}}<span class="carried" title="This was in an earlier sprint too">carried</span>{{end}}
+  </li>
+  {{else}}
+  <li class="empty">Nothing is in this sprint yet.</li>
+  {{end}}
+</ul>
+{{end}}

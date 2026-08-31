@@ -51,6 +51,43 @@
       <label for="assignee">Assignee</label>
       <input id="assignee" name="assignee" value="{{$t.Assignee}}" placeholder="agent/claude">
     </div>
+    {{if $data.Sizes}}
+    <div>
+      <label for="estimate">Size in {{$data.Unit}}</label>
+      {{if $data.Scale}}
+      <select id="estimate" name="estimate">
+        <option value="">— not sized —</option>
+        {{range $data.Scale}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Value}}</option>{{end}}
+      </select>
+      {{else}}
+      <input id="estimate" name="estimate" value="{{$data.Size}}" inputmode="decimal"
+             placeholder="a number of {{$data.Unit}}">
+      {{end}}
+      <p class="footnote inline">Not sized and nought are different answers: nought says there is
+      no work in it.</p>
+    </div>
+    {{else if $data.HasChildren}}
+    <div>
+      <label>Size</label>
+      <p class="footnote inline">This task has children, so its size is what they add up to{{if $data.Rollup}} —
+      {{$data.Rollup}} so far{{end}}. Size the children.</p>
+    </div>
+    {{end}}
+
+    {{if $data.Sprints}}
+    <div>
+      <label for="sprint">Sprint</label>
+      <select id="sprint" name="sprint">
+        <option value="">— none —</option>
+        {{range $data.Sprints}}
+        <option value="{{.Note}}"{{if .Selected}} selected{{end}}>{{.Title}}{{if .When}} · {{.When}}{{end}}{{if .Running}} · running{{end}}</option>
+        {{end}}
+      </select>
+      <p class="footnote inline">One at a time. Moving a task to the next sprint is a commit, and
+      where it has been is in the history.</p>
+    </div>
+    {{end}}
+
     <div>
       <label for="parent">Parent</label>
       <select id="parent" name="parent">

@@ -5,10 +5,23 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 )
 
+// initVault scaffolds from a template built here, never from the published one.
+//
+// It used to leave Options.Template empty, which meant `git clone` over the
+// network: slow, broken on a machine without one, and — the way it actually
+// failed — a test that goes red because somebody improved the template this
+// morning. What is under test is that scaffolding works, not what the scaffold
+// says. See package vaulttest, whose doc comment said all of this while this
+// test quietly did the opposite.
 func initVault(t *testing.T, opts Options) (dir string, written []string) {
 	t.Helper()
+	if opts.Template == "" {
+		opts.Template = vaulttest.Template(t)
+	}
 	dir = filepath.Join(t.TempDir(), "vault")
 	written, err := Init(dir, opts)
 	if err != nil {
@@ -26,34 +39,45 @@ func read(t *testing.T, dir, rel string) string {
 	return string(b)
 }
 
+// Init's contract: everything the template had, less the files that belong to
+// the template rather than to a vault, plus the project folder and the boards it
+// generates.
+//
+// Stated as that rather than as a list of names. The list used to be the
+// published template's contents, which meant this test went red the day somebody
+// added a page to a repository it does not own — and it went red for a change
+// that was correct.
 func TestInitWritesTheWholeVault(t *testing.T) {
 	dir, written := initVault(t, Options{Key: "ACME", Name: "Acme Platform"})
 
-	want := []string{
-		".gitignore",
-		".obsidian/app.json",
-		".obsidian/core-plugins.json",
-		"ACME/.gitkeep",
-		"AGENTS.md",
-		// CLAUDE.md points at AGENTS.md rather than repeating it: two copies of
-		// a rule is one copy that goes stale.
-		"CLAUDE.md",
-		"README.md",
-		"attachments/.gitkeep",
-		"boards/backlog.base",
-		"boards/board.base",
-		"boards/my-tasks.base",
-		"docs/index.md",
-		"docket.yaml",
-		"templates/page.md",
-		"templates/task.md",
+	templateOnly := map[string]bool{}
+	for _, name := range TemplateOnly {
+		templateOnly[name] = true
 	}
+
+	want := map[string]bool{}
+	for _, name := range vaulttest.Files() {
+		if !templateOnly[name] {
+			want[name] = true
+		}
+	}
+	// The project's own folder, and the boards, which are derived from
+	// docket.yaml rather than copied. Named rather than taken from Generated:
+	// that needs a configuration, and this test is about which files appear.
+	// The sprint board is not among them — a new vault has no sprint pages.
+	want["ACME/.gitkeep"] = true
+	want[BoardFile] = true
+	want[BacklogFile] = true
+	want[MineFile] = true
+	// The template's placeholder folder is renamed, not carried over.
+	delete(want, "PROJ/.gitkeep")
 
 	got := map[string]bool{}
 	for _, p := range written {
 		got[p] = true
 	}
-	for _, p := range want {
+
+	for p := range want {
 		if !got[p] {
 			t.Errorf("Init did not report %s\ngot: %v", p, written)
 		}
@@ -61,8 +85,22 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 			t.Errorf("%s is missing on disk: %v", p, err)
 		}
 	}
-	if len(written) != len(want) {
-		t.Errorf("wrote %d files, want %d: %v", len(written), len(want), written)
+	for p := range got {
+		if !want[p] {
+			t.Errorf("Init wrote %s, which is not part of a new vault", p)
+		}
+	}
+
+	// The template's own files stay behind. TEMPLATE.md explains the
+	// placeholder to whoever edits the template, and means nothing in a vault.
+	for _, name := range TemplateOnly {
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(name))); err == nil {
+			t.Errorf("%s was carried into the vault", name)
+		}
+	}
+	// And so does the template's history: a new vault is not a fork.
+	if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+		t.Error("the template's .git was carried into the vault")
 	}
 }
 
@@ -177,5 +215,30 @@ func TestKeyAndNameAreTrimmed(t *testing.T) {
 	}
 	if !strings.Contains(config, "name: Acme Platform\n") {
 		t.Errorf("the name was not trimmed:\n%s", config)
+	}
+}
+
+// PROJ-12 becomes ACME-12 and PROJ-NUMBER keeps its word.
+//
+// The substitution is on word boundaries for exactly this: a template that
+// explains its own placeholder ("a key is PROJ-NUMBER") would otherwise come
+// out of init saying "a key is ACME-NUMBER", which is a sentence about one
+// project pretending to be a sentence about the format.
+func TestInitSubstitutesTheKeyOnWordBoundaries(t *testing.T) {
+	dir, _ := initVault(t, Options{Key: "ACME", Name: "Acme Platform"})
+
+	agents := read(t, dir, "AGENTS.md")
+	if !strings.Contains(agents, "ACME-12") {
+		t.Errorf("PROJ-12 was not substituted:\n%s", agents)
+	}
+	if !strings.Contains(agents, "ACME/") {
+		t.Errorf("the project folder was not substituted:\n%s", agents)
+	}
+	if strings.Contains(agents, "PROJ") {
+		t.Errorf("a placeholder survived:\n%s", agents)
+	}
+	if !strings.Contains(agents, "NUMBER") {
+		t.Errorf("PROJ-NUMBER lost the word NUMBER, so the sentence about the "+
+			"format became a sentence about one project:\n%s", agents)
 	}
 }

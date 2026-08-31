@@ -250,7 +250,12 @@ type NewOptions struct {
 	Parent      string
 	Labels      []string
 	Tags        []string
-	Now         time.Time
+	// Estimate is how big the work is, when whoever is creating it has said.
+	// Nil leaves the property off, which is nobody having said — not nought.
+	Estimate *float64
+	// Sprint is the sprint page to put it in, by note name.
+	Sprint string
+	Now    time.Time
 }
 
 // Create writes a new task and returns its path relative to the vault root.
@@ -334,6 +339,16 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 		t.SetDescription(opts.Description)
 	}
 	t.SetParent(parentNote)
+	if opts.Estimate != nil {
+		if !c.OnScale(*opts.Estimate) {
+			return "", nil, fmt.Errorf("estimate %s is not on the scale the vault declared",
+				project.Amount(*opts.Estimate))
+		}
+		t.SetEstimate(*opts.Estimate)
+	}
+	if opts.Sprint != "" {
+		t.SetSprint(opts.Sprint)
+	}
 	if err := t.Sync(); err != nil {
 		return "", nil, err
 	}

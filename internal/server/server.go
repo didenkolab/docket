@@ -408,6 +408,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /new", s.handleNew)
 	mux.HandleFunc("GET /pages", s.handlePages)
 	mux.HandleFunc("GET /releases", s.handleReleases)
+	mux.HandleFunc("GET /sprints", s.handleSprints)
+	mux.HandleFunc("GET /sprint/{note}", s.handleSprint)
 	mux.HandleFunc("GET /branches", s.handleBranches)
 	mux.HandleFunc("GET /branch/{ref}", s.handleBranch)
 	mux.HandleFunc("GET /change/{ref}", s.handlePlanChange)

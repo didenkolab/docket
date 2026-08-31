@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -88,10 +89,17 @@ title:
 type: page
 ---
 `,
-	"AGENTS.md":  "# Working in this vault\n\nRead this before changing anything.\n",
-	"CLAUDE.md":  "# A template\n\nRead [AGENTS.md](AGENTS.md).\n",
-	"README.md":  "# A template\n\nA docket vault.\n",
-	".gitignore": ".obsidian/workspace.json\n.DS_Store\n",
+	// PROJ appears here on purpose, and in both the forms that matter: Init
+	// substitutes the key on word boundaries, so PROJ-12 becomes ACME-12 while
+	// PROJ-NUMBER keeps the word NUMBER. A template with no placeholder proves
+	// nothing about either.
+	"AGENTS.md": "# Working in this vault\n\nRead this before changing anything.\n\n" +
+		"A key is PROJ-NUMBER. Tasks live in PROJ/, so PROJ-12 is a file there.\n",
+	"CLAUDE.md":                   "# A template\n\nRead [AGENTS.md](AGENTS.md).\n",
+	"README.md":                   "# A template\n\nA docket vault.\n",
+	".gitignore":                  ".obsidian/workspace.json\n.DS_Store\n",
+	".obsidian/app.json":          "{}\n",
+	".obsidian/core-plugins.json": "[]\n",
 	// A file that explains the template and must not survive into a vault made
 	// from it, so tests can check that it does not.
 	"TEMPLATE.md": "# The template\n\nThis file belongs to the template.\n",
@@ -99,6 +107,18 @@ type: page
 
 // Template writes a template repository and returns its path, for
 // vault.Options.Template.
+// Files are the template's paths, so a test can state Init's contract — what
+// the template had, less the template-only files, plus what is generated —
+// rather than restating a list that lives in another repository.
+func Files() []string {
+	out := make([]string, 0, len(files))
+	for name := range files {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func Template(t *testing.T) string {
 	t.Helper()
 

@@ -39,6 +39,14 @@ type pageData struct {
 	// Workspace says this space holds several repositories, so there is a
 	// Projects page worth offering.
 	Workspace bool
+	// Sprints says the vault has sprint pages, so there is a Sprints page worth
+	// a place in the navigation.
+	//
+	// Conditional because most vaults will not use them and a navigation with
+	// one more permanent item is a navigation that fits on fewer screens. A
+	// sprint is offered to teams that work in sprints, and the way a vault says
+	// it works in sprints is by having written one down.
+	Sprints bool
 	// Pushes are the repositories with something unsent, or something that went
 	// wrong sending it. Empty when everything is where everybody else can read
 	// it, because a badge that is always there is a badge nobody reads.
@@ -74,6 +82,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		Sees:      s.showsAnything(r),
 		Pushes:    s.pushNotes(),
 		Workspace: s.sp().Workspace,
+		Sprints:   len(s.sp().Sprints()) > 0,
 		Theme:     themeAttribute(themeOf(r)),
 		Themes:    themeChoices(themeOf(r)),
 		Here:      r.URL.RequestURI(),
@@ -129,6 +138,17 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, title, m
 type column struct {
 	Status project.Status
 	Cards  []card
+	// Size is what the column's cards add up to, in the vault's unit, or empty
+	// when the vault does not size work or nothing in the column is sized.
+	//
+	// A column head is where "how much is in progress" is actually asked, and a
+	// work-in-progress limit is a number about a column. Counting cards answers
+	// neither: three cards of thirteen points is not the same column as three
+	// cards of one.
+	Size string
+	// Unsized is how many of its cards nobody has estimated, so the total is
+	// never read as the whole.
+	Unsized int
 }
 
 type card struct {
@@ -141,6 +161,11 @@ type card struct {
 	Priority string
 	Labels   []string
 	Tags     []string
+	// Size is the estimate as written, or empty when nobody has said. On the
+	// card because it is half of what a card is picked up for.
+	Size string
+	// Sprint is the sprint this card is in, when the vault runs them.
+	Sprint string
 	// Blocked is set when something this card waits on is unfinished. The one
 	// relation that changes what somebody picks up next, so it is on the card.
 	Blocked bool
@@ -195,6 +220,29 @@ func sortCards(cards []card) {
 			return false
 		}
 	})
+}
+
+// totalOf adds up a column, and says how much of it is unaccounted for.
+//
+// The total is what the cards say about themselves. A container carries no
+// estimate — rule 12 refuses one, because its size is what its children add to
+// — so it contributes nothing and nothing is counted twice.
+func totalOf(cards []card, c *project.Config) (total string, unsized int) {
+	if !c.Sizes() {
+		return "", 0
+	}
+	var sum float64
+	for _, drawn := range cards {
+		if drawn.Size == "" {
+			unsized++
+			continue
+		}
+		sum += amount(drawn.Size)
+	}
+	if sum == 0 {
+		return "", unsized
+	}
+	return project.Amount(sum), unsized
 }
 
 // reachableList is the workflow, flattened for an attribute.
@@ -302,7 +350,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		}
 		for i := range view.Columns {
 			if view.Columns[i].Status.Name == e.Task.Status {
-				view.Columns[i].Cards = append(view.Columns[i].Cards, card{
+				drawn := card{
 					Key: e.Key, Href: "/task/" + e.Key, Project: e.Project,
 					Title: e.Task.Title, Status: e.Task.Status,
 					Assignee: e.Task.Assignee, Priority: e.Task.Priority,
@@ -311,7 +359,12 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 					order:     e.Task.Order,
 					Blocked:   blocked(e.Task, known),
 					Epic:      epic, EpicTitle: epicTitle,
-				})
+					Sprint: e.Task.Sprint,
+				}
+				if e.Task.Sized() {
+					drawn.Size = project.Amount(e.Task.Size())
+				}
+				view.Columns[i].Cards = append(view.Columns[i].Cards, drawn)
 				view.Total++
 			}
 		}
@@ -319,6 +372,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 
 	for i := range view.Columns {
 		sortCards(view.Columns[i].Cards)
+		view.Columns[i].Size, view.Columns[i].Unsized = totalOf(view.Columns[i].Cards, c)
 	}
 
 	view.Projects = append(view.Projects, projectTab{
@@ -372,7 +426,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, "task.html", c, t.Key+" "+t.Title, taskView{
+	view := taskView{
 		Task:        t,
 		Reachable:   c.Reachable(t.Status),
 		Project:     projectKey,
@@ -384,7 +438,27 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		Backlinks:   s.backlinks(r, strings.TrimSuffix(path.Base(rel), ".md"), rel),
 		Version:     ver,
 		Path:        rel,
-	})
+		Unit:        c.Unit(),
+	}
+	if t.Sized() {
+		view.Size = project.Amount(t.Size())
+	}
+	// A container's size is what its children add to, computed here rather than
+	// stored — see rule 12.
+	if len(view.Children) > 0 {
+		var sum float64
+		sized := false
+		for _, child := range view.Children {
+			if child.Size != "" {
+				sum += amount(child.Size)
+				sized = true
+			}
+		}
+		if sized {
+			view.Rollup = project.Amount(sum)
+		}
+	}
+	s.render(w, r, "task.html", c, t.Key+" "+t.Title, view)
 }
 
 type taskView struct {
@@ -399,6 +473,14 @@ type taskView struct {
 	Backlinks   []mention
 	Version     string
 	Path        string
+	// Unit is the word estimates are in, empty when the vault does not size
+	// work — and then the row is not shown at all rather than shown empty.
+	Unit string
+	// Size is this task's own estimate, as written.
+	Size string
+	// Rollup is what its children add up to, for a container. When it is set it
+	// is the answer, because a container has no estimate of its own.
+	Rollup string
 }
 
 type renderedComment struct {
@@ -413,6 +495,9 @@ type childTask struct {
 	Title    string
 	Status   string
 	Category string
+	// Size is the child's estimate, which is what a container's own size is
+	// made of.
+	Size string
 }
 
 func renderComments(comments []task.Comment, ix *index) []renderedComment {
@@ -440,10 +525,14 @@ func (s *Server) childrenOf(r *http.Request, c *project.Config, key string) []ch
 	var children []childTask
 	for _, e := range entries {
 		if e.Task != nil && e.Task.Parent == key {
-			children = append(children, childTask{
+			child := childTask{
 				Key: e.Key, Title: e.Task.Title,
 				Status: e.Task.Status, Category: e.Task.StatusCategory,
-			})
+			}
+			if e.Task.Sized() {
+				child.Size = project.Amount(e.Task.Size())
+			}
+			children = append(children, child)
 		}
 	}
 	return children
@@ -645,6 +734,11 @@ type hitTask struct {
 	Assignee string
 	Labels   []string
 	Tags     []string
+	// Size is the estimate as written, or empty when nobody has said. On the
+	// card because it is half of what a card is picked up for.
+	Size string
+	// Sprint is the sprint this card is in, when the vault runs them.
+	Sprint string
 	// Blocked is set when something this card waits on is unfinished. The one
 	// relation that changes what somebody picks up next, so it is on the card.
 	Blocked bool

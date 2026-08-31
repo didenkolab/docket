@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
@@ -22,11 +24,42 @@ type editView struct {
 	Parents   []parentChoice
 	Error     string
 	Reachable []project.Status
+	// Sizes says the vault sizes work, so the form offers an estimate.
+	Sizes bool
+	// Unit is the word for one, so the field can be labelled in the vault's
+	// own terms rather than as "estimate".
+	Unit string
+	// Scale is the values the vault offers, which turns a free number into a
+	// list of choices. Empty when the vault declared no scale.
+	Scale []sizeChoice
+	// Size is the estimate as written, for the free-number case.
+	Size string
+	// Sprints are the sprints this task could be put in, newest first, and
+	// which one it is in now.
+	Sprints []sprintChoice
+	// HasChildren says a container's size is its children's, so the form says
+	// so instead of offering a field rule 12 would refuse.
+	HasChildren bool
+	// Rollup is what its children add up to, for a container.
+	Rollup string
 }
 
 type parentChoice struct {
 	Key      string
 	Title    string
+	Selected bool
+}
+
+type sizeChoice struct {
+	Value    string
+	Selected bool
+}
+
+type sprintChoice struct {
+	Note     string
+	Title    string
+	When     string
+	Running  bool
 	Selected bool
 }
 
@@ -72,6 +105,8 @@ func (s *Server) editView(r *http.Request, c *project.Config, t *task.Task, vers
 	// cannot be its own ancestor, and offering the choice invites the cycle.
 	entries, _ := s.entries(r)
 	descendants := descendantsOf(entries, t.Key)
+	var rollup float64
+	sized := false
 	for _, e := range entries {
 		if e.Task == nil || e.Key == t.Key || descendants[e.Key] {
 			continue
@@ -80,7 +115,48 @@ func (s *Server) editView(r *http.Request, c *project.Config, t *task.Task, vers
 			Key: e.Key, Title: e.Task.Title, Selected: e.Key == t.Parent,
 		})
 	}
+	for _, e := range entries {
+		if e.Task != nil && e.Task.Parent == t.Key {
+			view.HasChildren = true
+			if e.Task.Sized() {
+				rollup += e.Task.Size()
+				sized = true
+			}
+		}
+	}
+	if sized {
+		view.Rollup = project.Amount(rollup)
+	}
+
+	// An estimate, when the vault has said what one is. A container is not
+	// offered the field: its size is what its children add up to, and rule 12
+	// refuses a second answer.
+	view.Sizes = c.Sizes() && !view.HasChildren
+	view.Unit = c.Unit()
+	if t.Sized() {
+		view.Size = project.Amount(t.Size())
+	}
+	for _, v := range c.EstimateScale() {
+		value := project.Amount(v)
+		view.Scale = append(view.Scale, sizeChoice{Value: value, Selected: value == view.Size})
+	}
+
+	today := s.now().UTC()
+	for _, sp := range s.sp().Sprints() {
+		view.Sprints = append(view.Sprints, sprintChoice{
+			Note: sp.Note, Title: sp.Title, When: span(dayOf(sp.Starts), dayOf(sp.Ends)),
+			Running: sp.On(today), Selected: strings.EqualFold(sp.Note, t.Sprint),
+		})
+	}
 	return view
+}
+
+// dayOf writes a day, or nothing for a date that was never set.
+func dayOf(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(vault.DateFormat)
 }
 
 // descendantsOf walks down the parent graph, so the parent list cannot offer a
@@ -173,6 +249,18 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 			changed = append(changed, "assignee")
 		}
 
+		if said, err := s.applyEstimate(r, c, t, key); err != nil {
+			return "", nil, err
+		} else if said != "" {
+			changed = append(changed, said)
+		}
+
+		if said, err := s.applySprint(r, t); err != nil {
+			return "", nil, err
+		} else if said != "" {
+			changed = append(changed, said)
+		}
+
 		parent := strings.TrimSpace(r.FormValue("parent"))
 		if parent != t.Parent {
 			switch {
@@ -243,4 +331,108 @@ func (s *Server) rejectEdit(w http.ResponseWriter, r *http.Request, c *project.C
 
 func normaliseNewlines(s string) string {
 	return strings.TrimRight(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+}
+
+// applyEstimate reads the estimate off the form and says what changed.
+//
+// Refused rather than rounded when it is off the scale: a vault that declared
+// 1, 2, 3, 5, 8, 13 meant it, and quietly storing 4 would make the validator
+// disagree with the interface that wrote it.
+func (s *Server) applyEstimate(r *http.Request, c *project.Config, t *task.Task, key string) (string, error) {
+	// A form that never offered the field must not clear one that is set: the
+	// absence of a value in a request is not a decision.
+	raw, offered := r.Form["estimate"]
+	if !offered {
+		return "", nil
+	}
+	value := strings.TrimSpace(strings.Join(raw, ""))
+
+	if value == "" {
+		if !t.Sized() {
+			return "", nil
+		}
+		t.ClearEstimate()
+		return "estimate taken off", nil
+	}
+	if !c.Sizes() {
+		return "", fmt.Errorf("this vault does not size work: %s has no estimates block",
+			project.FileName)
+	}
+
+	size, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return "", fmt.Errorf("%q is not a number", value)
+	}
+	if size < 0 {
+		return "", errors.New("work cannot be smaller than nothing")
+	}
+	if !c.OnScale(size) {
+		return "", fmt.Errorf("%s is not on the scale %s",
+			project.Amount(size), amounts(c.EstimateScale()))
+	}
+	// A container's size is what its children add to — see rule 12.
+	if s.hasChildren(r, key) {
+		return "", errors.New("this task has children, so its size is what they add up to")
+	}
+	if t.Sized() && t.Size() == size {
+		return "", nil
+	}
+	t.SetEstimate(size)
+	return "estimate " + project.Amount(size), nil
+}
+
+// applySprint puts the task in a sprint, or takes it out of every one.
+//
+// The sprint has to be a page that exists. A task pointing at a sprint nobody
+// wrote is in a commitment with no goal and no dates, which rule 13 reports and
+// this refuses to create.
+func (s *Server) applySprint(r *http.Request, t *task.Task) (string, error) {
+	raw, offered := r.Form["sprint"]
+	if !offered {
+		return "", nil
+	}
+	note := strings.TrimSpace(strings.Join(raw, ""))
+
+	if note == "" {
+		if t.Sprint == "" {
+			return "", nil
+		}
+		was := t.Sprint
+		t.SetSprint("")
+		return "out of " + was, nil
+	}
+	if strings.EqualFold(note, t.Sprint) {
+		return "", nil
+	}
+
+	for _, sp := range s.sp().Sprints() {
+		if strings.EqualFold(sp.Note, note) {
+			t.SetSprint(sp.Note)
+			return "into " + sp.Note, nil
+		}
+	}
+	return "", fmt.Errorf("%q is not a sprint page in this vault", note)
+}
+
+// hasChildren reports whether any task names this one as its parent.
+func (s *Server) hasChildren(r *http.Request, key string) bool {
+	entries, err := s.entries(r)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.Task != nil && e.Task.Parent == key {
+			return true
+		}
+	}
+	return false
+}
+
+// amounts writes a scale the way the configuration says it.
+func amounts(scale []float64) string {
+	out := make([]string, 0, len(scale))
+	for _, v := range scale {
+		out = append(out, project.Amount(v))
+	}
+	return strings.Join(out, ", ")
 }

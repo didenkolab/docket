@@ -75,6 +75,27 @@ type Status struct {
 	Category string `yaml:"category"`
 }
 
+// Estimates is how big a piece of work is said to be.
+//
+// The vault chooses the unit, because the unit is an argument nobody else can
+// settle: points, hours, days, shirt sizes. And it chooses whether there is a
+// scale — a declared list means the interface offers those values and nothing
+// else, which is the same shape as statuses and priorities.
+//
+// No scale means a free number, which is what a team counting hours wants: a
+// list of every hour anybody might say is not a vocabulary, it is a nuisance.
+type Estimates struct {
+	// Unit is the word for one, shown wherever a number is: "points", "hours".
+	Unit string `yaml:"unit"`
+	// Scale is the values that may be used, in the order they are offered.
+	// Empty means any number.
+	//
+	// Fibonacci is the usual one and it is why this is a list rather than a
+	// minimum and a maximum: 1, 2, 3, 5, 8, 13 is a set of choices, and the
+	// gaps in it are the point.
+	Scale []float64 `yaml:"scale,omitempty"`
+}
+
 // Project is one project in a vault: a key, which is also its folder, and a
 // name for people.
 type Project struct {
@@ -94,6 +115,11 @@ type Config struct {
 	Statuses   []Status  `yaml:"statuses"`
 	Types      []Type    `yaml:"types"`
 	Priorities []string  `yaml:"priorities"`
+
+	// Estimates is the unit work is sized in, and the scale if there is one.
+	// Omitted when the vault does not size work — a vault that never asked for
+	// estimates should not grow a field it has to leave empty.
+	Estimates *Estimates `yaml:"estimates,omitempty"`
 
 	// SignIn is how people sign in, when the vault has said. Omitted otherwise,
 	// so a vault that never cared keeps a file it recognises.
@@ -237,7 +263,68 @@ func (c *Config) validate() error {
 	if len(c.Priorities) == 0 {
 		return errors.New("no priorities")
 	}
+	if c.Estimates != nil {
+		if strings.TrimSpace(c.Estimates.Unit) == "" {
+			return errors.New("estimates have no unit: a number without one says nothing")
+		}
+		c.Estimates.Unit = strings.TrimSpace(c.Estimates.Unit)
+		seen := map[float64]bool{}
+		for _, v := range c.Estimates.Scale {
+			if v < 0 {
+				return fmt.Errorf("the estimate scale holds %s, and work cannot be "+
+					"smaller than nothing", Amount(v))
+			}
+			if seen[v] {
+				return fmt.Errorf("the estimate scale holds %s twice", Amount(v))
+			}
+			seen[v] = true
+		}
+	}
 	return nil
+}
+
+// Sizes reports whether this vault sizes work at all.
+func (c *Config) Sizes() bool { return c.Estimates != nil }
+
+// Unit is the word for one estimate, or empty when the vault does not size
+// work.
+func (c *Config) Unit() string {
+	if c.Estimates == nil {
+		return ""
+	}
+	return c.Estimates.Unit
+}
+
+// EstimateScale is the values that may be used, or nil for any number.
+func (c *Config) EstimateScale() []float64 {
+	if c.Estimates == nil {
+		return nil
+	}
+	return c.Estimates.Scale
+}
+
+// OnScale reports whether a value is one the vault offers. Always true when
+// there is no scale.
+func (c *Config) OnScale(value float64) bool {
+	scale := c.EstimateScale()
+	if len(scale) == 0 {
+		return true
+	}
+	for _, v := range scale {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+// Amount writes an estimate the way somebody typed it: 3 rather than 3.0, and
+// 0.5 kept.
+//
+// Fractions matter for a vault counting days, and a trailing zero on every
+// whole number makes a board of points look like a spreadsheet.
+func Amount(v float64) string {
+	return strconv.FormatFloat(v, 'f', -1, 64)
 }
 
 // ValidKey checks a project key.

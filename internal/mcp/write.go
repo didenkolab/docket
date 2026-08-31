@@ -34,6 +34,13 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		Parent *string
 		Labels *[]string
 		Tags   *[]string
+		// Estimate is how big the work is, in the vault's unit. A pointer to
+		// nought is a claim that there is no work in it; nil is nobody having
+		// said, and leaves whatever is there alone.
+		Estimate *float64
+		// Sprint is the sprint page to put it in, by title, or the empty string
+		// to take it out of every one.
+		Sprint *string
 		// Relations is keyed by the property name — blocks, blocked_by,
 		// relates — with task keys as the values.
 		Relations map[string][]string
@@ -109,6 +116,20 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 	if args.Assignee != nil && *args.Assignee != t.Assignee {
 		t.Set("assignee", *args.Assignee)
 		changed = append(changed, "assignee")
+	}
+	if args.Estimate != nil {
+		if said, err := s.setEstimate(c, t, *args.Estimate, args.Key); err != nil {
+			return nil, err
+		} else if said != "" {
+			changed = append(changed, said)
+		}
+	}
+	if args.Sprint != nil {
+		if said, err := s.setSprint(t, *args.Sprint); err != nil {
+			return nil, err
+		} else if said != "" {
+			changed = append(changed, said)
+		}
 	}
 	if args.Parent != nil && *args.Parent != t.Parent {
 		note := ""
@@ -396,4 +417,86 @@ func (s *Server) taskAt(key string) *task.Task {
 		return nil
 	}
 	return t
+}
+
+// setEstimate sizes a task, refusing what `docket check` would report.
+//
+// Refused here rather than written and reported later: an agent that gets a
+// clear "4 is not on the scale" fixes it in the same turn, and an agent that
+// gets a silent success leaves a vault that fails validation.
+func (s *Server) setEstimate(c *project.Config, t *task.Task, size float64, key string) (string, error) {
+	if !c.Sizes() {
+		return "", fmt.Errorf("this vault does not size work: %s has no estimates block",
+			project.FileName)
+	}
+	if size < 0 {
+		return "", fmt.Errorf("work cannot be smaller than nothing")
+	}
+	if !c.OnScale(size) {
+		return "", fmt.Errorf("estimate %s is not on the scale %s",
+			project.Amount(size), strings.Join(scaleNames(c.EstimateScale()), ", "))
+	}
+	// A container's size is what its children add to — see rule 12.
+	if s.hasChildren(key) {
+		return "", fmt.Errorf("%s has children, so its size is what they add up to; "+
+			"size the children instead", key)
+	}
+	if t.Sized() && t.Size() == size {
+		return "", nil
+	}
+	t.SetEstimate(size)
+	return "estimate " + project.Amount(size), nil
+}
+
+// setSprint puts a task in a sprint, or takes it out of every one.
+func (s *Server) setSprint(t *task.Task, note string) (string, error) {
+	note = strings.TrimSpace(note)
+	if note == "" {
+		if t.Sprint == "" {
+			return "", nil
+		}
+		was := t.Sprint
+		t.SetSprint("")
+		return "out of " + was, nil
+	}
+	if strings.EqualFold(note, t.Sprint) {
+		return "", nil
+	}
+
+	var known []string
+	for _, sp := range s.Space.Sprints() {
+		if strings.EqualFold(sp.Note, note) {
+			t.SetSprint(sp.Note)
+			return "into " + sp.Note, nil
+		}
+		known = append(known, sp.Note)
+	}
+	if len(known) == 0 {
+		return "", fmt.Errorf("this vault has no sprint pages: write one at %s/%s.md with "+
+			"type: %s, starts and ends", vault.SprintDir, note, vault.SprintType)
+	}
+	return "", fmt.Errorf("%q is not a sprint page in this vault; it has %s",
+		note, strings.Join(known, ", "))
+}
+
+// hasChildren reports whether any task names this one as its parent.
+func (s *Server) hasChildren(key string) bool {
+	entries, err := s.Space.Entries()
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.Task != nil && e.Task.Parent == key {
+			return true
+		}
+	}
+	return false
+}
+
+func scaleNames(scale []float64) []string {
+	out := make([]string, 0, len(scale))
+	for _, v := range scale {
+		out = append(out, project.Amount(v))
+	}
+	return out
 }
