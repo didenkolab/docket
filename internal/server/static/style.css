@@ -1404,3 +1404,51 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 /* A heading with one thing to do next to it. */
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
 .page-head h1 { margin-bottom: 0; }
+
+/* ---- what has not been sent ---- */
+
+/* A count in the header, and only when there is something to say.
+ *
+ * A background push that failed silently is the same bug as never pushing at
+ * all, so this exists — but a badge that is always there is a badge nobody
+ * reads, so it is absent whenever everything is where everybody else can read
+ * it. */
+.unsent { position: relative; }
+
+.unsent > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 1.6rem;
+  padding: 0 var(--s2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-radius: 999px;
+  cursor: pointer;
+  list-style: none;
+}
+.unsent > summary::-webkit-details-marker { display: none; }
+
+.unsent-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 26rem;
+  max-width: calc(100vw - 2rem);
+  padding: var(--s3) var(--s4);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: normal;
+}
+
+.unsent-list p { margin: 0 0 var(--s2); }
+.unsent-list code { display: inline-block; }

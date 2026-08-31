@@ -23,6 +23,7 @@ type stubHost struct {
 
 func (h *stubHost) Name() string        { return "StubHub" }
 func (h *stubHost) HostName() string    { return "stub.example.com" }
+func (h *stubHost) GitUser() string     { return "x-token" }
 func (h *stubHost) Repository() string  { return "acme/platform" }
 func (h *stubHost) SettingsURL() string { return "https://example.com/settings" }
 

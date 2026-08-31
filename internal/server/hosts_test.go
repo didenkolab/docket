@@ -38,6 +38,7 @@ type twoHosts struct {
 
 func (h *twoHosts) Name() string        { return h.hostName }
 func (h *twoHosts) HostName() string    { return h.hostName }
+func (h *twoHosts) GitUser() string     { return "x-token" }
 func (h *twoHosts) Repository() string  { return h.repo }
 func (h *twoHosts) SettingsURL() string { return "https://" + h.hostName + "/" + h.repo }
 
@@ -110,6 +111,10 @@ func workspaceOnTwoHosts(t *testing.T) (*Server, http.Handler, *twoHosts, *twoHo
 	if len(s.auth.repos) != 2 {
 		t.Fatalf("server built %d repositories", len(s.auth.repos))
 	}
+	// These remotes are real URLs, because the host is resolved from them — but
+	// nothing here is about pushing, and a test must not reach the network.
+	s.pushes = nil
+
 	for _, repo := range s.auth.repos {
 		host := first
 		if repo.projects[0] == "TWO" {

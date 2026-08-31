@@ -182,7 +182,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	moved, err := s.applyRenames(c, renames, author)
+	moved, err := s.applyRenames(r, c, renames, author)
 	if err != nil {
 		s.rejectSettings(w, r, c, err.Error())
 		return
@@ -208,7 +208,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	changed := append([]string{project.FileName}, boards...)
-	if err := s.commit(changed, "Settings: the vault's vocabulary", author); err != nil {
+	if err := s.commit(r, changed, "Settings: the vault's vocabulary", author); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Saved, but not committed", err.Error())
 		return
 	}
@@ -337,7 +337,7 @@ func removedStatuses(before *project.Config, after []project.Status, renames map
 
 // applyRenames moves every task off a renamed status onto its new name, so that
 // a rename does not leave the vault failing its own validation.
-func (s *Server) applyRenames(c *project.Config, renames map[string]project.Status, author gitvcs.Author) (int, error) {
+func (s *Server) applyRenames(r *http.Request, c *project.Config, renames map[string]project.Status, author gitvcs.Author) (int, error) {
 	if len(renames) == 0 {
 		return 0, nil
 	}
@@ -376,7 +376,7 @@ func (s *Server) applyRenames(c *project.Config, renames map[string]project.Stat
 		if err := os.WriteFile(full, content, 0o644); err != nil {
 			return moved, err
 		}
-		if err := s.commit([]string{e.Path},
+		if err := s.commit(r, []string{e.Path},
 			fmt.Sprintf("%s: %s → %s", e.Key, from, to.Name), author); err != nil {
 			return moved, err
 		}

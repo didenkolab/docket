@@ -433,7 +433,7 @@ func (s *Server) handleSignInSetup(w http.ResponseWriter, r *http.Request) {
 	if repo.prefix != "" {
 		changed = repo.prefix + "/" + project.FileName
 	}
-	if err := s.commit([]string{changed}, "Access: how people sign in", s.authorFor(r)); err != nil {
+	if err := s.commit(r, []string{changed}, "Access: how people sign in", s.authorFor(r)); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Saved, but not committed", err.Error())
 		return
 	}

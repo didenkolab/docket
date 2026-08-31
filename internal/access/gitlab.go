@@ -20,6 +20,12 @@ func (g *GitLab) Name() string { return "GitLab" }
 // HostName is the host a token for this repository is good for.
 func (g *GitLab) HostName() string { return g.Ref.Host }
 
+// GitUser is what git should send as the username beside a token.
+//
+// GitLab requires this word beside an OAuth token; a personal access token
+// works with anything, and this works with both.
+func (g *GitLab) GitUser() string { return "oauth2" }
+
 // Repository is the project path, groups and all.
 func (g *GitLab) Repository() string { return g.Ref.Path() }
 

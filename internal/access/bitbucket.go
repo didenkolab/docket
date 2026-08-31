@@ -22,6 +22,11 @@ func (b *Bitbucket) Name() string { return "Bitbucket" }
 // HostName is the host a token for this repository is good for.
 func (b *Bitbucket) HostName() string { return b.Ref.Host }
 
+// GitUser is what git should send as the username beside a token.
+//
+// Bitbucket's own word for an access token in the username field.
+func (b *Bitbucket) GitUser() string { return "x-token-auth" }
+
 // Repository is workspace/repo.
 func (b *Bitbucket) Repository() string { return b.Ref.Path() }
 

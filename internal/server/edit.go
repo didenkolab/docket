@@ -128,7 +128,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
+	err = s.editTask(r, key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		var changed []string
 
 		if title != t.Title {

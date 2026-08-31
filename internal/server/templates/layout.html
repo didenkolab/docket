@@ -30,6 +30,37 @@
     <input type="search" name="q" placeholder="Search" aria-label="Search">
   </form>
   {{end}}
+  {{if .Pushes}}
+  <details class="unsent">
+    <summary title="not yet where everybody else can read it">
+      {{range $i, $p := .Pushes}}{{if $i}} · {{end}}{{if $p.Trouble}}⚠{{else}}↑{{end}}{{if $p.Waiting}} {{$p.Waiting}}{{end}}{{end}}
+    </summary>
+    <div class="unsent-list">
+      {{range .Pushes}}
+      <p>
+        <strong>{{if .Name}}{{.Name}}{{else}}This vault{{end}}</strong>
+        {{if .NoUpstream}}
+          — this branch tracks nothing, so there is nowhere to send it. Set an upstream:
+          <code>git push -u origin HEAD</code>.
+        {{else if .Moved}}
+          — {{.Waiting}} commit(s) here, and the remote has moved on since. That needs a rebase,
+          which is a decision rather than something a server does behind you:
+          <code>git pull --rebase &amp;&amp; git push</code>.
+        {{else if .Trouble}}
+          — {{.Waiting}} commit(s) not sent: {{.Trouble}}
+        {{else}}
+          — {{.Waiting}} commit(s) written here and not yet sent.
+        {{end}}
+      </p>
+      {{end}}
+      <form method="post" action="/push">
+        {{template "csrf" $}}
+        <input type="hidden" name="next" value="/">
+        <button type="submit" class="quiet">Send now</button>
+      </form>
+    </div>
+  </details>
+  {{end}}
   {{if .SignedIn}}
   <span class="who" title="{{.You.Login}} — {{.You.Role}}">
     {{.You.DisplayName}} <span class="role">{{.You.Role}}</span>

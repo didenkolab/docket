@@ -30,6 +30,10 @@ type pageData struct {
 	// CSRF is what this page must send back with a change for the change to be
 	// accepted. Every form carries it; the scripts read it from the head.
 	CSRF string
+	// Pushes are the repositories with something unsent, or something that went
+	// wrong sending it. Empty when everything is where everybody else can read
+	// it, because a badge that is always there is a badge nobody reads.
+	Pushes []pushNote
 	// Sees says the reader may look at something here. False only on a server
 	// that signs people in, for somebody who has not — and then the navigation
 	// has nothing to offer, because every link in it would bounce them back.
@@ -59,6 +63,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		SignedIn: signedIn,
 		CSRF:     tokenOf(r),
 		Sees:     s.showsAnything(r),
+		Pushes:   s.pushNotes(),
 		Refresh:  seconds,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
@@ -449,7 +454,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err = s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
+	err = s.editTask(r, key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		if t.Status == status {
 			return "", nil, nil
 		}
@@ -473,7 +478,7 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err := s.editTask(key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
+	err := s.editTask(r, key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		t.AppendComment(author.Name, s.now(), text)
 		return key + ": comment from " + author.Name, nil, nil
 	})
@@ -549,7 +554,7 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 		Now:         s.now(),
 	})
 	if err == nil {
-		err = s.commit([]string{rel}, t.Key+": "+t.Title, author)
+		err = s.commit(r, []string{rel}, t.Key+": "+t.Title, author)
 	}
 	s.writes.Unlock()
 

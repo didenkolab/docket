@@ -103,6 +103,9 @@ type Server struct {
 	recheck time.Duration
 	// onLoopback says the machine's own credentials may sign somebody in.
 	onLoopback bool
+	// pushes is what has been sent to each remote, and what went wrong. Nil
+	// when nothing here has a remote to send to.
+	pushes *pushing
 
 	// now is injectable so tests can assert on timestamps.
 	now func() time.Time
@@ -149,6 +152,7 @@ func New(root string, opts Options) (*Server, error) {
 
 		deviceClientID: strings.TrimSpace(opts.DeviceClientID),
 		onLoopback:     opts.OnLoopback && !opts.BehindProxy,
+		pushes:         newPushing(),
 	}
 	recheck, life := opts.Recheck, opts.SessionLife
 	if recheck <= 0 {
@@ -338,7 +342,13 @@ func (s *Server) pages() []string {
 // A change can touch two repositories at once — a retitle in one project
 // repointing a link in another — and each of them gets its own commit, because
 // each of them is its own history.
-func (s *Server) commit(paths []string, message string, author gitvcs.Author) error {
+// commit records a change and sends it on.
+//
+// It takes the request so that the push can be made as whoever made the change,
+// and so that pushing is what happens by default: every write in the server
+// goes through here, and a write that reached the remote only when somebody
+// remembered would be the bug this exists to fix. See push.go.
+func (s *Server) commit(r *http.Request, paths []string, message string, author gitvcs.Author) error {
 	byVault := map[*space.Vault][]string{}
 	for _, p := range paths {
 		v, rel, err := s.space.Resolve(p)
@@ -352,6 +362,7 @@ func (s *Server) commit(paths []string, message string, author gitvcs.Author) er
 			if err := v.Repo.Commit(in, message, author); err != nil {
 				return err
 			}
+			s.after(r, v)
 		}
 	}
 	return nil
@@ -395,6 +406,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sign-in/device/stop", s.handleDeviceStop)
 	mux.HandleFunc("POST /sign-in/local", s.handleLocalSignIn)
 	mux.HandleFunc("POST /sign-out", s.handleSignOut)
+	mux.HandleFunc("POST /push", s.handlePush)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)
@@ -462,6 +474,7 @@ func (s *Server) loadTask(key string) (*task.Task, string, error) {
 // returns their paths, and they land in the same commit: half of a change is
 // worse than none of it.
 func (s *Server) editTask(
+	r *http.Request,
 	key, expected string,
 	author gitvcs.Author,
 	mutate func(*task.Task) (message string, alsoCommit []string, err error),
@@ -528,7 +541,7 @@ func (s *Server) editTask(
 		}
 	}
 
-	return s.commit(paths, message, author)
+	return s.commit(r, paths, message, author)
 }
 
 func categoryClass(category string) string {

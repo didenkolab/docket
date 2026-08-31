@@ -249,11 +249,18 @@ func seconds(n int, fallback time.Duration) time.Duration {
 // (not confidential), which is what the device grant means. Its id goes in
 // --device-client-id.
 
-// DeviceScope for GitLab is reading the API, which is all docket does with it:
-// who is this, and what is their access level on this project. GitLab's scopes
-// are finer than GitHub's, so this one is genuinely narrow — it cannot write
-// anything, and it cannot read repository contents.
-func (g *GitLab) DeviceScope() string { return "read_api" }
+// DeviceScope for GitLab is reading the API and writing the repository.
+//
+// read_api answers the only questions docket asks a host — who is this, and what
+// is their access level here — and would be enough if the board only read.
+// It writes: every change is a commit, and a commit that never leaves the
+// server's clone is a change nobody else can see, so the token has to be able
+// to push. write_repository is what does that, and it is still narrower than
+// GitHub's `repo`: it cannot touch issues, members, settings or CI.
+//
+// The sign-in page shows the scope before anybody agrees, which is the point of
+// its being said here rather than assumed.
+func (g *GitLab) DeviceScope() string { return "read_api write_repository" }
 
 // StartDevice asks GitLab for a code pair.
 func (g *GitLab) StartDevice(ctx context.Context, clientID string) (Device, error) {

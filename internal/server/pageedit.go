@@ -144,7 +144,7 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 	if form.New {
 		verb = "wrote"
 	}
-	if err := s.commit([]string{rel}, verb+" "+strings.TrimSuffix(rel, ".md"), author); err != nil {
+	if err := s.commit(r, []string{rel}, verb+" "+strings.TrimSuffix(rel, ".md"), author); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Saved, but not committed", err.Error())
 		return
 	}
@@ -174,7 +174,7 @@ func (s *Server) handlePageDelete(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, http.StatusNotFound, "No such page", rel+" is not in this vault")
 		return
 	}
-	if err := s.commit([]string{rel}, "deleted "+strings.TrimSuffix(rel, ".md"),
+	if err := s.commit(r, []string{rel}, "deleted "+strings.TrimSuffix(rel, ".md"),
 		s.authorFor(r)); err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Deleted, but not committed", err.Error())
 		return

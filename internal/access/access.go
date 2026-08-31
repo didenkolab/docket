@@ -61,6 +61,10 @@ type Host interface {
 	// repositories with the same one share a sign-in, because a token belongs
 	// to a host rather than to a repository.
 	HostName() string
+	// GitUser is what to put in the username field when handing git a token
+	// for this host. Each of them wants a different fixed word there, and
+	// getting it wrong is refused rather than ignored.
+	GitUser() string
 	// Repository is owner/name, for showing and for linking.
 	Repository() string
 	// SettingsURL is where access is actually granted.

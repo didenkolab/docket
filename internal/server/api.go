@@ -148,7 +148,7 @@ func (s *Server) apiCreateTask(w http.ResponseWriter, r *http.Request) {
 		Labels: req.Labels, Tags: req.Tags, Now: s.now(),
 	})
 	if err == nil {
-		err = s.commit([]string{rel}, t.Key+": "+t.Title, author)
+		err = s.commit(r, []string{rel}, t.Key+": "+t.Title, author)
 	}
 	s.writes.Unlock()
 
@@ -198,7 +198,7 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
-	err = s.editTask(key, req.Version, author, func(t *task.Task) (string, []string, error) {
+	err = s.editTask(r, key, req.Version, author, func(t *task.Task) (string, []string, error) {
 		var changed []string
 
 		if req.Title != nil && *req.Title != t.Title {
