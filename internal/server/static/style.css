@@ -242,7 +242,11 @@ header .bar { display: flex; align-items: center; gap: var(--s4); flex-wrap: wra
   box-shadow: inset 0 0 0 2px var(--paper), 0 0 0 1px var(--accent);
 }
 
-header nav { display: flex; gap: var(--s1); }
+/* The bar wraps and the navigation inside it did not, so seven links were four
+ * pixels wider than a phone and the whole page scrolled sideways. min-width: 0
+ * as well as wrapping: a flex item will not shrink below its content otherwise,
+ * which is the same trap as the board's columns. */
+header nav { display: flex; flex-wrap: wrap; gap: var(--s1); min-width: 0; }
 
 header nav a {
   color: var(--ink-soft);
@@ -430,14 +434,52 @@ button.danger:hover { color: var(--on-accent); background: var(--warn); border-c
  * them off at the prose width would waste a monitor. */
 main:has(.board) > .shell { max-width: none; }
 
+/* One screen, from the body down. Every link in the chain has to say it, and
+ * every one has to permit shrinking, or the innermost overflow never happens. */
+body:has(.board) {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+body:has(.board) > header { flex: none; }
+body:has(.board) > main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+body:has(.board) > main > .shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* …and the header follows it, or the navigation starts a hundred pixels to the
  * right of the first column. */
 body:has(.board) header .bar { max-width: none; }
 
+/* The board is one screen, and each column scrolls on its own.
+ *
+ * It did not, and that is the bug that kept coming back: the columns grew as
+ * tall as their contents, so a full column ran off the bottom of the window and
+ * the whole page scrolled. On a board that is wrong twice over — the other
+ * columns and the headings scroll away with it, so you lose the thing you were
+ * comparing against, and the sticky heading was sticking to the page rather
+ * than to its column, which is why it looked fixed and was not.
+ *
+ * The layout is flex all the way down from the body instead of a computed
+ * height, so there is no number to get wrong when the header changes. The part
+ * that is easy to miss is min-height: 0 on every link in that chain: a flex
+ * item will not shrink below its content without it, so the overflow never
+ * happens and everything looks exactly as it did before. */
 .board {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: var(--s4);
-  align-items: flex-start;
+  align-items: stretch;
   overflow-x: auto;
   padding-bottom: var(--s4);
   scroll-snap-type: x proximity;
@@ -468,6 +510,7 @@ body:has(.board) header .bar { max-width: none; }
   flex: 1 1 0;
   min-width: 12rem;
   max-width: 22rem;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--sunken);
@@ -486,7 +529,19 @@ body:has(.board) header .bar { max-width: none; }
 .column.done .pip { background: var(--done); }
 .column.done .cards { opacity: 0.75; }
 
-.cards { display: flex; flex-direction: column; gap: var(--s2); padding: 0 var(--s2) var(--s2); min-height: 5rem; }
+/* The cards are what scrolls. min-height: 0 so it may shrink below its content,
+ * and 5rem of floor so an empty column is somewhere you can aim a card rather
+ * than a line of text. */
+.cards {
+  flex: 1;
+  min-height: 5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: 0 var(--s2) var(--s2);
+  scrollbar-width: thin;
+}
 
 .column.over { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .column.barred { box-shadow: inset 0 0 0 1px var(--warn); background: var(--warn-soft); }
@@ -1343,16 +1398,10 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 
 /* ---- board density ---- */
 
-/* The column heading stays while its column scrolls. A long column loses its
- * heading exactly when you most need it — halfway down, deciding whether the
- * card you are looking at is in review or in progress. */
-.column-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--sunken);
-  border-radius: var(--radius) var(--radius) 0 0;
-}
+/* The heading is outside what scrolls, so it stays without being told to.
+ * It was sticky, which stuck it to the page rather than to its column — right
+ * only as long as the page was the thing scrolling. */
+.column-head { flex: none; }
 
 /* The key, the blocked flag and the epic on one line.
  *
@@ -1548,3 +1597,14 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 }
 
 @media (max-width: 46rem) { .theme { display: none; } }
+
+/* On a phone, one screen is the wrong shape. Columns narrow enough to fit
+ * several across are too narrow to read, so a narrow board goes back to being
+ * a page that scrolls, with the columns stacked at full width. */
+@media (max-width: 46rem) {
+  body:has(.board) { height: auto; overflow: visible; display: block; }
+  body:has(.board) > main, body:has(.board) > main > .shell { display: block; min-height: 0; }
+  .board { display: block; overflow-x: visible; }
+  .board .column { max-width: none; margin-bottom: var(--s4); }
+  .cards { overflow-y: visible; }
+}
