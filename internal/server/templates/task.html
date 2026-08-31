@@ -173,6 +173,15 @@
         <dt>Tags</dt>
         <dd>{{range $t.Tags}}<a class="tag" href="/search?tag={{.}}">#{{.}}</a>{{end}}</dd>
         {{end}}
+        {{range $data.Fields}}
+        <dt title="{{.Help}}">{{.Label}}</dt>
+        <dd>
+          {{if .Flag}}{{if .On}}yes{{else}}<span class="empty">no</span>{{end}}
+          {{else if not .Value}}<span class="empty">—</span>
+          {{else if .Link}}<a href="{{.Value}}" rel="noopener">{{.Value}}</a>
+          {{else}}{{.Value}}{{end}}
+        </dd>
+        {{end}}
         {{if $t.Aliases}}
         <dt>Also known as</dt>
         <dd>{{range $t.Aliases}}<span class="label">{{.}}</span>{{end}}</dd>

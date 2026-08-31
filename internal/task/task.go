@@ -588,3 +588,65 @@ func Links(markdown string) []string {
 	}
 	return targets
 }
+
+// A field the vault added for itself.
+//
+// The format owns a dozen properties and a vault may add its own — see
+// project.Field. They are read and written as text here rather than as typed
+// values on purpose: what a property means is declared in docket.yaml, and a
+// task that parsed it would be a second place where the vocabulary lives.
+// `docket check` is where a value meets its declaration.
+
+// Property is what the frontmatter holds under a name, as written, or empty.
+//
+// A list comes back joined with ", " — nothing declares a list field yet, and
+// showing "[a b]" would be worse than saying what is there.
+func (t *Task) Property(name string) string {
+	mapping := t.front.Content[0]
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value != name {
+			continue
+		}
+		node := mapping.Content[i+1]
+		if node.Kind != yaml.SequenceNode {
+			return strings.TrimSpace(node.Value)
+		}
+		parts := make([]string, 0, len(node.Content))
+		for _, item := range node.Content {
+			parts = append(parts, strings.TrimSpace(item.Value))
+		}
+		return strings.Join(parts, ", ")
+	}
+	return ""
+}
+
+// HasProperty reports whether the frontmatter mentions it at all, which is a
+// different question from whether it holds anything: a required field written
+// and left blank is a fault, and one never written is the same fault said
+// differently.
+func (t *Task) HasProperty(name string) bool {
+	mapping := t.front.Content[0]
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == name {
+			return true
+		}
+	}
+	return false
+}
+
+// SetProperty writes a declared field.
+//
+// Text is quoted only where leaving it bare would change its meaning; a number,
+// a date and a flag are written plain, so Obsidian shows them as a number, a
+// date and a checkbox rather than as strings of them.
+func (t *Task) SetProperty(name, value string, plain bool) {
+	if strings.TrimSpace(value) == "" {
+		t.Remove(name)
+		return
+	}
+	if plain {
+		t.SetPlain(name, value)
+		return
+	}
+	t.Set(name, value)
+}

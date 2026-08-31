@@ -102,6 +102,54 @@
     Renaming a status keeps its moves. Removing one removes them with it.
   </p>
 
+  <h2>Fields</h2>
+
+  <p class="footnote">
+    Properties this vault added for itself, beyond the ones the format defines. A field is a
+    frontmatter property, so it is a property in Obsidian too — in the editor, in a Base, and
+    still there with the tool deleted. Leave <em>Types</em> empty and every kind of work carries
+    it; name one or two and only those do.
+  </p>
+
+  <div class="matrix-wrap">
+  <table class="settings">
+    <thead>
+      <tr><th>Property</th><th>Label</th><th>Kind</th><th>Choices</th><th>Types</th>
+          <th>Needed</th><th>Tasks</th></tr>
+    </thead>
+    <tbody>
+      {{range $i, $f := $data.Fields}}
+      <tr>
+        <td><input name="field_name_{{$i}}" value="{{$f.Name}}"
+              placeholder="{{if $f.New}}found_in{{end}}"
+              {{if not $f.New}}readonly title="renaming a property would leave its value behind on every task that carries it"{{end}}></td>
+        <td><input name="field_label_{{$i}}" value="{{$f.Label}}" placeholder="{{if $f.New}}Found in{{end}}"></td>
+        <td>
+          <select name="field_kind_{{$i}}">
+            {{range $data.Kinds}}<option value="{{.}}"{{if eq . $f.Kind}} selected{{end}}>{{.}}</option>{{end}}
+          </select>
+        </td>
+        <td><input name="field_choices_{{$i}}" value="{{$f.Choices}}" placeholder="low, high"></td>
+        <td><input name="field_types_{{$i}}" value="{{$f.Types}}" placeholder="{{range $j, $t := $data.AllTypes}}{{if $j}}, {{end}}{{$t}}{{end}}"></td>
+        <td><input type="checkbox" name="field_required_{{$i}}" value="1"{{if $f.Required}} checked{{end}}></td>
+        <td class="count">{{if $f.Carried}}{{$f.Carried}}{{else}}—{{end}}</td>
+      </tr>
+      <tr class="field-help">
+        <td colspan="7"><input name="field_help_{{$i}}" value="{{$f.Help}}"
+              placeholder="one line saying what to put in it, shown beside the control"></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  </div>
+
+  <p class="footnote">
+    Clearing a property name takes the field out of the vocabulary and leaves the values in the
+    task files. Deleting a property from a thousand tasks because somebody edited a settings page
+    is not something a form should do behind you — <code>docket check</code> simply stops having
+    an opinion about a field nobody declares.
+  </p>
+
   <h2>Vocabulary</h2>
 
   <label for="types">Task types</label>

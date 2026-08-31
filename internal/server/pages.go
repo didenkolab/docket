@@ -466,7 +466,26 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 			view.Rollup = project.Amount(sum)
 		}
 	}
+	view.Fields = shownFields(c, t)
 	s.render(w, r, "task.html", c, t.Key+" "+t.Title, view)
+}
+
+// shownFields is what this vault added, for a task of this type.
+func shownFields(c *project.Config, t *task.Task) []shownField {
+	var out []shownField
+	for _, f := range c.FieldsFor(t.Type) {
+		value := strings.TrimSpace(t.Property(f.Name))
+		shown := shownField{Label: f.Shown(), Value: value, Kind: f.Kind, Help: f.Help}
+		switch f.Kind {
+		case project.FieldLink:
+			shown.Link = value != ""
+		case project.FieldFlag:
+			shown.Flag = true
+			shown.On = strings.EqualFold(value, "true")
+		}
+		out = append(out, shown)
+	}
+	return out
 }
 
 type taskView struct {
@@ -489,6 +508,24 @@ type taskView struct {
 	// Rollup is what its children add up to, for a container. When it is set it
 	// is the answer, because a container has no estimate of its own.
 	Rollup string
+	// Fields are the vault's own properties for this type of task, with what
+	// this one holds. Shown in the order declared, and shown even when empty:
+	// a field a type has and this task does not is a fact, and hiding it is how
+	// somebody never learns the field exists.
+	Fields []shownField
+}
+
+// shownField is one declared property, ready to read.
+type shownField struct {
+	Label string
+	Value string
+	Kind  string
+	Help  string
+	// Link is set when the value is a URL, so it can be followed.
+	Link bool
+	// Flag is set when the value is yes or no, so it can be drawn as one.
+	Flag bool
+	On   bool
 }
 
 type renderedComment struct {

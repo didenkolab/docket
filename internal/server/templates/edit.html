@@ -49,7 +49,15 @@
     </div>
     <div>
       <label for="assignee">Assignee</label>
-      <input id="assignee" name="assignee" value="{{$t.Assignee}}" placeholder="agent/claude">
+      <input id="assignee" name="assignee" value="{{$t.Assignee}}" placeholder="agent/claude"
+             list="handles" autocomplete="off">
+      {{if $data.People}}
+      <datalist id="handles">
+        {{range $data.People}}<option value="{{.}}">{{end}}
+      </datalist>
+      <p class="footnote inline">Whoever is already at work here, busiest first — or type
+      somebody new. Empty unassigns.</p>
+      {{end}}
     </div>
     {{if $data.Sizes}}
     <div>
@@ -71,6 +79,25 @@
       <label>Size</label>
       <p class="footnote inline">This task has children, so its size is what they add up to{{if $data.Rollup}} —
       {{$data.Rollup}} so far{{end}}. Size the children.</p>
+    </div>
+    {{end}}
+
+    {{range $data.Fields}}
+    <div>
+      <label for="field-{{.Name}}">{{.Label}}{{if .Required}} <span class="needed">needed</span>{{end}}</label>
+      {{if eq .Kind "choice"}}
+      <select id="field-{{.Name}}" name="field_{{.Name}}">
+        {{range .Choices}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{if .Value}}{{.Value}}{{else}}— none —{{end}}</option>{{end}}
+      </select>
+      {{else if eq .Kind "flag"}}
+      <label class="switch">
+        <input type="checkbox" id="field-{{.Name}}" name="field_{{.Name}}" value="true"{{if .On}} checked{{end}}>
+        <span>yes</span>
+      </label>
+      {{else}}
+      <input id="field-{{.Name}}" name="field_{{.Name}}" type="{{.Type}}" value="{{.Value}}">
+      {{end}}
+      {{if .Help}}<p class="footnote inline">{{.Help}}</p>{{end}}
     </div>
     {{end}}
 

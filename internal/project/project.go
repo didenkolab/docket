@@ -96,6 +96,117 @@ type Estimates struct {
 	Scale []float64 `yaml:"scale,omitempty"`
 }
 
+// A field a vault added for itself.
+//
+// Jira lets a team add fields and say what type each one is, and a tracker that
+// cannot is a tracker somebody keeps a spreadsheet beside. The importer already
+// carried eighteen of them out of a real project — as x_ properties nobody
+// declared, nothing validated and no page showed.
+//
+// So they are declared. A field is a frontmatter property, which means it is a
+// property in Obsidian too: visible in the editor, filterable in a Base,
+// readable with the tool deleted. Nothing here invents a store.
+//
+// What a field is not is a relationship. A choice with a page behind it is a
+// label, and how-things-connect §3 says which mechanism answers which question:
+// a field is a property of one task, and anything that joins two of them is a
+// link. The kinds below are all scalars for that reason.
+type Field struct {
+	// Name is the property as written in frontmatter: lower case, underscores.
+	Name string `yaml:"name"`
+	// Label is what a person reads. Empty means the name will do.
+	Label string `yaml:"label,omitempty"`
+	// Kind is what may go in it.
+	Kind string `yaml:"kind"`
+	// Choices are the values a choice field offers, in the order offered.
+	Choices []string `yaml:"choices,omitempty"`
+	// Types are the task types that have this field. Empty means all of them —
+	// a field every kind of work carries is the ordinary case, and listing
+	// every type to say so is noise.
+	Types []string `yaml:"types,omitempty"`
+	// Required means a task of those types must carry it.
+	Required bool `yaml:"required,omitempty"`
+	// Help is one line saying what to put in it, shown beside the control.
+	Help string `yaml:"help,omitempty"`
+}
+
+// The kinds a field can be. Each is something a single task can be true of on
+// its own, because anything that joins two tasks is a link and not a field.
+const (
+	FieldText   = "text"   // a line of words
+	FieldNumber = "number" // an amount
+	FieldDate   = "date"   // a day, YYYY-MM-DD
+	// FieldMoment is a point in time rather than a day. Jira has both, and a
+	// real import brought a "date of first response" that is a timestamp — so
+	// a vault with only days had to call it text and lose the sorting.
+	FieldMoment = "datetime"
+	FieldChoice = "choice" // one of a declared list
+	FieldFlag   = "flag"   // yes or no
+	FieldLink   = "link"   // a URL somewhere else
+)
+
+// FieldKinds is every kind, for a form and for an error that has to list them.
+var FieldKinds = []string{FieldText, FieldNumber, FieldDate, FieldMoment,
+	FieldChoice, FieldFlag, FieldLink}
+
+// OwnedProperties is every property the format itself owns.
+//
+// A declared field that took one of these would shadow it: `status` as a free
+// text field is a board that cannot draw a column. The relation names are
+// written out rather than read from package task, because task is the layer
+// above this one and reading upwards would be a cycle — TestReservedNamesAgree
+// keeps the two lists honest.
+var OwnedProperties = map[string]bool{
+	"key": true, "title": true, "type": true, "status": true, "status_category": true,
+	"priority": true, "assignee": true, "created": true, "updated": true,
+	"aliases": true, "tags": true, "labels": true, "parent": true, "sprint": true,
+	"estimate": true, "order": true,
+
+	"blocks": true, "blocked_by": true, "duplicates": true, "duplicated_by": true,
+	"causes": true, "caused_by": true, "relates": true,
+}
+
+// FieldName is the shape of a property name: what YAML, Obsidian's property
+// editor and a Bases formula can all hold without quoting.
+//
+// Letters in any script. It was `[a-z][a-z0-9_]*`, which refused every property
+// a Russian project has — and the importer writes exactly those, so a vault
+// imported from one could not declare a single one of its own fields. The same
+// ASCII assumption had just been taken out of the importer's own slugging; it
+// went straight back in here, in a regular expression written from memory.
+var FieldName = regexp.MustCompile(`^\p{Ll}[\p{L}\p{N}_]*$`)
+
+// Shown is what to call the field to a person.
+func (f Field) Shown() string {
+	if strings.TrimSpace(f.Label) != "" {
+		return f.Label
+	}
+	return f.Name
+}
+
+// AppliesTo reports whether a task of this type carries the field.
+func (f Field) AppliesTo(taskType string) bool {
+	if len(f.Types) == 0 {
+		return true
+	}
+	for _, t := range f.Types {
+		if strings.EqualFold(t, taskType) {
+			return true
+		}
+	}
+	return false
+}
+
+// Offers reports whether a choice field offers this value.
+func (f Field) Offers(value string) bool {
+	for _, c := range f.Choices {
+		if c == value {
+			return true
+		}
+	}
+	return false
+}
+
 // Project is one project in a vault: a key, which is also its folder, and a
 // name for people.
 type Project struct {
@@ -115,6 +226,10 @@ type Config struct {
 	Statuses   []Status  `yaml:"statuses"`
 	Types      []Type    `yaml:"types"`
 	Priorities []string  `yaml:"priorities"`
+
+	// Fields are the properties this vault added for itself, beyond the ones
+	// the format defines.
+	Fields []Field `yaml:"fields,omitempty"`
 
 	// Estimates is the unit work is sized in, and the scale if there is one.
 	// Omitted when the vault does not size work — a vault that never asked for
@@ -263,6 +378,44 @@ func (c *Config) validate() error {
 	if len(c.Priorities) == 0 {
 		return errors.New("no priorities")
 	}
+	named := map[string]bool{}
+	for i := range c.Fields {
+		f := &c.Fields[i]
+		f.Name = strings.TrimSpace(f.Name)
+		f.Kind = strings.ToLower(strings.TrimSpace(f.Kind))
+
+		if !FieldName.MatchString(f.Name) {
+			return fmt.Errorf("field %q is not a usable property name: lower case, digits and "+
+				"underscores, starting with a letter", f.Name)
+		}
+		if OwnedProperties[f.Name] {
+			return fmt.Errorf("field %q is a property the format already owns, and a second "+
+				"meaning for it is one the board cannot read", f.Name)
+		}
+		if named[f.Name] {
+			return fmt.Errorf("field %q is declared twice", f.Name)
+		}
+		named[f.Name] = true
+
+		if !knownKind(f.Kind) {
+			return fmt.Errorf("field %q is of kind %q, want one of %s",
+				f.Name, f.Kind, strings.Join(FieldKinds, ", "))
+		}
+		if f.Kind == FieldChoice && len(f.Choices) == 0 {
+			return fmt.Errorf("field %q is a choice and offers nothing to choose", f.Name)
+		}
+		if f.Kind != FieldChoice && len(f.Choices) > 0 {
+			return fmt.Errorf("field %q is of kind %q and has choices, which only a choice "+
+				"field has", f.Name, f.Kind)
+		}
+		for _, t := range f.Types {
+			if !c.HasType(t) {
+				return fmt.Errorf("field %q is for type %q, which this vault does not have",
+					f.Name, t)
+			}
+		}
+	}
+
 	if c.Estimates != nil {
 		if strings.TrimSpace(c.Estimates.Unit) == "" {
 			return errors.New("estimates have no unit: a number without one says nothing")
@@ -281,6 +434,36 @@ func (c *Config) validate() error {
 		}
 	}
 	return nil
+}
+
+func knownKind(kind string) bool {
+	for _, k := range FieldKinds {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// FieldsFor is the fields a task of this type carries, in the order declared.
+func (c *Config) FieldsFor(taskType string) []Field {
+	var out []Field
+	for _, f := range c.Fields {
+		if f.AppliesTo(taskType) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// FieldNamed is the declaration for a property, if the vault has one.
+func (c *Config) FieldNamed(name string) (Field, bool) {
+	for _, f := range c.Fields {
+		if f.Name == name {
+			return f, true
+		}
+	}
+	return Field{}, false
 }
 
 // Sizes reports whether this vault sizes work at all.

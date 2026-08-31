@@ -27,6 +27,9 @@ type statusRow struct {
 
 type settingsView struct {
 	Name       string
+	Fields     []fieldRow
+	Kinds      []string
+	AllTypes   []string
 	Statuses   []statusRow
 	Types      string
 	Priorities string
@@ -36,6 +39,28 @@ type settingsView struct {
 	Matrix     []transitionRow
 	Error      string
 	Saved      string
+}
+
+// fieldRow is one of the vault's own properties, on the form.
+//
+// Editable here because a team adds a field when it turns out it needs one, and
+// a tracker where that means editing YAML on somebody's laptop is a tracker
+// where it does not happen. What is on the form is what a person can decide;
+// the property name is not, because renaming it would leave the value behind on
+// every task that carries it — that is a migration, not a setting.
+type fieldRow struct {
+	Name     string
+	Label    string
+	Kind     string
+	Choices  string
+	Types    string
+	Required bool
+	Help     string
+	// Carried is how many tasks hold a value for it, so removing one says what
+	// it would leave behind.
+	Carried int
+	// New is a blank row, which is how a field is added without any script.
+	New bool
 }
 
 // transitionRow is one line of the workflow matrix: from this status, to which.
@@ -86,6 +111,18 @@ func (s *Server) settingsView(c *project.Config, message, saved string) settings
 	for i := range 2 {
 		view.Statuses = append(view.Statuses, statusRow{Position: len(c.Statuses) + i + 1})
 	}
+	view.Kinds = project.FieldKinds
+	view.AllTypes = c.TypeNames()
+	carried := s.fieldUsage(c)
+	for _, f := range c.Fields {
+		view.Fields = append(view.Fields, fieldRow{
+			Name: f.Name, Label: f.Label, Kind: f.Kind,
+			Choices: strings.Join(f.Choices, ", "), Types: strings.Join(f.Types, ", "),
+			Required: f.Required, Help: f.Help, Carried: carried[f.Name],
+		})
+	}
+	view.Fields = append(view.Fields, fieldRow{New: true}, fieldRow{New: true})
+
 	for _, p := range c.Projects {
 		view.Projects = append(view.Projects, projectUsage{p.Key, p.Name, perProject[p.Key]})
 	}
@@ -149,6 +186,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	// survives keeps the level it had and a new one is standard.
 	updated.Types = retype(c, splitCommas(r.FormValue("types")))
 	updated.Priorities = splitCommas(r.FormValue("priorities"))
+	updated.Fields = readFields(r, c)
 
 	statuses, renames, err := readStatuses(r)
 	if err != nil {
@@ -407,4 +445,62 @@ func retype(c *project.Config, names []string) []project.Type {
 		types = append(types, project.Type{Name: name, Level: was[name]})
 	}
 	return types
+}
+
+// fieldUsage is how many tasks hold a value for each declared field, so the
+// form can say what removing one would leave behind.
+func (s *Server) fieldUsage(c *project.Config) map[string]int {
+	carried := map[string]int{}
+	entries, err := s.sp().Entries()
+	if err != nil {
+		return carried
+	}
+	for _, e := range entries {
+		if e.Task == nil {
+			continue
+		}
+		for _, f := range c.Fields {
+			if strings.TrimSpace(e.Task.Property(f.Name)) != "" {
+				carried[f.Name]++
+			}
+		}
+	}
+	return carried
+}
+
+// readFields reads the declared fields off the form.
+//
+// A row whose name is cleared is a field removed from the vocabulary. The
+// values stay in the task files: deleting a property from a thousand tasks
+// because somebody edited a settings page is not something a form should do
+// behind them, and rule 15 goes quiet about a field nobody declares.
+func readFields(r *http.Request, c *project.Config) []project.Field {
+	var out []project.Field
+	for i := 0; ; i++ {
+		at := strconv.Itoa(i)
+		name, present := r.Form["field_name_"+at]
+		if !present {
+			break
+		}
+		clean := strings.TrimSpace(strings.Join(name, ""))
+		if clean == "" {
+			continue
+		}
+
+		f := project.Field{
+			Name:     clean,
+			Label:    strings.TrimSpace(r.FormValue("field_label_" + at)),
+			Kind:     strings.TrimSpace(r.FormValue("field_kind_" + at)),
+			Help:     strings.TrimSpace(r.FormValue("field_help_" + at)),
+			Required: r.FormValue("field_required_"+at) != "",
+			Choices:  splitCommas(r.FormValue("field_choices_" + at)),
+			Types:    splitCommas(r.FormValue("field_types_" + at)),
+		}
+		// A label the same as the name says nothing twice.
+		if f.Label == f.Name {
+			f.Label = ""
+		}
+		out = append(out, f)
+	}
+	return out
 }

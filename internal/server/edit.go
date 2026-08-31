@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +43,43 @@ type editView struct {
 	HasChildren bool
 	// Rollup is what its children add up to, for a container.
 	Rollup string
+	// Fields are the vault's own properties for this type, as controls.
+	Fields []fieldControl
+	// People are the handles already at work in this vault, offered beside the
+	// assignee box.
+	//
+	// It was a bare text input: to move a task you had to know somebody's handle
+	// by heart and type it exactly, and a typo made a person who does not
+	// exist. On a project with a thousand tasks and thirteen people that is not
+	// a field anybody uses twice.
+	//
+	// A list rather than a closed set, because the handles are whatever the
+	// vault says — an import maps them, an agent has one, and somebody arriving
+	// tomorrow is not in it yet.
+	People []string
+}
+
+// fieldControl is one declared property, ready to edit. The kind decides the
+// control: a choice is a list, a flag is a checkbox, a date is a date picker.
+// A text box for all of them would be a form that lets you write nonsense and
+// then reports it.
+type fieldControl struct {
+	Name     string
+	Label    string
+	Kind     string
+	Help     string
+	Value    string
+	Required bool
+	Choices  []choiceOption
+	// Type is the HTML input type for the kinds that are a plain box.
+	Type string
+	// On is a flag's state.
+	On bool
+}
+
+type choiceOption struct {
+	Value    string
+	Selected bool
 }
 
 type parentChoice struct {
@@ -139,6 +177,41 @@ func (s *Server) editView(r *http.Request, c *project.Config, t *task.Task, vers
 	for _, v := range c.EstimateScale() {
 		value := project.Amount(v)
 		view.Scale = append(view.Scale, sizeChoice{Value: value, Selected: value == view.Size})
+	}
+
+	view.People = s.handlesIn(r)
+
+	for _, f := range c.FieldsFor(t.Type) {
+		control := fieldControl{
+			Name: f.Name, Label: f.Shown(), Kind: f.Kind, Help: f.Help,
+			Required: f.Required, Value: strings.TrimSpace(t.Property(f.Name)),
+		}
+		switch f.Kind {
+		case project.FieldNumber:
+			control.Type = "number"
+		case project.FieldDate:
+			control.Type = "date"
+		case project.FieldMoment:
+			control.Type = "text"
+		case project.FieldLink:
+			control.Type = "url"
+		case project.FieldFlag:
+			control.On = strings.EqualFold(control.Value, "true")
+		case project.FieldChoice:
+			// An empty first option, unless the field is required: a choice
+			// somebody has not made is a real state, and a list that forces one
+			// gets a wrong answer rather than no answer.
+			if !f.Required {
+				control.Choices = append(control.Choices, choiceOption{})
+			}
+			for _, value := range f.Choices {
+				control.Choices = append(control.Choices,
+					choiceOption{Value: value, Selected: value == control.Value})
+			}
+		default:
+			control.Type = "text"
+		}
+		view.Fields = append(view.Fields, control)
 	}
 
 	today := s.now().UTC()
@@ -258,6 +331,10 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		if said, err := s.applySprint(r, t); err != nil {
 			return "", nil, err
 		} else if said != "" {
+			changed = append(changed, said)
+		}
+
+		for _, said := range applyFields(r, c, t) {
 			changed = append(changed, said)
 		}
 
@@ -435,4 +512,91 @@ func amounts(scale []float64) string {
 		out = append(out, project.Amount(v))
 	}
 	return strings.Join(out, ", ")
+}
+
+// applyFields reads the vault's own properties off the form.
+//
+// Refused nowhere: a value that does not match its declaration is written and
+// then reported by rule 15. That is the opposite of how a status is handled,
+// and on purpose — a status the board cannot read breaks the board, and a field
+// that says the wrong thing is a mistake in somebody's data. Refusing it would
+// mean a form that will not save until every unrelated field is correct, on a
+// vault imported from a system that had no such rule.
+//
+// A field only offered to some types is not read off a form that did not offer
+// it, so retyping a task does not silently blank the properties of the type it
+// used to be — rule 15 reports the leftovers instead, where a person can see
+// them.
+func applyFields(r *http.Request, c *project.Config, t *task.Task) []string {
+	var said []string
+	for _, f := range c.FieldsFor(t.Type) {
+		name := "field_" + f.Name
+		raw, offered := r.Form[name]
+		if !offered && f.Kind != project.FieldFlag {
+			continue
+		}
+		value := strings.TrimSpace(strings.Join(raw, ""))
+
+		// A checkbox that is off sends nothing at all, which is how a flag says
+		// no. Every other kind treats a missing field as "not asked".
+		if f.Kind == project.FieldFlag {
+			value = "false"
+			if len(raw) > 0 {
+				value = "true"
+			}
+		}
+
+		was := strings.TrimSpace(t.Property(f.Name))
+		if was == value {
+			continue
+		}
+		// A number, a date, a moment and a flag are written plain, so Obsidian
+		// shows them as what they are rather than as strings of them.
+		plain := f.Kind == project.FieldNumber || f.Kind == project.FieldDate ||
+			f.Kind == project.FieldMoment || f.Kind == project.FieldFlag
+		t.SetProperty(f.Name, value, plain)
+
+		switch {
+		case value == "":
+			said = append(said, f.Shown()+" cleared")
+		default:
+			said = append(said, f.Shown()+" "+value)
+		}
+	}
+	return said
+}
+
+// handlesIn is who is already at work in this vault, most tasks first.
+//
+// Read from the tasks rather than from the host: the host knows who may push,
+// and the vault knows who the work is actually on — an agent, or somebody an
+// import mapped, is in the second list and not the first. Ordered by how much
+// they carry, so the people a board is about are at the top of the list.
+func (s *Server) handlesIn(r *http.Request) []string {
+	entries, err := s.entries(r)
+	if err != nil {
+		return nil
+	}
+
+	carries := map[string]int{}
+	for _, e := range entries {
+		if e.Task == nil {
+			continue
+		}
+		if who := strings.TrimSpace(e.Task.Assignee); who != "" {
+			carries[who]++
+		}
+	}
+
+	out := make([]string, 0, len(carries))
+	for who := range carries {
+		out = append(out, who)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if carries[out[i]] != carries[out[j]] {
+			return carries[out[i]] > carries[out[j]]
+		}
+		return out[i] < out[j]
+	})
+	return out
 }
