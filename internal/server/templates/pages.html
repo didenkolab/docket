@@ -30,6 +30,7 @@
       <summary>
         <span class="folder">{{.Name}}</span>
         <span class="count">{{.Pages}}</span>
+        {{if .Make}}<a class="here" href="{{.Make}}" title="a new page in {{.In}}">+ page</a>{{end}}
       </summary>
       {{template "branch" .Children}}
     </details>

@@ -195,3 +195,77 @@ func (r *Repo) PushNew(cred Credential) error {
 	}
 	return nil
 }
+
+// Looking the other way.
+//
+// Every write here is a commit and every commit is sent, and that was the whole
+// of it: the board pushed and never once looked at what had arrived. A vault is
+// a repository, so the other ways in are ordinary — somebody editing in Obsidian
+// on another machine, a merged proposal, an agent working in a clone — and the
+// board went on drawing a board that was out of date with no sign that it was.
+
+// Waiting is how many commits the remote has that this clone does not.
+//
+// It fetches, because the question cannot be answered from what is already
+// here: a stale remote-tracking ref answers about the last time somebody looked.
+// Fetching moves nothing in the working tree, so it is safe to do on a timer.
+func (r *Repo) Waiting(cred Credential) (int, error) {
+	upstream, err := r.output("rev-parse", "--abbrev-ref", "@{upstream}")
+	if err != nil {
+		return 0, ErrNoUpstream
+	}
+	upstream = strings.TrimSpace(upstream)
+
+	args := append(PushArgs(cred), "fetch", "--quiet")
+	if _, err := r.outputWithEnv(PushEnv(cred), args...); err != nil {
+		return 0, classify(err)
+	}
+
+	out, err := r.output("rev-list", "--count", "HEAD.."+upstream)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(out))
+}
+
+// ErrWouldDiverge means the remote has moved and so has this clone, so taking
+// what arrived is a merge rather than a fast-forward.
+var ErrWouldDiverge = errors.New("both sides have commits the other does not")
+
+// ErrNotClean means the working tree has changes that a fast-forward would have
+// to overwrite.
+var ErrNotClean = errors.New("the working tree has uncommitted changes")
+
+// Take brings the remote's commits into this clone, and only when doing so
+// changes nothing that is here.
+//
+// Fast-forward only, and deliberately. A merge of two plans is a decision — the
+// same reasoning that stops the board rebasing when a push is refused — and
+// this one would be made against a working tree somebody may have open in
+// Obsidian. A divergence is reported with the two numbers and left to a person.
+func (r *Repo) Take(cred Credential) (int, error) {
+	waiting, err := r.Waiting(cred)
+	if err != nil || waiting == 0 {
+		return 0, err
+	}
+	ahead, err := r.Unpushed()
+	if err != nil && !errors.Is(err, ErrNoUpstream) {
+		return 0, err
+	}
+	if ahead > 0 {
+		return waiting, ErrWouldDiverge
+	}
+
+	// A fast-forward rewrites files, and anything uncommitted in the way of one
+	// is somebody's unsaved work. The board commits everything it writes, so
+	// this is a person editing in the folder — which is exactly who must not
+	// lose anything.
+	if dirty, err := r.output("status", "--porcelain"); err == nil && strings.TrimSpace(dirty) != "" {
+		return waiting, ErrNotClean
+	}
+
+	if _, err := r.output("merge", "--ff-only", "@{upstream}"); err != nil {
+		return waiting, err
+	}
+	return waiting, nil
+}

@@ -502,6 +502,13 @@ body:has(.board) body > header .bar { max-width: none; }
 
 .column { scroll-snap-align: start; }
 
+/* While a card is in the air the board must scroll by a few pixels at a time,
+   and snapping undoes exactly that: measured, scrollLeft += 22 lands back on 0
+   before the next frame. A board wider than the window could not be dragged
+   across at all, which reads as a card that only ever moves inside its own
+   column. */
+.board.dragging-board { scroll-snap-type: none; }
+
 /* A vault with more statuses than fit scrolls sideways. Cut off with no sign of
  * it, the last column reads as a rendering fault rather than as an invitation,
  * so the edge fades — but only once something has measured that there is
@@ -518,12 +525,17 @@ body:has(.board) body > header .bar { max-width: none; }
  *
  * Columns share the width rather than taking a fixed slice of it: a board is
  * for seeing the whole of the work at once, and a sixth column half off the
- * edge reads as a rendering fault rather than as an invitation to scroll. They
- * stop shrinking at 13rem, below which a title wraps to four lines, and the
- * board scrolls sideways from there. */
+ * edge reads as a rendering fault rather than as an invitation to scroll.
+ *
+ * The floor is 17rem. It was 12, which held up on a board of six columns and
+ * failed on a real one of fourteen: every column hit the floor, and at 192px a
+ * task title wraps to seven lines, so a card became a paragraph and a column
+ * showed three of them. A board that cannot be scanned is not a board. Past
+ * this width the board scrolls sideways, which it already did and which is the
+ * right answer for a fourteen-stage workflow. */
 .column {
   flex: 1 1 0;
-  min-width: 12rem;
+  min-width: 17rem;
   max-width: 22rem;
   min-height: 0;
   display: flex;
@@ -2064,3 +2076,33 @@ details.sprint > summary:hover .version { color: var(--accent); }
   details.sprint > summary .says { margin-left: 0; flex-basis: 100%; }
   .sprint-body { padding-left: 0; }
 }
+
+/* Send and get, side by side. The board pushed for months and never once looked
+   at what had arrived, so the panel had one button and said one half of the
+   truth. */
+.unsent-do { display: flex; gap: var(--s2); flex-wrap: wrap; }
+
+/* Making a page where you are looking.
+   The form always took ?in=, and nothing ever offered it, so putting a page in
+   docs/design meant typing docs/design into a box. A folder you have open is
+   the folder you meant. Quiet until the row is under the pointer, because a
+   tree of folders each shouting "+ page" is a tree nobody can read. */
+.tree summary .here {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tree summary:hover .here,
+.tree summary:focus-within .here { opacity: 1; }
+.tree summary .here:hover { color: var(--accent); }
+/* Never hidden from a keyboard: opacity would leave it focusable but invisible. */
+.tree summary .here:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A name inside a folder: the folder is fixed and reads as part of the field,
+   so the box asks for the one thing it cannot know. */
+.where { display: flex; align-items: center; gap: 0.15rem; margin: 0; flex-wrap: wrap; }
+.where code { color: var(--ink-faint); background: none; padding: 0; white-space: nowrap; }
+.where input { flex: 1 1 12rem; min-width: 0; }

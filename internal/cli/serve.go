@@ -16,6 +16,7 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/server"
 	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/vault"
@@ -201,6 +202,23 @@ func resolveHost(auth, kind, api, root string, stdout, stderr io.Writer) (access
 		return nil, exitOK
 
 	case "git", "auto":
+		// The flag wins, then the vault's own docket.yaml. A self-hosted host has
+		// to be named because a hostname does not say what API is behind it —
+		// and the place to name it is the repository, so that cloning the vault
+		// is enough. That is what sign_in.kind is for, and the server was the
+		// one path that never read it: it refused to start on a vault that had
+		// said, in its own configuration, exactly what it needed to say.
+		if kind == "" || api == "" {
+			if c, err := project.Load(root); err == nil {
+				if kind == "" {
+					kind = c.HostKind()
+				}
+				if api == "" {
+					api = c.HostAPI()
+				}
+			}
+		}
+
 		host, err := access.FromRepository(root, kind, api)
 		if err == nil {
 			return host, exitOK

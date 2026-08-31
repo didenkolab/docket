@@ -112,6 +112,13 @@
     card.addEventListener('dragstart', event => {
       dragged = card;
       moved = false;
+      // Snapping is for flicking between columns and it eats a drag.
+      //
+      // With scroll-snap-type on, a programmatic scroll of a few pixels is
+      // undone before the next frame — measured: scrollLeft += 22 lands on 0.
+      // So the edge pull did nothing at all, and a column past the edge stayed
+      // unreachable. Off while a card is in the air, back afterwards.
+      board.classList.add('dragging-board');
       event.dataTransfer.setData('text/plain', card.dataset.key);
       event.dataTransfer.effectAllowed = 'move';
       // An anchor drags as a link by default, ghost URL and all. Naming the
@@ -124,6 +131,8 @@
 
     card.addEventListener('dragend', () => {
       card.classList.remove('dragging');
+      board.classList.remove('dragging-board');
+      stopPulling();
       clearSlot();
       dragged = null;
       // A drag that ended on the card it started from is not a click.
@@ -234,10 +243,70 @@
     });
   });
 
+  /* ---------- reaching a column that is off the screen ---------- */
+
+  // A board wider than the window cannot be dragged across without this.
+  //
+  // Held card, pointer at the edge, and nothing happens: the board only scrolls
+  // when you are not holding anything, so a column past the edge is somewhere a
+  // card can never go. What it looks like from the outside is a card that only
+  // ever moves inside its own column, which is how this was reported.
+  //
+  // It went unnoticed while a board had six columns and fit. A real workflow
+  // has fourteen.
+  const EDGE = 90;   // how near the edge starts pulling
+  const FASTEST = 22; // pixels per frame at the very edge
+
+  let pulling = 0;
+  let pullingFrame = null;
+
+  function pull() {
+    if (!dragged || pulling === 0) {
+      pullingFrame = null;
+      return;
+    }
+    board.scrollLeft += pulling;
+    pullingFrame = requestAnimationFrame(pull);
+  }
+
+  // Speed rises with how far into the margin the pointer is, so the edge is
+  // approachable rather than a cliff.
+  function pullTowards(x) {
+    const box = board.getBoundingClientRect();
+    const intoLeft = x - box.left;
+    const intoRight = box.right - x;
+
+    if (intoLeft < EDGE && board.scrollLeft > 0) {
+      pulling = -Math.ceil(FASTEST * (1 - Math.max(intoLeft, 0) / EDGE));
+    } else if (intoRight < EDGE && board.scrollLeft < board.scrollWidth - board.clientWidth - 1) {
+      pulling = Math.ceil(FASTEST * (1 - Math.max(intoRight, 0) / EDGE));
+    } else {
+      pulling = 0;
+    }
+    if (pulling !== 0 && pullingFrame === null) {
+      pullingFrame = requestAnimationFrame(pull);
+    }
+  }
+
+  function stopPulling() {
+    pulling = 0;
+    if (pullingFrame !== null) {
+      cancelAnimationFrame(pullingFrame);
+      pullingFrame = null;
+    }
+  }
+
   // The board itself, so a card dropped in the gutter goes back rather than
   // vanishing into the page.
-  board.addEventListener('dragover', event => { if (dragged) event.preventDefault(); });
-  board.addEventListener('drop', event => { event.preventDefault(); clearSlot(); });
+  board.addEventListener('dragover', event => {
+    if (!dragged) return;
+    event.preventDefault();
+    pullTowards(event.clientX);
+  });
+  board.addEventListener('dragleave', event => {
+    if (!board.contains(event.relatedTarget)) stopPulling();
+  });
+  board.addEventListener('drop', event => { event.preventDefault(); stopPulling(); clearSlot(); });
 
   function recount() {
     board.querySelectorAll('.column').forEach(column => {

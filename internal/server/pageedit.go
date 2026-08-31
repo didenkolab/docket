@@ -25,14 +25,22 @@ type pageForm struct {
 	Version string
 	New     bool
 	Error   string
+	// In is the folder a new page is being made in, so the form asks for a name
+	// rather than for a path.
+	//
+	// The path box was the only way in, and it meant knowing and typing
+	// docs/design before writing anything — for a page you were making because
+	// you were looking at docs/design. The folder you are in is the folder you
+	// meant; the form says so and asks for the one part it cannot know.
+	In string
+	// Name is the file name inside In, without .md.
+	Name string
 }
 
 func (s *Server) handlePageNewForm(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
-	s.render(w, r, "page-edit.html", c, "New page", pageForm{
-		Path: strings.TrimPrefix(r.URL.Query().Get("in"), "/"),
-		New:  true,
-	})
+	in := strings.Trim(strings.TrimSpace(r.URL.Query().Get("in")), "/")
+	s.render(w, r, "page-edit.html", c, "New page", pageForm{In: in, New: true})
 }
 
 func (s *Server) handlePageEditForm(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +84,8 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 
 	form := pageForm{
 		Path:    strings.TrimSpace(r.FormValue("path")),
+		In:      strings.Trim(strings.TrimSpace(r.FormValue("in")), "/"),
+		Name:    strings.Trim(strings.TrimSpace(r.FormValue("name")), "/"),
 		Title:   strings.TrimSpace(r.FormValue("title")),
 		Body:    normaliseNewlines(r.FormValue("body")),
 		Version: r.FormValue("version"),
@@ -86,6 +96,21 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 		form.Error = message
 		w.WriteHeader(http.StatusBadRequest)
 		s.render(w, r, "page-edit.html", c, "Page", form)
+	}
+
+	// A name inside a folder is the ordinary way in; a whole path is still
+	// accepted, because somebody who knows where a page goes should not have to
+	// go and find the folder first.
+	if form.Path == "" && form.Name != "" {
+		if form.In != "" {
+			form.Path = form.In + "/" + form.Name
+		} else {
+			form.Path = form.Name
+		}
+	}
+	if form.Path == "" {
+		reject("A page needs a name.")
+		return
 	}
 
 	rel, err := pagePath(form.Path)

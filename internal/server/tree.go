@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/url"
 	"sort"
 	"strings"
 )
@@ -37,6 +38,33 @@ type pageNode struct {
 	// Pages is how many pages are anywhere beneath a folder, so a closed folder
 	// says whether opening it is worth it.
 	Pages int
+	// In is the folder's own path, for making a page inside it.
+	//
+	// The server always understood ?in=, and the interface never offered it, so
+	// the only way to put a page in docs/design was to type docs/design into a
+	// box. A folder you are looking at is the folder you meant.
+	In string
+	// Make is where to go to make a page here, empty when the reader may not.
+	//
+	// Decided in Go rather than in the template. A nested template rebinds `$`
+	// to what was passed to it, so `$.You.CanWrite` inside the recursive branch
+	// was asking a tree of folders about a permission it does not have — and
+	// silently answering no, which is why the link never appeared.
+	Make string
+}
+
+// offerMaking fills in where a page can be made, for a reader who may.
+func offerMaking(nodes []pageNode, may bool) []pageNode {
+	if !may {
+		return nodes
+	}
+	for i := range nodes {
+		if nodes[i].IsFolder() {
+			nodes[i].Make = "/pages/new?in=" + url.QueryEscape(nodes[i].In)
+			nodes[i].Children = offerMaking(nodes[i].Children, may)
+		}
+	}
+	return nodes
 }
 
 // IsFolder reports whether this holds other things.
@@ -69,6 +97,8 @@ type builder struct {
 	// page is set on a leaf.
 	page  titled
 	isDoc bool
+	// at is a folder's path from the space root, so a page can be made in it.
+	at string
 }
 
 func (b *builder) add(segments []string, page titled) {
@@ -82,10 +112,21 @@ func (b *builder) add(segments []string, page titled) {
 	}
 	child, ok := b.children[name]
 	if !ok {
-		child = &builder{children: map[string]*builder{}}
+		// A folder remembers where it is, so the interface can offer to make a
+		// page in it. Built from the page's own path rather than carried down,
+		// because that is the path a link and a form both need.
+		child = &builder{children: map[string]*builder{}, at: joinPath(b.at, name)}
 		b.children[name] = child
 	}
 	child.add(segments[1:], page)
+}
+
+// joinPath is a folder's path from the space root.
+func joinPath(parent, name string) string {
+	if parent == "" {
+		return name
+	}
+	return parent + "/" + name
 }
 
 // build turns the map into a sorted slice: folders first, then pages, each in
@@ -98,6 +139,7 @@ func (b *builder) build() []pageNode {
 		if !child.isDoc {
 			node.Children = child.build()
 			node.Pages = count(node.Children)
+			node.In = child.at
 			nodes = append(nodes, node)
 			continue
 		}

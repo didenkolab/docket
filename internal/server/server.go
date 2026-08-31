@@ -192,6 +192,11 @@ func New(root string, opts Options) (*Server, error) {
 			s.auth = newAuthority(repos, life)
 		}
 	}
+
+	// Looking at what has arrived on the remote, on the same rhythm as
+	// everything else that asks a host a question. A fetch moves nothing here,
+	// so it is safe without anybody asking; taking what it finds is a button.
+	s.watchRemote(recheck)
 	return s, nil
 }
 
@@ -414,6 +419,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /branch/{ref}", s.handleBranch)
 	mux.HandleFunc("GET /change/{ref}", s.handlePlanChange)
 	mux.HandleFunc("POST /review", s.handleReview)
+	mux.HandleFunc("POST /take", s.handleTake)
 	mux.HandleFunc("GET /pages/new", s.handlePageNewForm)
 	mux.HandleFunc("POST /pages/save", s.handlePageSave)
 	mux.HandleFunc("POST /preview", s.handlePreview)

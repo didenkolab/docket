@@ -191,6 +191,25 @@ type Reader interface {
 	Units(dir string) ([]string, error)
 }
 
+// declaredPriorities is the priorities the source lists, in its own order. An
+// empty result is the ordinary case for a snapshot taken before this was
+// captured, and the caller falls back to alphabetical.
+func declaredPriorities(snap Reader) []string {
+	var priorities []struct {
+		Name string `json:"name"`
+	}
+	if err := snap.ReadJSON("meta/priorities.json", &priorities); err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(priorities))
+	for _, p := range priorities {
+		if p.Name != "" {
+			out = append(out, p.Name)
+		}
+	}
+	return out
+}
+
 func fieldCatalogue(snap Reader) (map[string]string, error) {
 	var fields []struct {
 		ID     string `json:"id"`
@@ -394,6 +413,45 @@ func (m *Maps) StatusOrder() []StatusMap {
 		sort.Slice(group, func(i, j int) bool { return group[i].Name < group[j].Name })
 		out = append(out, group...)
 	}
+	return out
+}
+
+// PriorityOrder is the priorities in the order the source declares them, most
+// important first.
+//
+// Alphabetical order is what Values gives, and for a priority it is nonsense:
+// a real project came out as high, highest, low, lowest, medium. The vault then
+// takes the middle of the list as its default, which made "low" the default,
+// and the board's colouring means whatever position implies — so every one of
+// them was wrong.
+//
+// Jira states the order and the extract keeps it. A priority the order does not
+// mention follows the ones it does, alphabetically, so a value that appeared on
+// an issue but not in the metadata is still offered rather than dropped.
+func (m *Maps) PriorityOrder(declared []string) []string {
+	rank := make(map[string]int, len(declared))
+	for i, name := range declared {
+		if mapped, known := m.Priorities[name]; known && mapped != "" {
+			if _, seen := rank[mapped]; !seen {
+				rank[mapped] = i
+			}
+		}
+	}
+
+	out := Values(m.Priorities)
+	sort.SliceStable(out, func(i, j int) bool {
+		a, knownA := rank[out[i]]
+		b, knownB := rank[out[j]]
+		switch {
+		case knownA && knownB:
+			return a < b
+		case knownA:
+			return true
+		case knownB:
+			return false
+		}
+		return out[i] < out[j]
+	})
 	return out
 }
 

@@ -61,7 +61,7 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 		return nil, fmt.Errorf("the snapshot holds no issues for project %s", opts.Project)
 	}
 
-	if err := writeConfig(opts.Root, opts.Project, projectName(issues, opts.Project), maps); err != nil {
+	if err := writeConfig(opts.Root, opts.Project, projectName(issues, opts.Project), maps, declaredPriorities(snap)); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func projectName(issues []sourceIssue, fallback string) string {
 
 // writeConfig builds docket.yaml from the maps, so the vault's vocabulary is
 // exactly what the import decided rather than the scaffold's defaults.
-func writeConfig(root, key, name string, maps *Maps) error {
+func writeConfig(root, key, name string, maps *Maps, priorities []string) error {
 	if _, err := vault.Init(root, vault.Options{Key: key, Name: name}); err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func writeConfig(root, key, name string, maps *Maps) error {
 		Name:       name,
 		Projects:   []project.Project{{Key: key, Name: name}},
 		Types:      typesOf(maps.Types),
-		Priorities: Values(maps.Priorities),
+		Priorities: maps.PriorityOrder(priorities),
 	}
 	for _, mapped := range maps.StatusOrder() {
 		c.Statuses = append(c.Statuses, project.Status{Name: mapped.Name, Category: mapped.Category})

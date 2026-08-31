@@ -164,6 +164,13 @@ type card struct {
 	// Size is the estimate as written, or empty when nobody has said. On the
 	// card because it is half of what a card is picked up for.
 	Size string
+	// Notable says the priority is worth showing.
+	//
+	// A real board came out with "medium" on every one of eleven hundred cards,
+	// which is the badge-that-is-always-there again: it costs a line on every
+	// card and tells nobody anything. The default is the value that says
+	// "nobody has thought about this", so the ones worth seeing are the others.
+	Notable bool
 	// Sprint is the sprint this card is in, when the vault runs them.
 	Sprint string
 	// Blocked is set when something this card waits on is unfinished. The one
@@ -364,6 +371,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 				if e.Task.Sized() {
 					drawn.Size = project.Amount(e.Task.Size())
 				}
+				drawn.Notable = e.Task.Priority != configOf(e.Project).DefaultPriority()
 				view.Columns[i].Cards = append(view.Columns[i].Cards, drawn)
 				view.Total++
 			}
@@ -671,7 +679,10 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
-	s.render(w, r, "pages.html", c, "Pages", newPagesView(s.pagesTitled()))
+	view := newPagesView(s.pagesTitled())
+	who, _ := s.whoIsAsking(r)
+	view.Tree = offerMaking(view.Tree, who.CanWrite())
+	s.render(w, r, "pages.html", c, "Pages", view)
 }
 
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
@@ -737,6 +748,13 @@ type hitTask struct {
 	// Size is the estimate as written, or empty when nobody has said. On the
 	// card because it is half of what a card is picked up for.
 	Size string
+	// Notable says the priority is worth showing.
+	//
+	// A real board came out with "medium" on every one of eleven hundred cards,
+	// which is the badge-that-is-always-there again: it costs a line on every
+	// card and tells nobody anything. The default is the value that says
+	// "nobody has thought about this", so the ones worth seeing are the others.
+	Notable bool
 	// Sprint is the sprint this card is in, when the vault runs them.
 	Sprint string
 	// Blocked is set when something this card waits on is unfinished. The one

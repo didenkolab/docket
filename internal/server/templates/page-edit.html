@@ -18,9 +18,25 @@
   <input type="hidden" name="version" value="{{$data.Version}}">
   <input type="hidden" name="new" value="{{if $data.New}}1{{else}}0{{end}}">
 
+  {{if and $data.New $data.In}}
+  <input type="hidden" name="in" value="{{$data.In}}">
+  <label for="name">Name</label>
+  <p class="where">
+    <code>{{$data.In}}/</code><input id="name" name="name" value="{{$data.Name}}" required
+      placeholder="session-model" autofocus><code>.md</code>
+  </p>
+  <p class="footnote inline">The name is what a <code>[[wikilink]]</code> to this page says, and
+  what the graph labels it — so it is the title in words, not a slug.</p>
+  {{else if $data.New}}
+  <label for="name">Path</label>
+  <input id="name" name="name" value="{{$data.Name}}" required
+         placeholder="docs/auth/session-model">
+  <p class="footnote inline">Or open a folder on the Pages tree and make it there, and this
+  becomes a name rather than a path.</p>
+  {{else}}
   <label for="path">Path</label>
-  <input id="path" name="path" value="{{$data.Path}}" required
-         placeholder="docs/auth/session-model"{{if not $data.New}} readonly{{end}}>
+  <input id="path" name="path" value="{{$data.Path}}" required readonly>
+  {{end}}
   <p class="footnote inline">Under <code>docs/</code>, without <code>.md</code>. Folders are
   made as needed.</p>
 
