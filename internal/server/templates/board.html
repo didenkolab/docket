@@ -57,14 +57,16 @@
       <a class="card" href="{{.Href}}"
          data-key="{{.Key}}" data-status="{{.Status}}" data-version="{{.Version}}"
          data-reachable="{{.Reachable}}">
-        <span class="key">{{.Key}}{{if .Blocked}} <span class="blocked" title="waiting on something unfinished">blocked</span>{{end}}</span>
-        {{if .Epic}}<span class="epic" title="{{.EpicTitle}}">{{.EpicTitle}}</span>{{end}}
+        <span class="card-head">
+          <span class="key">{{.Key}}</span>
+          {{if .Blocked}}<span class="blocked" title="waiting on something unfinished">blocked</span>{{end}}
+        </span>
         <span class="card-title">{{.Title}}</span>
         <span class="meta">
-          {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
+          {{if .Epic}}<span class="epic" title="{{.EpicTitle}}">{{.EpicTitle}}</span>{{end}}
           <span class="priority p-{{.Priority}}">{{.Priority}}</span>
+          {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
           {{range .Labels}}<span class="label">{{.}}</span>{{end}}
-          {{range .Tags}}<span class="tag">#{{.}}</span>{{end}}
         </span>
       </a>
       {{end}}

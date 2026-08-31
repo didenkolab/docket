@@ -1259,3 +1259,78 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
   .menu, .menu > summary { width: 100%; }
   .menu-list { width: 100%; }
 }
+
+/* A row of fields, each as wide as what goes in it.
+ *
+ * A stacked form gave a priority the same width as a title, which is what makes
+ * a form read as unconsidered: the width of a field is a statement about what
+ * belongs in it, and one width for everything makes no statement at all. So the
+ * short values sit in a row and take the width they need; prose stays full. */
+.stacked .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  margin-top: var(--s4);
+}
+
+.stacked .row .field { display: flex; flex-direction: column; }
+.stacked .row .field > label { margin-top: 0; }
+.stacked .row select, .stacked .row input { width: auto; min-width: 9rem; }
+.stacked .row .field:last-child input { min-width: 12rem; }
+
+@media (max-width: 46rem) {
+  .stacked .row { gap: var(--s3); }
+  .stacked .row .field { flex: 1 1 9rem; }
+  .stacked .row select, .stacked .row input { width: 100%; min-width: 0; }
+}
+
+/* ---- board density ---- */
+
+/* The column heading stays while its column scrolls. A long column loses its
+ * heading exactly when you most need it — halfway down, deciding whether the
+ * card you are looking at is in review or in progress. */
+.column-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--sunken);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+/* The key, the blocked flag and the epic on one line.
+ *
+ * They are all the same thing — small print about which larger thing this is —
+ * and giving each its own line cost a row on every card in the vault. */
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.card .key { display: inline; flex: none; }
+.card .epic { margin-top: 0; min-width: 0; }
+.card-title { margin: 0.3rem 0 var(--s2); font-weight: 500; }
+
+/* Tags are not on a card.
+ *
+ * A tag is a set somebody asks for, not a fact about the thing — you filter by
+ * it, you do not read it here. On a column two hundred pixels wide, four
+ * dimensions of metadata wrap to four lines and the board stops being scannable,
+ * which is the one thing a board is for. See docs/design/how-things-connect.md
+ * in docket-board: the card carries what you scan for, and the filter bar carries
+ * what you ask for. */
+.card .meta { gap: 0.3rem; row-gap: 0.2rem; }
+
+/* The epic sits with the rest of the small print, not on the key's line.
+ *
+ * Three things on one line — the key, a blocked flag and an epic name — meant
+ * the epic was truncated to a letter and a full stop on any card that was
+ * blocked. It is the same kind of information as the priority and the labels:
+ * small print about which larger thing this is. Down there it takes the width
+ * it needs, wraps like everything else, and competes with nothing.
+ *
+ * Not a link, however much one would help: the whole card is an anchor, and an
+ * anchor inside an anchor is not markup a browser will keep — it closes the
+ * outer one at the inner, and every card spills its metadata onto the page. */
+.card .meta .epic { order: -1; max-width: 100%; }

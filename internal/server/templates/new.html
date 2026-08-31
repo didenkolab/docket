@@ -11,29 +11,39 @@
 <form class="stacked" method="post" action="/new">
   {{template "csrf" $}}
   <input type="hidden" name="parent" value="{{$data.Parent}}">
-  <label for="project">Project</label>
-  <select id="project" name="project">
-    {{range .Config.Projects}}
-    <option value="{{.Key}}"{{if eq .Key $selected}} selected{{end}}>{{.Key}} — {{.Name}}</option>
-    {{end}}
-  </select>
-
+  {{$c := .Config}}
   <label for="title">Title</label>
   <input id="title" name="title" required autofocus placeholder="Fix login redirect loop">
 
-  {{$c := .Config}}
-  <label for="type">Type</label>
-  <select id="type" name="type">
-    {{range $c.TypeNames}}<option value="{{.}}"{{if eq . $c.DefaultType}} selected{{end}}>{{.}}</option>{{end}}
-  </select>
+  <div class="row">
+    <div class="field">
+      <label for="project">Project</label>
+      <select id="project" name="project">
+        {{range .Config.Projects}}
+        <option value="{{.Key}}"{{if eq .Key $selected}} selected{{end}}>{{.Key}} — {{.Name}}</option>
+        {{end}}
+      </select>
+    </div>
 
-  <label for="priority">Priority</label>
-  <select id="priority" name="priority">
-    {{range $c.Priorities}}<option value="{{.}}"{{if eq . $c.DefaultPriority}} selected{{end}}>{{.}}</option>{{end}}
-  </select>
+    <div class="field">
+      <label for="type">Type</label>
+      <select id="type" name="type">
+        {{range $c.TypeNames}}<option value="{{.}}"{{if eq . $c.DefaultType}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
 
-  <label for="assignee">Assignee</label>
-  <input id="assignee" name="assignee" placeholder="agent/claude">
+    <div class="field">
+      <label for="priority">Priority</label>
+      <select id="priority" name="priority">
+        {{range $c.Priorities}}<option value="{{.}}"{{if eq . $c.DefaultPriority}} selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="assignee">Assignee</label>
+      <input id="assignee" name="assignee" placeholder="agent/claude">
+    </div>
+  </div>
 
   <label for="body">Description</label>
   <textarea id="body" name="body" rows="6" data-editor placeholder="What needs to happen, and why."></textarea>
