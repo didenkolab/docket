@@ -369,8 +369,21 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		return
 	}
 
+	// The columns of the project being looked at, not of everything in the
+	// space. A workspace's statuses are the union of its projects' — which is
+	// the only honest answer for "every project", and the wrong one for a tab:
+	// a board of eleven hundred Acme tasks came out with twenty one columns,
+	// fifteen of them belonging to somebody else's workflow and permanently
+	// empty. A column a card cannot be dropped into is a column in the way.
+	drawn := c
+	if selected != "" {
+		if own, _, err := sp.ConfigOf(selected); err == nil {
+			drawn = own
+		}
+	}
+
 	view := boardView{Selected: selected, Ref: ref}
-	for _, status := range c.Statuses {
+	for _, status := range drawn.Statuses {
 		view.Columns = append(view.Columns, column{Status: status})
 	}
 
@@ -448,7 +461,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		sortCards(view.Columns[i].Cards)
 		// Counted and added up before anything is put aside, so the head is
 		// about the column and not about the page.
-		view.Columns[i].Size, view.Columns[i].Unsized = totalOf(view.Columns[i].Cards, c)
+		view.Columns[i].Size, view.Columns[i].Unsized = totalOf(view.Columns[i].Cards, drawn)
 		view.Columns[i].Count = len(view.Columns[i].Cards)
 		holdBack(&view.Columns[i], whole, func(status string) string {
 			return elsewhere(r.URL, "full", status)
