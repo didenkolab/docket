@@ -42,6 +42,13 @@ type Page struct {
 	// is checked against.
 	Sections []string
 	Body     string
+	// Example says the page is a worked example the template ships to teach by
+	// being good rather than by being a form.
+	//
+	// It matters at exactly one moment: an import brings real content, and a
+	// document beside it that reads like a real sprint or a real decision but
+	// was invented is worse than no example at all. Somebody will believe it.
+	Example bool
 }
 
 // PageTypes are the kinds a document can declare. A vault may use others — the
@@ -139,6 +146,7 @@ func ParsePage(raw []byte) (Page, bool) {
 		Status     string `yaml:"status"`
 		Date       string `yaml:"date"`
 		Supersedes string `yaml:"supersedes"`
+		Example    bool   `yaml:"example"`
 	}
 	if err := yaml.Unmarshal(front, &read); err != nil {
 		return Page{}, false
@@ -150,6 +158,7 @@ func ParsePage(raw []byte) (Page, bool) {
 		Status:     strings.TrimSpace(read.Status),
 		Date:       strings.TrimSpace(read.Date),
 		Supersedes: strings.TrimSpace(read.Supersedes),
+		Example:    read.Example,
 		Body:       body,
 	}
 	p.Sections = sectionsOf(body)
@@ -214,4 +223,29 @@ func (p Page) Has(section string) bool {
 		}
 	}
 	return false
+}
+
+// DropExamples removes the template's worked examples from a vault.
+//
+// `docket init` keeps them: they teach by being good documents rather than empty
+// headings, and somebody starting a vault has nothing else to look at. An
+// import is the opposite case — it arrives with a thousand real tasks, and an
+// invented sprint sitting among them reads as one the team ran.
+func DropExamples(root string) ([]string, error) {
+	pages, err := Pages(root)
+	if err != nil {
+		return nil, err
+	}
+	var dropped []string
+	for _, p := range pages {
+		if !p.Example {
+			continue
+		}
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash(p.Path))); err != nil {
+			return dropped, err
+		}
+		dropped = append(dropped, p.Path)
+	}
+	sort.Strings(dropped)
+	return dropped, nil
 }

@@ -65,6 +65,19 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 		return nil, err
 	}
 
+	// The scaffold ships worked examples — a sprint with a goal, a decision with
+	// its alternatives — because somebody starting a vault has nothing else to
+	// look at. An import is the opposite case: it arrives with a thousand real
+	// tasks, and an invented sprint sitting among them reads as one the team
+	// ran. Found in a vault of eleven hundred imported issues that also
+	// contained a fortnight nobody had ever worked.
+	if dropped, err := vault.DropExamples(opts.Root); err != nil {
+		return nil, err
+	} else if len(dropped) > 0 {
+		log("dropped %d worked example(s) the scaffold ships: %s",
+			len(dropped), strings.Join(dropped, ", "))
+	}
+
 	comments, err := groupByKey(snap, "comments/"+opts.Project+".jsonl")
 	if err != nil {
 		return nil, err
