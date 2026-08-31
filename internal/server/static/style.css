@@ -210,7 +210,15 @@ h1 { font-size: 1.5rem; font-weight: 650; letter-spacing: -0.015em; margin: 0 0 
 
 /* ---- header ---- */
 
-header {
+/* The page's own header, and only it.
+ *
+ * This was written as a bare `header` selector, and a column heading is a
+ * <header> too — so every column heading was position: sticky with z-index 20
+ * without anybody deciding that. It is why they appeared to stay put while the
+ * page scrolled, and why they painted over the popovers in the real header.
+ * An element selector for a page region leaks into every component that uses
+ * the same element correctly. */
+body > header {
   border-bottom: 1px solid var(--rule);
   background: color-mix(in srgb, var(--paper) 88%, transparent);
   backdrop-filter: saturate(180%) blur(8px);
@@ -220,7 +228,7 @@ header {
   padding: var(--s3) var(--edge);
 }
 
-header .bar { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
+body > header .bar { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; }
 
 .brand {
   font-weight: 700;
@@ -246,9 +254,9 @@ header .bar { display: flex; align-items: center; gap: var(--s4); flex-wrap: wra
  * pixels wider than a phone and the whole page scrolled sideways. min-width: 0
  * as well as wrapping: a flex item will not shrink below its content otherwise,
  * which is the same trap as the board's columns. */
-header nav { display: flex; flex-wrap: wrap; gap: var(--s1); min-width: 0; }
+body > header nav { display: flex; flex-wrap: wrap; gap: var(--s1); min-width: 0; }
 
-header nav a {
+body > header nav a {
   color: var(--ink-soft);
   text-decoration: none;
   font-size: 0.875rem;
@@ -256,9 +264,9 @@ header nav a {
   border-radius: var(--radius-sm);
 }
 
-header nav a:hover { color: var(--ink); background: var(--sunken); }
+body > header nav a:hover { color: var(--ink); background: var(--sunken); }
 
-header .search { margin-left: auto; }
+body > header .search { margin-left: auto; }
 
 .who { display: flex; align-items: center; gap: var(--s2); font-size: 0.8rem; color: var(--ink-soft); }
 
@@ -440,12 +448,19 @@ body:has(.board) {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 body:has(.board) > header { flex: none; }
+
+/* The clipping belongs to main, not to the body.
+ *
+ * On the body it also clipped the header, and the header holds popovers — the
+ * unsent-commits panel and the theme switch — so they were cut off at the first
+ * line. With height and flex above, nothing overflows the body anyway; what has
+ * to be contained is the board. */
 body:has(.board) > main {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -458,7 +473,7 @@ body:has(.board) > main > .shell {
 
 /* …and the header follows it, or the navigation starts a hundred pixels to the
  * right of the first column. */
-body:has(.board) header .bar { max-width: none; }
+body:has(.board) body > header .bar { max-width: none; }
 
 /* The board is one screen, and each column scrolls on its own.
  *
@@ -1249,9 +1264,9 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 
 @media (max-width: 40rem) {
   :root { --edge: 1rem; }
-  header .bar { gap: var(--s2); }
-  header .search { margin-left: 0; width: 100%; }
-  header .search input { width: 100%; }
+  body > header .bar { gap: var(--s2); }
+  body > header .search { margin-left: 0; width: 100%; }
+  body > header .search input { width: 100%; }
 
   /* On a phone the columns stack. Scrolling sideways would land you on
    * whatever the first column happens to be — usually an empty backlog — and
@@ -1602,8 +1617,12 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
  * several across are too narrow to read, so a narrow board goes back to being
  * a page that scrolls, with the columns stacked at full width. */
 @media (max-width: 46rem) {
-  body:has(.board) { height: auto; overflow: visible; display: block; }
-  body:has(.board) > main, body:has(.board) > main > .shell { display: block; min-height: 0; }
+  body:has(.board) { height: auto; display: block; }
+  body:has(.board) > main, body:has(.board) > main > .shell {
+    display: block;
+    min-height: 0;
+    overflow: visible;
+  }
   .board { display: block; overflow-x: visible; }
   .board .column { max-width: none; margin-bottom: var(--s4); }
   .cards { overflow-y: visible; }
