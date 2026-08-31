@@ -2,7 +2,9 @@ package server
 
 import (
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -126,4 +128,65 @@ func run(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
 	}
 	return string(out)
+}
+
+/* ---------- a board over a branch ---------- */
+
+// A branch is a proposal about the plan. The only way to judge one is to see
+// the board it would produce, and that must not disturb the working tree.
+func TestABoardOverABranch(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := vault.Create(root, c, vault.NewOptions{Title: "Session model", Now: noon}); err != nil {
+		t.Fatal(err)
+	}
+	commitAll(t, root, "ACME-2")
+
+	// On a branch, ACME-2 is dropped.
+	git(t, root, "checkout", "-q", "-b", "proposal")
+	path := filepath.Join(root, "ACME", "ACME-2 Session model.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposed := strings.Replace(string(raw), "status: Backlog", "status: Dropped", 1)
+	proposed = strings.Replace(proposed, "status_category: todo", "status_category: done", 1)
+	if err := os.WriteFile(path, []byte(proposed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commitAll(t, root, "Proposal: drop it")
+	git(t, root, "checkout", "-q", "main")
+
+	tree := get(t, h, "/").Body.String()
+	branch := get(t, h, "/branch/proposal").Body.String()
+
+	if !strings.Contains(branch, "proposal") || !strings.Contains(branch, "class=\"proposal\"") {
+		t.Errorf("the board does not say it is showing a branch:\n%s", branch[:min(len(branch), 900)])
+	}
+	// The status differs between the two, and the working tree is untouched.
+	if strings.Contains(tree, "Dropped</b>\n      <span class=\"count\">1") {
+		t.Error("the working tree changed")
+	}
+	if !strings.Contains(branch, `data-ref="proposal"`) {
+		t.Error("the board does not mark itself as a proposal, so dragging stays armed")
+	}
+	if got := currentBranch(t, root); got != "main" {
+		t.Errorf("reading a branch checked it out: now on %s", got)
+	}
+}
+
+func TestAnUnknownBranchIsNotFound(t *testing.T) {
+	_, h, _ := newServer(t)
+	if w := get(t, h, "/branch/nonsense"); w.Code != http.StatusNotFound {
+		t.Errorf("code = %d, want 404", w.Code)
+	}
+}
+
+func currentBranch(t *testing.T, root string) string {
+	t.Helper()
+	return strings.TrimSpace(run(t, root, "rev-parse", "--abbrev-ref", "HEAD"))
 }

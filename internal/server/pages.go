@@ -15,6 +15,7 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -100,6 +101,10 @@ type boardView struct {
 	// once per column.
 	FirstProject string
 	FirstKey     string
+	// Ref is the branch this board is drawn from, empty for the working tree.
+	// A board showing a proposal has to say so, or somebody acts on a plan
+	// nobody has agreed to.
+	Ref string
 }
 
 // sortCards puts a column in the order somebody dragged it into.
@@ -143,12 +148,21 @@ type projectTab struct {
 // Work crosses projects constantly, so the default is all of them and the
 // project is a chip on the card rather than a separate board to go and find.
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
-	c, err := s.config()
+	s.board(w, r, s.space, "")
+}
+
+// board draws the board from one space, which is the working tree or a branch.
+//
+// Reading a branch goes through here rather than through a ref threaded into
+// every helper: a proposal is looked at, not worked in, and a separate way in
+// is a way that cannot be forgotten. See handleBranch.
+func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, ref string) {
+	c, err := sp.Config()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
 		return
 	}
-	entries, err := s.entries()
+	entries, err := sp.Entries()
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return
@@ -161,7 +175,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	view := boardView{Selected: selected}
+	view := boardView{Selected: selected, Ref: ref}
 	for _, status := range c.Statuses {
 		view.Columns = append(view.Columns, column{Status: status})
 	}
@@ -175,7 +189,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		if known, ok := vocabulary[projectKey]; ok {
 			return known
 		}
-		own, _, err := s.space.ConfigOf(projectKey)
+		own, _, err := sp.ConfigOf(projectKey)
 		if err != nil {
 			own = c
 		}

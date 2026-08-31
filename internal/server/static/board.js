@@ -8,6 +8,18 @@
   const board = document.querySelector('.board');
   if (!board) return;
 
+  // A board drawn from a branch is a proposal being looked at, not the working
+  // tree. Dragging a card here would write to the tree — a different plan from
+  // the one on screen — so the cards are not made draggable at all. The banner
+  // above says which branch this is.
+  if (board.dataset.ref) {
+    // A card is an anchor, and an anchor is draggable to the browser whether or
+    // not anything is listening. Saying so explicitly stops the board offering
+    // a gesture that would do nothing.
+    board.querySelectorAll('.card').forEach(card => { card.draggable = false; });
+    return;
+  }
+
   // The token the server drew into this page. A change carries it back, which
   // is what tells the server the change came from a page it served.
   const token = document.querySelector('meta[name="csrf-token"]')?.content || '';

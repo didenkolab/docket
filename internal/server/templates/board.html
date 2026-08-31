@@ -1,6 +1,14 @@
 {{template "head" .}}
 {{$data := .Data}}
 
+{{if $data.Ref}}
+<div class="proposal">
+  <strong>{{$data.Ref}}</strong> — a board as it would be on that branch, read out of the
+  repository rather than off the disk. Nothing here can be changed; a proposal is changed by
+  checking it out. <a href="/">Back to the working tree</a>.
+</div>
+{{end}}
+
 {{if $data.Broken}}
 <div class="notice">
   <strong>{{len $data.Broken}} file(s) could not be read.</strong>
@@ -36,7 +44,7 @@
 </div>
 {{end}}
 
-<div class="board">
+<div class="board"{{if $data.Ref}} data-ref="{{$data.Ref}}"{{end}}>
   {{range $data.Columns}}
   <section class="column {{categoryClass .Status.Category}}" data-status="{{.Status.Name}}">
     <header class="column-head">

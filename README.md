@@ -137,6 +137,29 @@ reads. The exception is the one that changes what you pick up next — a task wa
 unfinished work is marked **blocked** on the board, and blocked by something already done is not
 blocked.
 
+### A plan on a branch
+
+A branch is a proposal about the plan — a release re-scoped, an epic split, a quarter dropped.
+The **Branches** page lists them, and opening one draws the board as it would be, read out of
+the repository rather than off the disk:
+
+```bash
+git switch -c proposal/drop-the-exporter
+# edit the plan, commit, push, open a pull request
+```
+
+The diff is exactly what changed: which tasks moved, what their acceptance criteria became,
+which were dropped. Reviewed the way code is reviewed, on the lines. Merged in one commit, or
+closed, and nothing happened.
+
+No tracker can do this. A plan change in Jira is applied immediately and irreversibly to the one
+live instance, and the record of it is an activity feed nobody reads. There is no plan on a
+branch, no plan under review, and no way to look at two candidate plans.
+
+Looking at a proposal writes nothing and does not touch the working tree, so it cannot disturb
+whoever is working in it. The cards there are not draggable, the page says which branch it is,
+and a proposal is changed by checking it out.
+
 ### A release is a tag
 
 There is no version object, no `fixVersion` to set and no release notes to generate. A release

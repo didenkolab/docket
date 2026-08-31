@@ -89,6 +89,13 @@ func Load(dir string) (*Config, error) {
 		return nil, err
 	}
 
+	return Parse(raw)
+}
+
+// Parse reads a configuration from bytes, for the callers that have the content
+// without having a directory — reading a vault at a point in history, where the
+// file comes out of git rather than off the disk.
+func Parse(raw []byte) (*Config, error) {
 	var c Config
 	if err := yaml.Unmarshal(raw, &c); err != nil {
 		return nil, fmt.Errorf("%s: %w", FileName, err)

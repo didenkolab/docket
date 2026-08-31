@@ -36,7 +36,38 @@ type Space struct {
 	Missing []string
 
 	vaults []*Vault
+
+	// ref is the branch or tag being read, or "" for the working tree.
+	//
+	// A branch is a proposal about the plan, and the only way to judge one is to
+	// see the board it produces. Reading it out of the object database means
+	// looking at a proposal cannot disturb whoever is editing the tree — see
+	// docs/design/git-as-the-database.md.
+	ref string
 }
+
+// At returns the same space read at a branch or tag rather than from the
+// working tree. The original is unchanged, so one request can look at a
+// proposal while another looks at what is checked out.
+func (s *Space) At(ref string) *Space {
+	if ref == "" {
+		return s
+	}
+	other := *s
+	other.ref = ref
+	return &other
+}
+
+// Ref is what this space is reading: a branch or tag, or "" for the files on
+// disk. Everything that writes refuses when it is set — see Writable.
+func (s *Space) Ref() string { return s.ref }
+
+// Writable reports whether this space may be changed.
+//
+// Reading a branch is looking at a proposal; changing one would mean committing
+// to a branch nobody has checked out, which is a thing git can do and a thing
+// no interface should do quietly. A proposal is changed by checking it out.
+func (s *Space) Writable() bool { return s.ref == "" }
 
 // Vault is one repository in the space.
 type Vault struct {
@@ -146,7 +177,7 @@ func (s *Space) Single() *Vault {
 // column a project does not have simply never holds its cards.
 func (s *Space) Config() (*project.Config, error) {
 	if len(s.vaults) == 1 {
-		return project.Load(s.vaults[0].Root)
+		return s.configIn(s.vaults[0])
 	}
 
 	merged := &project.Config{Name: filepath.Base(s.Root)}
@@ -154,7 +185,7 @@ func (s *Space) Config() (*project.Config, error) {
 	seenText := map[string]bool{}
 
 	for _, v := range s.vaults {
-		c, err := project.Load(v.Root)
+		c, err := s.configIn(v)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", v.Prefix, err)
 		}
@@ -194,7 +225,7 @@ func union(into, from []string, seen map[string]bool, kind string) []string {
 // whose statuses, priorities and workflow decide what may happen to its tasks.
 func (s *Space) ConfigOf(projectKey string) (*project.Config, *Vault, error) {
 	for _, v := range s.vaults {
-		c, err := project.Load(v.Root)
+		c, err := s.configIn(v)
 		if err != nil {
 			continue
 		}
@@ -213,11 +244,11 @@ var ErrNoSuchTask = errors.New("no such task")
 func (s *Space) Entries() ([]vault.Entry, error) {
 	var all []vault.Entry
 	for _, v := range s.vaults {
-		c, err := project.Load(v.Root)
+		c, err := s.configIn(v)
 		if err != nil {
 			return nil, err
 		}
-		entries, err := vault.List(v.Root, c)
+		entries, err := s.listIn(v, c)
 		if err != nil {
 			return nil, err
 		}
@@ -229,12 +260,47 @@ func (s *Space) Entries() ([]vault.Entry, error) {
 	return all, nil
 }
 
+// configIn reads one vault's configuration, from the working tree or from the
+// ref this space is looking at.
+//
+// A branch can differ in its vocabulary — a proposal that adds a status is a
+// proposal about the workflow — so a board over a branch reads that branch's
+// configuration rather than the one on disk.
+func (s *Space) configIn(v *Vault) (*project.Config, error) {
+	if s.ref == "" || v.Repo == nil {
+		return project.Load(v.Root)
+	}
+	return vault.ConfigAt(v.Repo, s.ref)
+}
+
+// listIn reads one vault's tasks, from the working tree or from the ref.
+func (s *Space) listIn(v *Vault, c *project.Config) ([]vault.Entry, error) {
+	if s.ref == "" || v.Repo == nil {
+		return vault.List(v.Root, c)
+	}
+	return vault.ListAt(v.Repo, s.ref, c)
+}
+
 // Locate finds a task: the vault that holds it, its path inside that vault, and
 // its path in the space.
 func (s *Space) Locate(key string) (v *Vault, inVault, inSpace string, err error) {
 	for _, candidate := range s.vaults {
-		c, err := project.Load(candidate.Root)
+		c, err := s.configIn(candidate)
 		if err != nil {
+			continue
+		}
+		if s.ref != "" {
+			// At a ref there is no directory to glob, so the task is found the
+			// same way everything else at a ref is: by listing what is there.
+			entries, err := vault.ListAt(candidate.Repo, s.ref, c)
+			if err != nil {
+				continue
+			}
+			for _, e := range entries {
+				if e.Key == key {
+					return candidate, e.Path, candidate.pathIn(e.Path), nil
+				}
+			}
 			continue
 		}
 		rel, err := vault.Find(candidate.Root, c, key)

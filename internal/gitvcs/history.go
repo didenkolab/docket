@@ -284,3 +284,81 @@ func (r *Repo) Shipped(from, to string) ([]string, error) {
 // At is a file's content at a point in history — a tag, a branch, a commit.
 // Empty with no error means the file was not there.
 func (r *Repo) At(ref, path string) ([]byte, error) { return r.Blob(ref, path) }
+
+/* ---------- branches ---------- */
+
+// Branch is one line of work in the repository.
+type Branch struct {
+	Name string
+	// Current is the branch the working tree is on. A board reading files from
+	// disk is reading this one.
+	Current bool
+	Subject string
+	When    time.Time
+}
+
+// Branches are the repository's local branches, the current one first and the
+// rest by how recently they moved.
+//
+// A branch is a proposal about the plan: re-scoping a release, splitting an
+// epic, dropping a quarter's work. This is what lets a board show one without
+// applying it — see docs/design/git-as-the-database.md.
+func (r *Repo) Branches() ([]Branch, error) {
+	const fields = 4
+	out, err := r.output("-c", "core.quotePath=false", "for-each-ref",
+		"--sort=-committerdate",
+		"--format=%(refname:short)%0a%(HEAD)%0a%(committerdate:iso-strict)%0a%(contents:subject)",
+		"refs/heads")
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	var branches []Branch
+	for i := 0; i+fields <= len(lines); i += fields {
+		if lines[i] == "" {
+			continue
+		}
+		when, _ := time.Parse(time.RFC3339, lines[i+2])
+		branches = append(branches, Branch{
+			Name: lines[i], Current: strings.TrimSpace(lines[i+1]) == "*",
+			When: when, Subject: lines[i+3],
+		})
+	}
+
+	sort.SliceStable(branches, func(a, b int) bool { return branches[a].Current && !branches[b].Current })
+	return branches, nil
+}
+
+// Current is the branch the working tree is on, or "" in a detached head.
+func (r *Repo) Current() string {
+	out, err := r.output("symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+// Tree is every file under a directory at one point in history.
+//
+// This is what makes a board over a branch possible without touching the
+// working tree: the files are read out of the object database, so looking at a
+// proposal cannot disturb what somebody is editing.
+func (r *Repo) Tree(ref, dir string) ([]string, error) {
+	args := []string{"-c", "core.quotePath=false", "ls-tree", "-r", "--name-only", ref}
+	if dir != "" {
+		args = append(args, "--", dir)
+	}
+	out, err := r.output(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line != "" {
+			paths = append(paths, line)
+		}
+	}
+	return paths, nil
+}
