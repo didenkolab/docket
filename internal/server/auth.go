@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
@@ -50,9 +51,13 @@ type authority struct {
 	// repos is every repository in the space and the host that answers for it,
 	// in space order. See hosts.go for why this is per repository.
 	//
-	// It changes when a repository is connected to a workspace, so it is read
-	// through repositories() under the lock rather than directly.
-	repos []*repository
+	// Held atomically rather than under mu, and that is not a micro-optimisation
+	// — it is what makes the list safe to read from anywhere. Guarding it with
+	// mu meant a method that already held mu deadlocked the server by reading
+	// it, which happened twice: once in close(), where a token going stale hung
+	// every request, and once in adopt(). A lock-free read cannot be misused
+	// that way.
+	repos atomic.Pointer[[]*repository]
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -62,20 +67,22 @@ type authority struct {
 }
 
 func newAuthority(repos []*repository, life time.Duration) *authority {
-	return &authority{
-		repos:    repos,
+	a := &authority{
 		life:     life,
 		sessions: map[string]*session{},
 		pending:  map[string]*waiting{},
 	}
+	a.repos.Store(&repos)
+	return a
 }
 
-// repositories is the list as it stands. A copy of the slice header, so a
-// caller iterating it cannot see it change halfway through.
+// repositories is the list as it stands. Safe to call while holding mu, which
+// is the whole reason it is not guarded by it.
 func (a *authority) repositories() []*repository {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.repos
+	if held := a.repos.Load(); held != nil {
+		return *held
+	}
+	return nil
 }
 
 // adopt replaces the list, keeping the checker of every repository that is
@@ -97,7 +104,7 @@ func (a *authority) adopt(repos []*repository) {
 			r.checker = old.checker
 		}
 	}
-	a.repos = repos
+	a.repos.Store(&repos)
 }
 
 // hostFor is the host a token would be for, and the repositories it covers.
@@ -148,10 +155,9 @@ func (a *authority) close(id string) {
 	if !ok {
 		return
 	}
-	// a.repos directly, not repositories(): the lock is already held here, and
-	// that method takes it. Calling it deadlocked the whole server the moment a
-	// token stopped working.
-	for _, r := range a.repos {
+	// Forgetting the cached answer everywhere the token was used, so signing out
+	// cannot leave a repository still believing in it.
+	for _, r := range a.repositories() {
 		if r.checker == nil {
 			continue
 		}
@@ -278,6 +284,19 @@ func allowed(st *standing, r *http.Request) string {
 	if r.URL.Path == "/sign-out" {
 		return ""
 	}
+	// Which repositories the workspace holds is not about any one project, and
+	// must not be checked as though it were: a project being made does not
+	// exist yet, so asking whether this person may write to it would refuse
+	// every creation. It takes administering something here, which is what the
+	// handlers check again for themselves.
+	if strings.HasPrefix(r.URL.Path, "/projects") {
+		if !st.canConfigureAnything() {
+			return "Changing which repositories this workspace holds needs administrator " +
+				"access to a repository already in it."
+		}
+		return ""
+	}
+
 	// How the vault describes itself, and how people get into it, are the two
 	// things a member may read and may not change. /admin is a page anybody
 	// signed in may look at — it says who has access — but writing there sets

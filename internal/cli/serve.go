@@ -18,6 +18,7 @@ import (
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/server"
 	"github.com/vadymdidenkolab/docket/internal/space"
+	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
 const serveUsage = `docket serve — a board and an API over a vault.
@@ -55,6 +56,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	proxied := flags.Bool("behind-proxy", false,
 		"a reverse proxy sits in front, so rate limits follow the client it names "+
 			"rather than the proxy")
+	template := flags.String("template", "",
+		"the repository a new project is scaffolded from\n"+
+			"    \t(default "+vault.DefaultTemplate+")")
 	clientID := flags.String("device-client-id", "",
 		"override the OAuth application people sign in with, for this server only\n"+
 			"    \t(public, not a secret; normally set on the Access page and kept in docket.yaml)")
@@ -118,6 +122,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		OnLoopback: onLoopback(*addr),
 
 		DeviceClientID: deviceClientID(*clientID),
+		Template:       *template,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)

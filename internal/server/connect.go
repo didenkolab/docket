@@ -41,6 +41,9 @@ type connectView struct {
 	Projects  []connectRow
 	Error     string
 	Saved     string
+	// Create is where a new project could be made, empty when nowhere can be
+	// asked for one.
+	Create createView
 }
 
 // connectRow is a project already here, so the page shows what it is adding to.
@@ -67,6 +70,7 @@ func (s *Server) connectPage(r *http.Request, problem, saved string) connectView
 	if !sp.Workspace {
 		return view
 	}
+	view.Create.Hosts = s.creatableHosts()
 
 	for _, v := range sp.Vaults() {
 		row := connectRow{Path: v.Prefix}
@@ -279,7 +283,7 @@ func (s *Server) reload() error {
 		return err
 	}
 	if s.auth != nil {
-		repos, err := newRepositories(sp, nil, s.recheck)
+		repos, err := newRepositories(sp, s.namedHost, s.recheck)
 		if err != nil {
 			return err
 		}

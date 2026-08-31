@@ -64,8 +64,11 @@ func workspaceToGrow(t *testing.T) (*Server, http.Handler, string, string) {
 	shell(t, second, "git", "commit", "-q", "-m", "start")
 
 	s, err := New(root, Options{
-		Author:          gitvcs.Author{Name: "Server", Email: "server@example.com"},
-		SessionLife:     time.Hour,
+		Author:      gitvcs.Author{Name: "Server", Email: "server@example.com"},
+		SessionLife: time.Hour,
+		// A local template: making a project scaffolds from one, and a test
+		// must not reach the network.
+		Template:        template,
 		Unauthenticated: true,
 	})
 	if err != nil {

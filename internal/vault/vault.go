@@ -102,6 +102,12 @@ func Init(dir string, opts Options) ([]string, error) {
 
 	source := filepath.Join(staging, "template")
 	clone := exec.Command("git", "clone", "--depth", "1", "--quiet", opts.Template, source)
+	// Nothing may prompt. A server scaffolding a project would hang forever
+	// waiting for a password nobody is there to type, and a person at a
+	// terminal is better told the template is unreachable than asked to
+	// authenticate to it.
+	clone.Env = append(clone.Environ(),
+		"GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=", "SSH_ASKPASS=")
 	if out, err := clone.CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("cannot read the template at %s: %s",
 			opts.Template, strings.TrimSpace(string(out)))

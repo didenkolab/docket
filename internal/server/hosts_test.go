@@ -108,14 +108,14 @@ func workspaceOnTwoHosts(t *testing.T) (*Server, http.Handler, *twoHosts, *twoHo
 	}
 	// The hosts are assigned per repository, standing in for what a remote and
 	// a docket.yaml would have resolved to.
-	if len(s.auth.repos) != 2 {
-		t.Fatalf("server built %d repositories", len(s.auth.repos))
+	if len(s.auth.repositories()) != 2 {
+		t.Fatalf("server built %d repositories", len(s.auth.repositories()))
 	}
 	// These remotes are real URLs, because the host is resolved from them — but
 	// nothing here is about pushing, and a test must not reach the network.
 	s.pushes = nil
 
-	for _, repo := range s.auth.repos {
+	for _, repo := range s.auth.repositories() {
 		host := first
 		if repo.projects[0] == "TWO" {
 			host = second
@@ -285,7 +285,7 @@ func TestARepositoryNobodyVouchesForIsReadOnly(t *testing.T) {
 
 	// Take the host away from TWO, as though it had no remote at all.
 	server, _, _, _ := workspaceOnTwoHosts(t)
-	for _, repo := range server.auth.repos {
+	for _, repo := range server.auth.repositories() {
 		if repo.projects[0] == "TWO" {
 			repo.host, repo.checker, repo.why = nil, nil, "no origin remote"
 		}

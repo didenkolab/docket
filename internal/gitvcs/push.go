@@ -160,3 +160,38 @@ func orDefault(v, fallback string) string {
 	}
 	return v
 }
+
+// Start makes dir a repository on a default branch, pointed at remote.
+//
+// For a project whose repository was just created on a host and is empty: there
+// is nothing to clone, so the local side is made first and pushed.
+func Start(dir, remote string) error {
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"remote", "add", "origin", remote},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git %s: %s", strings.Join(args, " "),
+				strings.TrimSpace(string(out)))
+		}
+	}
+	return nil
+}
+
+// PushNew sends a branch that has no upstream yet and sets one.
+//
+// Push refuses to guess where a branch belongs; this is the one case where the
+// answer is not a guess, because the remote was made for it a moment ago.
+func (r *Repo) PushNew(cred Credential) error {
+	branch := r.Current()
+	if branch == "" {
+		return errors.New("not on a branch, so there is nothing to push")
+	}
+	args := append(PushArgs(cred), "push", "-u", "origin", branch)
+	if _, err := r.outputWithEnv(PushEnv(cred), args...); err != nil {
+		return classify(err)
+	}
+	return nil
+}

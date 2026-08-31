@@ -67,6 +67,9 @@ type Options struct {
 	// loopback and is reachable from the world: the two facts have to be
 	// combined by whoever knows both. See local.go.
 	OnLoopback bool
+	// Template is the repository a new project is scaffolded from. Empty means
+	// vault.DefaultTemplate, which is the public one.
+	Template string
 	// Unauthenticated runs the server with nobody signed in, whatever the
 	// repositories say about their hosts.
 	//
@@ -107,6 +110,11 @@ type Server struct {
 	recheck time.Duration
 	// onLoopback says the machine's own credentials may sign somebody in.
 	onLoopback bool
+	// template is what a new project starts as. See vault.DefaultTemplate.
+	template string
+	// namedHost is the host given on the command line, kept so that reopening
+	// the space does not lose it.
+	namedHost access.Host
 	// pushes is what has been sent to each remote, and what went wrong. Nil
 	// when nothing here has a remote to send to.
 	pushes *pushing
@@ -156,6 +164,8 @@ func New(root string, opts Options) (*Server, error) {
 		deviceClientID: strings.TrimSpace(opts.DeviceClientID),
 		onLoopback:     opts.OnLoopback && !opts.BehindProxy,
 		pushes:         newPushing(),
+		template:       orTemplate(opts.Template),
+		namedHost:      opts.Host,
 	}
 	s.space.Store(sp)
 	recheck, life := opts.Recheck, opts.SessionLife
@@ -418,6 +428,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /theme", s.handleTheme)
 	mux.HandleFunc("GET /projects", s.handleConnectForm)
 	mux.HandleFunc("POST /projects", s.handleConnect)
+	mux.HandleFunc("POST /projects/new", s.handleCreateProject)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)
@@ -564,4 +575,12 @@ func categoryClass(category string) string {
 	default:
 		return "todo"
 	}
+}
+
+// orTemplate is the template to scaffold a new project from.
+func orTemplate(named string) string {
+	if named = strings.TrimSpace(named); named != "" {
+		return named
+	}
+	return vault.DefaultTemplate
 }

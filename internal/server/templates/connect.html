@@ -55,6 +55,66 @@
   A repository that is not a docket vault is refused rather than scaffolded over: it is somebody
   else's repository, and <code>docket init</code> in it is a decision to make there.
 </p>
+
+{{with $data.Create.Hosts}}
+<h2>Or make a new one</h2>
+
+<p class="footnote">
+  There is nothing to clone yet: the repository is made on the host, scaffolded from the
+  template, and pushed — so its history starts with what the project is.
+</p>
+
+<form class="stacked" method="post" action="/projects/new">
+  {{template "csrf" $}}
+  <div class="row">
+    <div class="field">
+      <label for="key">Project key</label>
+      <input id="key" name="key" required placeholder="ACME" class="field-short">
+    </div>
+    <div class="field">
+      <label for="name">Project name</label>
+      <input id="name" name="name" placeholder="Acme Platform">
+    </div>
+    <div class="field">
+      <label for="host">Host</label>
+      <select id="host" name="host">
+        {{range .}}<option value="{{.Key}}">{{.Name}}</option>{{end}}
+      </select>
+    </div>
+    <div class="field">
+      <label for="visibility">Who can see it</label>
+      <select id="visibility" name="visibility">
+        <option value="private">Private</option>
+        <option value="public">Public</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="field">
+      <label for="repository">Repository name</label>
+      <input id="repository" name="repository" required placeholder="acme-board">
+    </div>
+    <div class="field">
+      <label for="owner">Owner</label>
+      <input id="owner" name="owner" placeholder="you, or an organisation">
+    </div>
+  </div>
+
+  <label for="description">Description</label>
+  <input id="description" name="description" class="field-wide"
+         placeholder="What this project is, for whoever finds the repository.">
+
+  <button type="submit">Create and add</button>
+</form>
+
+<p class="footnote">
+  Asked for with the credentials you already have — the token you signed in with, or the
+  machine's own. A token needs
+  {{range $i, $h := .}}{{if $i}} or {{end}}<code>{{$h.Scope}}</code> on {{$h.Name}}{{end}}
+  to make a repository; if it does not, the host says so and nothing local happens.
+</p>
+{{end}}
 {{end}}
 {{end}}
 
