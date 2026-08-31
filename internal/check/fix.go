@@ -10,6 +10,30 @@ import (
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
+// Boards rewrites every generated board that has drifted from docket.yaml, and
+// reports which ones it rewrote.
+//
+// The third finding with a right answer: a board is generated from the
+// configuration, so a stale one is not a disagreement between two things a
+// person meant — it is the tool's own output, out of date. A board that has had
+// vault.Marker removed is left alone.
+func Boards(root string) ([]string, error) {
+	c, err := project.Load(root)
+	if err != nil {
+		return nil, err
+	}
+
+	var written []string
+	for _, f := range checkGeneratedBoards(root, c) {
+		full := filepath.Join(root, filepath.FromSlash(f.Path))
+		if err := os.WriteFile(full, []byte(vault.Generated(c)[f.Path]), 0o644); err != nil {
+			return written, err
+		}
+		written = append(written, f.Path)
+	}
+	return written, nil
+}
+
 // Rename is one file whose name no longer says what the task is.
 type Rename struct {
 	From string // relative to the vault root

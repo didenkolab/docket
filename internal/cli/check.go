@@ -17,10 +17,11 @@ Usage:
 Reports every problem it finds, with a file and a line, and exits non-zero when
 there is at least one — so it works as a pre-commit hook.
 
---fix settles the two findings that have a right answer: a file whose name no
-longer matches its title, and a relationship still written as a string rather
-than as a link. Everything else is left alone, because picking a side between
-two things a person meant would be guessing. Flags:
+--fix settles the three findings that have a right answer: a file whose name no
+longer matches its title, a relationship still written as a string rather than
+as a link, and a generated board that has drifted from docket.yaml. Everything
+else is left alone, because picking a side between two things a person meant
+would be guessing. Flags:
 `
 
 func runCheck(args []string, stdout, stderr io.Writer) int {
@@ -33,7 +34,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	quiet := flags.Bool("quiet", false, "print findings only, without the summary")
 	fix := flags.Bool("fix", false,
 		"rename files whose name drifted from their title, rewrite relationships still\n"+
-			"    \twritten as strings, then check again")
+			"    \twritten as strings, regenerate stale boards, then check again")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -162,7 +163,15 @@ func repair(root string, stdout io.Writer) (int, error) {
 		return 0, err
 	}
 
-	touched := len(relinked) + len(renames)
+	boards, err := check.Boards(root)
+	if err != nil {
+		return 0, err
+	}
+	for _, path := range boards {
+		fmt.Fprintf(stdout, "wrote   %s\n", path)
+	}
+
+	touched := len(relinked) + len(renames) + len(boards)
 	if touched > 0 {
 		fmt.Fprintf(stdout, "\n%s. Commit them together with whatever changed.\n",
 			plural(touched, "file changed", "files changed"))

@@ -256,3 +256,26 @@ func TestRemovingAStatusRemovesItsMoves(t *testing.T) {
 		}
 	}
 }
+
+// A vault whose words are its own gets a sensible default, which is what the
+// testbed vault caught: its priorities are низкий, обычный, высокий, критичный,
+// and taking the first would have made every task it created низкий.
+func TestTheDefaultPriorityIsTheMiddleOfTheList(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		priorities []string
+		want       string
+	}{
+		{"four of the vault's own", []string{"низкий", "обычный", "высокий", "критичный"}, "обычный"},
+		{"five, Jira's shape", []string{"lowest", "low", "medium", "high", "highest"}, "medium"},
+		{"one, so there is no choice", []string{"same"}, "same"},
+		{"the word normal wins wherever it is", []string{"a", "b", "normal", "c", "d", "e"}, "normal"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Config{Priorities: tc.priorities}
+			if got := c.DefaultPriority(); got != tc.want {
+				t.Errorf("DefaultPriority() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

@@ -371,3 +371,56 @@ func TestTwoTasksWithTheSameTitleDoNotCollide(t *testing.T) {
 		t.Errorf("not clean:\n%v", findings)
 	}
 }
+
+// A board is generated from docket.yaml, so one that has drifted is the tool's
+// own output out of date rather than two things a person meant — the third
+// finding --fix can settle.
+func TestAStaleBoardIsReportedAndRegenerated(t *testing.T) {
+	root := newVault(t)
+	board := filepath.Join(root, filepath.FromSlash(vault.BoardFile))
+
+	raw, err := os.ReadFile(board)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale := strings.Replace(string(raw), "property: formula.stage", "property: note.status", 1)
+	if stale == string(raw) {
+		t.Fatal("the scaffolded board does not group by the stage formula")
+	}
+	if err := os.WriteFile(board, []byte(stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	findings := run(t, root)
+	if len(findings) != 1 || findings[0].Path != vault.BoardFile {
+		t.Fatalf("want one finding about %s, got %v", vault.BoardFile, findings)
+	}
+
+	written, err := Boards(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(written) != 1 || written[0] != vault.BoardFile {
+		t.Fatalf("--fix wrote %v", written)
+	}
+	if got := run(t, root); len(got) != 0 {
+		t.Errorf("still not clean after regenerating: %v", got)
+	}
+}
+
+// Removing the first line is how a vault says a board is its own, and after
+// that nothing has an opinion about what is in it.
+func TestABoardWithoutTheMarkerIsLeftAlone(t *testing.T) {
+	root := newVault(t)
+	board := filepath.Join(root, filepath.FromSlash(vault.BoardFile))
+
+	if err := os.WriteFile(board, []byte("filters:\n  and:\n    - file.inFolder(\"ACME\")\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := run(t, root); len(got) != 0 {
+		t.Errorf("a board somebody took over was reported: %v", got)
+	}
+	if written, err := Boards(root); err != nil || len(written) != 0 {
+		t.Errorf("--fix overwrote a board it does not own: %v, %v", written, err)
+	}
+}

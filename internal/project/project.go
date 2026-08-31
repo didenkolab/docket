@@ -352,12 +352,19 @@ func (c *Config) FirstStatus() Status { return c.Statuses[0] }
 func (c *Config) HasPriority(v string) bool { return contains(c.Priorities, v) }
 
 // DefaultPriority is the middle of the road: "normal" when the vault has it,
-// otherwise the first one listed.
+// otherwise the middle of the list.
+//
+// The first one listed would be wrong, and quietly. Priorities are written in
+// order, so the first is an extreme — a vault that lists низкий, обычный,
+// высокий, критичный would have made every task it created низкий, and a vault
+// that lists them the other way up would have made every task критичный.
+// Neither is what "no priority given" means. The middle is, and it is what
+// "normal" means in the vault that has the word.
 func (c *Config) DefaultPriority() string {
 	if c.HasPriority("normal") {
 		return "normal"
 	}
-	return c.Priorities[0]
+	return c.Priorities[(len(c.Priorities)-1)/2]
 }
 
 // StatusNames lists every status name, in board order.

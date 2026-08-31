@@ -284,6 +284,8 @@ func checkProjects(root string, c *project.Config) []Finding {
 		}
 	}
 
+	findings = append(findings, checkGeneratedBoards(root, c)...)
+
 	boards, err := os.ReadDir(filepath.Join(root, vault.BoardsDir))
 	if err != nil {
 		return findings
@@ -307,6 +309,33 @@ func checkProjects(root string, c *project.Config) []Finding {
 					"regenerate the boards, or its tasks are invisible", key)})
 		}
 	}
+	return findings
+}
+
+// checkGeneratedBoards reports a generated board that no longer says what the
+// configuration says.
+//
+// A board is derived from docket.yaml, so it goes stale whenever the vocabulary
+// changes or the tool learns to write a better one — and a stale board is not a
+// cosmetic problem: it groups by a status the vault renamed, or draws the
+// columns of a pipeline in the wrong order. There is one right answer, so
+// `--fix` writes it.
+//
+// Only files still carrying vault.Marker are checked. Removing that line is how
+// a vault says a board is its own.
+func checkGeneratedBoards(root string, c *project.Config) []Finding {
+	var findings []Finding
+	for rel, want := range vault.Generated(c) {
+		got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil || !strings.HasPrefix(string(got), vault.Marker) || string(got) == want {
+			continue
+		}
+		findings = append(findings, Finding{rel, 0, RuleProjects,
+			"this board no longer matches " + project.FileName +
+				" — run docket check --fix to regenerate it, or delete its first " +
+				"line to keep it as your own"})
+	}
+	sort.Slice(findings, func(i, j int) bool { return findings[i].Path < findings[j].Path })
 	return findings
 }
 
