@@ -18,11 +18,18 @@
       {{if .Current}}<span class="new">checked out</span>{{end}}
     </a>
     <time>{{.When}}</time>
+    {{if not .Current}}<a class="what-it-does" href="/change/{{.Name}}">What it would do</a>{{end}}
     {{if .Subject}}<p class="context">{{.Subject}}</p>{{end}}
   </li>
   {{end}}
 </ul>
 {{end}}
+
+<p class="footnote">
+  Two ways to read a proposal: the board it would produce, and what it would change. The board
+  answers "what would this be like"; the change answers "what exactly is being decided", which
+  is the question a reviewer has.
+</p>
 
 <p class="footnote">
   A board on a branch is read out of the repository rather than off the disk, so looking at a

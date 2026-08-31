@@ -1716,3 +1716,54 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 @media (max-width: 46rem) {
   .statusbar-links { margin-left: 0; width: 100%; }
 }
+
+/* ---- a proposal read as a change ---- */
+
+/* One line per task and one line per fact under it. Deliberately not a table:
+ * the facts are sentences of different lengths, and a column for each would
+ * make most of them empty. */
+.change { max-width: 56rem; margin-bottom: var(--s6); }
+.change h3 { margin: var(--s5) 0 var(--s2); font-size: 0.95rem; }
+.change h3 .count {
+  margin-left: var(--s2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.plan { list-style: none; margin: 0; padding: 0; }
+.plan > li {
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--rule-soft);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 var(--s3);
+  align-items: baseline;
+}
+
+.plan-task { display: flex; gap: var(--s2); align-items: baseline; text-decoration: none; color: inherit; min-width: 0; }
+.plan-task:hover .plan-title { color: var(--accent); text-decoration: underline; }
+.plan-title { font-weight: 500; }
+
+/* The facts. Indented under the task and set smaller, because the task is what
+ * you scan for and the facts are what you stop on. */
+.plan-says {
+  grid-column: 1 / -1;
+  margin: var(--s1) 0 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+.plan-says li { padding-left: var(--s4); position: relative; }
+.plan-says li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--ink-faint);
+}
+
+.lede { max-width: var(--measure); color: var(--ink-soft); }
+
+/* The second way to read a proposal, beside the board it would produce. */
+.branches .what-it-does { font-size: 0.85rem; }

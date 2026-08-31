@@ -1,0 +1,85 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/branches">Branches</a>
+  <span aria-hidden="true">/</span>
+  <span class="key">{{$data.Ref}}</span>
+</nav>
+
+<h1>What this proposal would do</h1>
+
+<p class="lede">
+  <code>{{$data.Ref}}</code> read as a change to the plan, in the vault's own words rather than
+  as a diff. <a href="/branch/{{$data.Ref}}">See the board it would produce</a>.
+</p>
+
+{{if $data.Missing}}
+<p class="empty">That branch is in none of this space's repositories.</p>
+{{end}}
+
+{{range $data.Repos}}
+<section class="change">
+  {{if .Name}}<h2>{{.Name}}</h2>{{end}}
+
+  <p class="footnote inline">
+    Compared with <code>{{.Base}}</code>, where it parted company — not with the working tree,
+    so nothing that has happened since is reported as though this proposal undid it.
+    {{.Ahead}} commit(s) on the branch{{if .Behind}}, {{.Behind}} here it does not have{{end}}.
+  </p>
+
+  {{if .Trouble}}
+  <div class="notice">{{.Trouble}}</div>
+  {{else if .Change.Nothing}}
+  <p class="empty">It changes no tasks and no vocabulary — a branch that only touches code.</p>
+  {{else}}
+
+  {{with .Change.Vocabulary}}
+  <div class="notice">
+    <strong>It changes what the vault calls things.</strong>
+    <ul>{{range .}}<li>{{.}}</li>{{end}}</ul>
+    A proposal that adds a status is a proposal about how the team works, which is a bigger
+    thing than any card it moves.
+  </div>
+  {{end}}
+
+  {{if .Change.Arrived}}
+  <h3>Arrives <span class="count">{{len .Change.Arrived}}</span></h3>
+  {{template "changed" .Change.Arrived}}
+  {{end}}
+
+  {{if .Change.Dropped}}
+  <h3>Dropped <span class="count">{{len .Change.Dropped}}</span></h3>
+  {{template "changed" .Change.Dropped}}
+  {{end}}
+
+  {{if .Change.Changed}}
+  <h3>Changed <span class="count">{{len .Change.Changed}}</span></h3>
+  {{template "changed" .Change.Changed}}
+  {{end}}
+
+  <p class="footnote">
+    {{.Change.Untouched}} task(s) are left alone.
+  </p>
+  {{end}}
+</section>
+{{end}}
+
+{{template "foot" .}}
+
+{{define "changed"}}
+<ul class="plan">
+  {{range .}}
+  <li>
+    <a class="plan-task" href="/task/{{.Key}}">
+      <span class="key">{{.Key}}</span>
+      <span class="plan-title">{{.Title}}</span>
+    </a>
+    <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+    <ul class="plan-says">
+      {{range .Says}}<li>{{.}}</li>{{end}}
+    </ul>
+  </li>
+  {{end}}
+</ul>
+{{end}}

@@ -406,6 +406,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /releases", s.handleReleases)
 	mux.HandleFunc("GET /branches", s.handleBranches)
 	mux.HandleFunc("GET /branch/{ref}", s.handleBranch)
+	mux.HandleFunc("GET /change/{ref}", s.handlePlanChange)
 	mux.HandleFunc("GET /pages/new", s.handlePageNewForm)
 	mux.HandleFunc("POST /pages/save", s.handlePageSave)
 	mux.HandleFunc("POST /preview", s.handlePreview)

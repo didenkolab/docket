@@ -362,3 +362,36 @@ func (r *Repo) Tree(ref, dir string) ([]string, error) {
 	}
 	return paths, nil
 }
+
+// MergeBase is where two refs diverged.
+//
+// It is what a proposal has to be compared against. Comparing a branch with
+// whatever the working tree is now would report everything that has happened
+// on the working tree since as though the proposal were undoing it — the
+// proposal did not touch those tasks, and saying it did is worse than saying
+// nothing.
+func (r *Repo) MergeBase(a, b string) (string, error) {
+	out, err := r.output("merge-base", a, b)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// Distance is how many commits each of two refs has that the other does not.
+func (r *Repo) Distance(base, ref string) (behind, ahead int, err error) {
+	out, err := r.output("rev-list", "--left-right", "--count", base+"..."+ref)
+	if err != nil {
+		return 0, 0, err
+	}
+	fields := strings.Fields(out)
+	if len(fields) != 2 {
+		return 0, 0, fmt.Errorf("git rev-list said %q", strings.TrimSpace(out))
+	}
+	behind, err = strconv.Atoi(fields[0])
+	if err != nil {
+		return 0, 0, err
+	}
+	ahead, err = strconv.Atoi(fields[1])
+	return behind, ahead, err
+}
