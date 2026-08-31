@@ -711,6 +711,34 @@ a.label { text-decoration: none; }
 }
 
 .issue-main { min-width: 0; }
+
+/* The properties stay while the body scrolls.
+   A real task can be five thousand pixels of specification, and the side column
+   is two hundred and fifty of status, assignee and fields. Static, it was a
+   thousand pixels above the top of the window by the time you were reading the
+   thing it describes — so you scrolled back up to see what state the task was
+   in, then back down to find your place. It is the board's problem again: the
+   heading scrolling away from the thing it heads.
+
+   Its own scroll, because a side column longer than the window would otherwise
+   pin its bottom off-screen and you could never reach the end of it. */
+.issue-side {
+  position: sticky;
+  top: var(--s4);
+  align-self: start;
+  max-height: calc(100dvh - var(--s6));
+  overflow-y: auto;
+}
+
+/* The status bar goes with it: what the task is and where it can go next are
+   the two things you look up mid-read. It sits above the grid, so it sticks to
+   the window rather than to a column. */
+.statusbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--paper);
+}
 .block { margin-bottom: var(--s6); }
 .block > h2, .panel > h2 { margin: 0 0 var(--s3); }
 .block > h2 .count, .panel > h2 .count { margin-left: var(--s1); color: var(--ink-faint); }
@@ -1964,9 +1992,11 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
   padding: 0 0.4em;
 }
 
-/* Settings is one form four screens long. A save at the bottom of it means
-   changing the vault name and then scrolling past the workflow matrix to
-   commit it — so the control follows you down instead.
+/* A long form's save follows you down it.
+   Sticky travels only inside its own parent, which is the thing that catches
+   people: wrapped in the short actions row at the end of the form it had 83
+   pixels to move in and never left the bottom of the page. The actions row
+   itself is the sticky element, and it is a child of the form.
 
    Sticky rather than fixed: it stays in the flow of the form, so it cannot end
    up floating over a page it does not belong to, and it needs no script. */
@@ -2108,3 +2138,10 @@ details.sprint > summary:hover .version { color: var(--accent); }
 .where { display: flex; align-items: center; gap: 0.15rem; margin: 0; flex-wrap: wrap; }
 .where code { color: var(--ink-faint); background: none; padding: 0; white-space: nowrap; }
 .where input { flex: 1 1 12rem; min-width: 0; }
+
+/* Changing one field where you are reading it.
+   The status could be changed from the task page and the assignee could not,
+   which is an odd place to draw the line: they are the two things somebody
+   changes while looking at a task rather than while editing one. */
+.inline-set { display: flex; gap: var(--s2); align-items: center; }
+.inline-set input { min-width: 0; flex: 1 1 10rem; }

@@ -50,3 +50,35 @@ func TestAVaultWithNoRemoteSaysSo(t *testing.T) {
 		}
 	}
 }
+
+// The assignee changes from the page you are reading the task on.
+//
+// The status could already be changed there and the assignee could not, which
+// is an odd place to draw the line: they are the two things somebody changes
+// while looking at a task rather than while editing one.
+func TestAssigneeChangesFromTheTaskPage(t *testing.T) {
+	_, handler, _ := newServer(t)
+
+	page := as(t, handler, nil, http.MethodGet, "/task/ACME-1", nil).Body.String()
+	if !strings.Contains(page, `action="/task/ACME-1/assignee"`) {
+		t.Fatal("the task page offers no way to change who it is on")
+	}
+
+	w := as(t, handler, nil, http.MethodPost, "/task/ACME-1/assignee",
+		url.Values{"assignee": {"dana"}})
+	if w.Code != http.StatusSeeOther && w.Code != http.StatusOK {
+		t.Fatalf("refused: %d %s", w.Code, w.Body)
+	}
+	if got := as(t, handler, nil, http.MethodGet, "/task/ACME-1", nil).Body.String(); !strings.Contains(got, "dana") {
+		t.Error("the task is not on dana")
+	}
+
+	// Empty unassigns, which is a real thing to want and not a mistake.
+	if w := as(t, handler, nil, http.MethodPost, "/task/ACME-1/assignee",
+		url.Values{"assignee": {""}}); w.Code != http.StatusSeeOther && w.Code != http.StatusOK {
+		t.Fatalf("unassigning was refused: %d %s", w.Code, w.Body)
+	}
+	if got := as(t, handler, nil, http.MethodGet, "/task/ACME-1", nil).Body.String(); strings.Contains(got, "dana") {
+		t.Error("it is still on dana")
+	}
+}

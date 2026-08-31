@@ -1107,3 +1107,33 @@ var marks = strings.NewReplacer(
 )
 
 func plain(fragment string) string { return marks.Replace(fragment) }
+
+// handleAssign changes who a task is on, from the page you are reading it on.
+//
+// The status could already be changed there and the assignee could not, which
+// is an odd place to draw the line: they are the two things somebody changes
+// while looking at a task rather than while editing one. Going to a separate
+// form, finding the box, saving and coming back is four steps for a field with
+// one value in it.
+func (s *Server) handleAssign(w http.ResponseWriter, r *http.Request) {
+	key := keyOf(r)
+	who := strings.TrimSpace(r.FormValue("assignee"))
+
+	author := s.authorFor(r)
+	err := s.editTask(r, key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
+		if t.Assignee == who {
+			return "", nil, nil
+		}
+		was := t.Assignee
+		t.Set("assignee", who)
+
+		switch {
+		case was == "":
+			return key + ": assigned to " + who, nil, nil
+		case who == "":
+			return key + ": unassigned, was " + was, nil, nil
+		}
+		return key + ": " + was + " → " + who, nil, nil
+	})
+	s.afterEdit(w, r, key, err)
+}

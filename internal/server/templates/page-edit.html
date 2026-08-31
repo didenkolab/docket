@@ -65,13 +65,14 @@
   <p class="footnote inline">Markdown. Connect pages with <code>[[wikilinks]]</code> — a page
   nothing links to is a page nobody finds.</p>
 
-  <div class="edit-actions">
+  <div class="edit-actions save-bar">
     <button type="submit">Save</button>
     {{if $data.New}}
     <a class="cancel" href="/pages">Cancel</a>
     {{else}}
     <a class="cancel" href="/page/{{$data.Path}}">Cancel</a>
     {{end}}
+    <span class="hint">Every change is a commit, and it is sent as soon as it is written.</span>
   </div>
 </form>
 

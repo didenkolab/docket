@@ -401,6 +401,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.handleBoard)
 	mux.HandleFunc("GET /task/{key}", s.handleTask)
 	mux.HandleFunc("POST /task/{key}/status", s.handleMove)
+	mux.HandleFunc("POST /task/{key}/assignee", s.handleAssign)
 	mux.HandleFunc("POST /task/{key}/comment", s.handleComment)
 	mux.HandleFunc("GET /task/{key}/edit", s.handleEditForm)
 	mux.HandleFunc("GET /task/{key}/history", s.handleHistory)

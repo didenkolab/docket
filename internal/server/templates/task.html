@@ -151,7 +151,24 @@
         <dt>Type</dt><dd>{{$t.Type}}</dd>
         <dt>Priority</dt><dd><span class="priority p-{{$t.Priority}}">{{$t.Priority}}</span></dd>
         <dt>Assignee</dt>
-        <dd>{{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">Unassigned</span>{{end}}</dd>
+        <dd>
+          {{if .You.CanWrite}}
+          <form class="inline-set" method="post" action="/task/{{$t.Key}}/assignee">
+            {{template "csrf" $}}
+            <input type="hidden" name="version" value="{{$data.Version}}">
+            <input name="assignee" value="{{$t.Assignee}}" list="handles" autocomplete="off"
+                   placeholder="nobody" aria-label="Assignee">
+            <button type="submit" class="quiet">Set</button>
+          </form>
+          {{if $data.People}}
+          <datalist id="handles">
+            {{range $data.People}}<option value="{{.}}">{{end}}
+          </datalist>
+          {{end}}
+          {{else}}
+          {{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">Unassigned</span>{{end}}
+          {{end}}
+        </dd>
         {{if $data.Unit}}
         <dt>Size</dt>
         <dd>
