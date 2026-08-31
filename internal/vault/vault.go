@@ -194,7 +194,16 @@ func stamp(dir string, opts Options) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(written, boards...), nil
+	written = append(written, boards...)
+
+	// And the graph, for the same reason: the colours are the vault's own
+	// words for its containers and its statuses, so a template that did not
+	// know them could not carry it. Without this the graph opens as one grey
+	// dot per note, which is the picture purpose §3 promises and does not keep.
+	if err := WriteGraph(dir, c); err != nil {
+		return nil, err
+	}
+	return append(written, GraphFile), nil
 }
 
 // removeIfEmpty drops a placeholder project folder, and leaves one that holds

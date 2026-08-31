@@ -69,6 +69,9 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 	want[BoardFile] = true
 	want[BacklogFile] = true
 	want[MineFile] = true
+	// The graph settings, which are derived the same way: the colours are this
+	// vault's own words for its containers and its statuses.
+	want[GraphFile] = true
 	// The template's placeholder folder is renamed, not carried over.
 	delete(want, "PROJ/.gitkeep")
 
