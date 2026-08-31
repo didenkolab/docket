@@ -19,8 +19,17 @@ import (
 
 // pageNode is a folder or a page in the knowledge base.
 type pageNode struct {
-	// Name is what to show: the folder's name, or the note's name.
+	// Name is what to show: the folder's name, or the page's title.
 	Name string
+	// Note is the file's name, shown beside the title when they differ —
+	// because that is what a wikilink has to say, and a list that showed only
+	// the title would leave nobody able to write one.
+	Note string
+	// order is what this sorts by: the file's name, always. Numbering a file is
+	// an explicit statement about order — `0004-access-comes-from-git.md` is
+	// fourth on purpose — and a title is not, so sorting by the title would
+	// scramble a sequence somebody built by hand.
+	order string
 	// Path is where the page is, from the space root, and is empty on a folder.
 	Path string
 	// Children are what is inside a folder, folders first.
@@ -39,10 +48,10 @@ func (n pageNode) IsFolder() bool { return n.Path == "" }
 // in a workspace, and neither is worth a level of its own: a page list that
 // starts with one folder holding everything is a list with a wasted click. So
 // the roots are what is inside them.
-func tree(paths []string) []pageNode {
+func tree(pages []titled) []pageNode {
 	root := &builder{children: map[string]*builder{}}
-	for _, p := range paths {
-		root.add(strings.Split(p, "/"), p)
+	for _, page := range pages {
+		root.add(strings.Split(page.Path, "/"), page)
 	}
 
 	// Unwrap the levels that hold nothing but one folder — `docs`, and in a
@@ -57,17 +66,18 @@ func tree(paths []string) []pageNode {
 // builder is the tree while it is being assembled.
 type builder struct {
 	children map[string]*builder
-	// page is set on a leaf: the path to it.
-	page string
+	// page is set on a leaf.
+	page  titled
+	isDoc bool
 }
 
-func (b *builder) add(segments []string, full string) {
+func (b *builder) add(segments []string, page titled) {
 	if len(segments) == 0 {
 		return
 	}
 	name := segments[0]
 	if len(segments) == 1 {
-		b.children[name] = &builder{children: map[string]*builder{}, page: full}
+		b.children[name] = &builder{children: map[string]*builder{}, page: page, isDoc: true}
 		return
 	}
 	child, ok := b.children[name]
@@ -75,7 +85,7 @@ func (b *builder) add(segments []string, full string) {
 		child = &builder{children: map[string]*builder{}}
 		b.children[name] = child
 	}
-	child.add(segments[1:], full)
+	child.add(segments[1:], page)
 }
 
 // build turns the map into a sorted slice: folders first, then pages, each in
@@ -84,10 +94,19 @@ func (b *builder) add(segments []string, full string) {
 func (b *builder) build() []pageNode {
 	nodes := make([]pageNode, 0, len(b.children))
 	for name, child := range b.children {
-		node := pageNode{Name: name, Path: child.page}
-		if child.page == "" {
+		node := pageNode{Name: name, order: name}
+		if !child.isDoc {
 			node.Children = child.build()
 			node.Pages = count(node.Children)
+			nodes = append(nodes, node)
+			continue
+		}
+
+		// A page is shown by the title it gives itself, and by its file name
+		// when that is something else — the file name being what a link says.
+		node.Path, node.order = child.page.Path, name
+		if title := child.page.Title; title != "" && title != name {
+			node.Name, node.Note = title, name
 		}
 		nodes = append(nodes, node)
 	}
@@ -96,7 +115,7 @@ func (b *builder) build() []pageNode {
 		if nodes[i].IsFolder() != nodes[j].IsFolder() {
 			return nodes[i].IsFolder()
 		}
-		return strings.ToLower(nodes[i].Name) < strings.ToLower(nodes[j].Name)
+		return strings.ToLower(nodes[i].order) < strings.ToLower(nodes[j].order)
 	})
 	return nodes
 }
@@ -124,9 +143,9 @@ type pagesView struct {
 	Flat bool
 }
 
-func newPagesView(paths []string) pagesView {
-	nodes := tree(paths)
-	view := pagesView{Tree: nodes, Total: len(paths), Flat: true}
+func newPagesView(pages []titled) pagesView {
+	nodes := tree(pages)
+	view := pagesView{Tree: nodes, Total: len(pages), Flat: true}
 	for _, n := range nodes {
 		if n.IsFolder() {
 			view.Flat = false

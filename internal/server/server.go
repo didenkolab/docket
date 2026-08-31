@@ -278,6 +278,41 @@ func (s *Server) create(opts vault.NewOptions) (string, *task.Task, error) {
 }
 
 // pages is every page in the space, said from the space root.
+// titled is a page and what to call it.
+type titled struct {
+	// Path is where the page is, from the space root, without .md.
+	Path string
+	// Title is its frontmatter title, empty when it has none.
+	Title string
+}
+
+// pagesTitled is every page with the title it gives itself.
+//
+// A page is not required to be named after its title — that rule is for tasks,
+// whose file name carries the key and the title (ADR-0005). A page may be
+// `0004-access-comes-from-git.md` and call itself "Access comes from git", and
+// a list of pages somebody reads should say the second.
+//
+// It reads each page's frontmatter, which is a small file per page and few of
+// them. task.Parse does it, because a page's frontmatter is the same kind of
+// thing and parsing it twice two ways is how they come to disagree.
+func (s *Server) pagesTitled() []titled {
+	paths := s.pages()
+	out := make([]titled, 0, len(paths))
+	for _, rel := range paths {
+		page := titled{Path: rel}
+		if full, err := s.abs(rel + ".md"); err == nil {
+			if raw, err := os.ReadFile(full); err == nil {
+				if t, err := task.Parse(raw); err == nil {
+					page.Title = strings.TrimSpace(t.Title)
+				}
+			}
+		}
+		out = append(out, page)
+	}
+	return out
+}
+
 func (s *Server) pages() []string {
 	var paths []string
 	for _, v := range s.space.Vaults() {

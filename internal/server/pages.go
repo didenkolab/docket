@@ -564,7 +564,7 @@ func (s *Server) handleNew(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePages(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
-	s.render(w, r, "pages.html", c, "Pages", newPagesView(s.pages()))
+	s.render(w, r, "pages.html", c, "Pages", newPagesView(s.pagesTitled()))
 }
 
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {

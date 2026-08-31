@@ -34,7 +34,10 @@
       {{template "branch" .Children}}
     </details>
     {{else}}
-    <a class="leaf" href="/page/{{.Path}}">{{.Name}}</a>
+    <a class="leaf" href="/page/{{.Path}}">
+      <span class="leaf-title">{{.Name}}</span>
+      {{if .Note}}<code class="leaf-note" title="what a link to it says">{{.Note}}</code>{{end}}
+    </a>
     {{end}}
   </li>
   {{end}}

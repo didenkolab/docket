@@ -1386,13 +1386,20 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 }
 
 .tree .leaf {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
   padding: 0.2rem 0.3rem 0.2rem 1.6rem;
   border-radius: var(--radius-sm);
   color: var(--ink);
   text-decoration: none;
 }
 .tree .leaf:hover { background: var(--sunken); color: var(--accent); }
+
+/* The file name, when it is not the title. It is what a wikilink has to say,
+ * so it stays visible — quietly, because most of the time nobody needs it. */
+.tree .leaf-note { color: var(--ink-faint); font-size: 0.78rem; }
+.tree .leaf:hover .leaf-note { color: var(--ink-soft); }
 
 /* A heading with one thing to do next to it. */
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
