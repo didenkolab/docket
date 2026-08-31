@@ -139,7 +139,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 		taskType := strings.TrimSpace(r.FormValue("type"))
 		if taskType != t.Type {
 			if !c.HasType(taskType) {
-				return "", nil, fmt.Errorf("type %q is not one of %s", taskType, strings.Join(c.Types, ", "))
+				return "", nil, fmt.Errorf("type %q is not one of %s", taskType, strings.Join(c.TypeNames(), ", "))
 			}
 			t.Set("type", taskType)
 			changed = append(changed, "type")

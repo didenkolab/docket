@@ -82,6 +82,11 @@ form — a list of links. Write each side yourself; nothing writes the inverse f
 `parent` is hierarchy and decides what the board does. A relation is an annotation. Do not use
 one for the other.
 
+A type has a level, and **a parent sits above its child**: an epic holds a task, a task holds a
+sub-task, and a bug cannot hold an epic. `docket.yaml` says which level each type is at. A
+sub-task never appears in a backlog on its own, because it is work inside a task rather than a
+thing to schedule.
+
 `tags` is the other one, and a different thing: a label says what a task is about, a tag says
 which slice of the work it is in, and tags nest — `area/auth` is inside `area`. Written without
 the `#` and unquoted: `tags: [area/auth, needs-review]`. No spaces, and not all digits.

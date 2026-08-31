@@ -50,6 +50,7 @@
          data-key="{{.Key}}" data-status="{{.Status}}" data-version="{{.Version}}"
          data-reachable="{{.Reachable}}">
         <span class="key">{{.Key}}{{if .Blocked}} <span class="blocked" title="waiting on something unfinished">blocked</span>{{end}}</span>
+        {{if .Epic}}<span class="epic" title="{{.EpicTitle}}">{{.EpicTitle}}</span>{{end}}
         <span class="card-title">{{.Title}}</span>
         <span class="meta">
           {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}

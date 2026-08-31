@@ -154,7 +154,7 @@ func writeConfig(root, key, name string, maps *Maps) error {
 	c := &project.Config{
 		Name:       name,
 		Projects:   []project.Project{{Key: key, Name: name}},
-		Types:      Values(maps.Types),
+		Types:      typesOf(Values(maps.Types)),
 		Priorities: Values(maps.Priorities),
 	}
 	for _, mapped := range maps.StatusOrder() {
@@ -436,4 +436,16 @@ func noteNames(projectKey string, issues []sourceIssue) map[string]string {
 		notes[key] = strings.TrimSuffix(vault.FileName(key, title), ".md")
 	}
 	return notes
+}
+
+// typesOf turns imported type names into vault types. Levels are not imported:
+// the source system's hierarchy is a mapping decision, and guessing which of
+// somebody's types is an epic is exactly the kind of guess an import should not
+// make silently. Say so in the plan, and let a person write the level.
+func typesOf(names []string) []project.Type {
+	types := make([]project.Type, 0, len(names))
+	for _, name := range names {
+		types = append(types, project.Type{Name: name})
+	}
+	return types
 }

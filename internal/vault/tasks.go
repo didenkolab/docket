@@ -274,10 +274,11 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 	}
 
 	if opts.Type == "" {
-		opts.Type = c.Types[0]
+		opts.Type = c.DefaultType()
 	}
 	if !c.HasType(opts.Type) {
-		return "", nil, fmt.Errorf("type %q is not one of %s", opts.Type, strings.Join(c.Types, ", "))
+		return "", nil, fmt.Errorf("type %q is not one of %s",
+			opts.Type, strings.Join(c.TypeNames(), ", "))
 	}
 
 	if opts.Priority == "" {

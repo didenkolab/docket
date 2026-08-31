@@ -70,7 +70,7 @@ func (s *Server) settingsView(c *project.Config, message, saved string) settings
 
 	view := settingsView{
 		Name:       c.Name,
-		Types:      strings.Join(c.Types, ", "),
+		Types:      strings.Join(c.TypeNames(), ", "),
 		Priorities: strings.Join(c.Priorities, ", "),
 		Categories: []string{project.CategoryTodo, project.CategoryDoing, project.CategoryDone},
 		Error:      message,
@@ -138,7 +138,10 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 
 	updated := *c
 	updated.Name = strings.TrimSpace(r.FormValue("name"))
-	updated.Types = splitCommas(r.FormValue("types"))
+	// A type's level is not on this form. Editing the vocabulary here must not
+	// silently flatten a hierarchy somebody wrote in docket.yaml, so a type that
+	// survives keeps the level it had and a new one is standard.
+	updated.Types = retype(c, splitCommas(r.FormValue("types")))
 	updated.Priorities = splitCommas(r.FormValue("priorities"))
 
 	statuses, renames, err := readStatuses(r)
@@ -384,4 +387,18 @@ func splitCommas(raw string) []string {
 		}
 	}
 	return out
+}
+
+// retype rebuilds the type list from names, keeping the level of every type
+// that was already there.
+func retype(c *project.Config, names []string) []project.Type {
+	was := map[string]int{}
+	for _, t := range c.Types {
+		was[t.Name] = t.Level
+	}
+	types := make([]project.Type, 0, len(names))
+	for _, name := range names {
+		types = append(types, project.Type{Name: name, Level: was[name]})
+	}
+	return types
 }

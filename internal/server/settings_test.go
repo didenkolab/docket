@@ -17,7 +17,7 @@ import (
 func settingsForm(c *project.Config, change func(i int, s project.Status) (string, string)) url.Values {
 	form := url.Values{
 		"name":       {c.Name},
-		"types":      {strings.Join(c.Types, ", ")},
+		"types":      {strings.Join(c.TypeNames(), ", ")},
 		"priorities": {strings.Join(c.Priorities, ", ")},
 	}
 	for i, status := range c.Statuses {

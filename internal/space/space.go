@@ -166,7 +166,15 @@ func (s *Space) Config() (*project.Config, error) {
 				merged.Statuses = append(merged.Statuses, st)
 			}
 		}
-		merged.Types = union(merged.Types, c.Types, seenText, "type:")
+		// A type keeps the level its own project gave it. Two projects that
+		// disagree about a level are two projects that mean different things by
+		// the same word, and the first one wins rather than an invented merge.
+		for _, t := range c.Types {
+			if !seenText["type:"+t.Name] {
+				seenText["type:"+t.Name] = true
+				merged.Types = append(merged.Types, t)
+			}
+		}
 		merged.Priorities = union(merged.Priorities, c.Priorities, seenText, "priority:")
 	}
 	return merged, nil

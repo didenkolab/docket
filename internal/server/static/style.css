@@ -370,6 +370,26 @@ body:has(.board) header .bar { max-width: none; }
 .card .key { display: block; color: var(--ink-faint); font-size: 0.72rem; letter-spacing: 0.02em; }
 .card-title { display: block; margin: var(--s1) 0 var(--s2); line-height: 1.4; }
 
+/* Which larger thing this is part of. Jira puts it on the card because that is
+ * the question a board is scanned for, and it is only shown when a vault has
+ * said what its levels are. */
+.card .epic {
+  display: inline-block;
+  margin-top: var(--s1);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.05rem 0.4rem;
+  vertical-align: middle;
+}
+
 .meta { display: flex; flex-wrap: wrap; gap: var(--s1); align-items: center; }
 
 /* A tag is Obsidian's, so it is shown the way Obsidian shows one — with the

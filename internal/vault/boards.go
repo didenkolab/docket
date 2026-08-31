@@ -105,7 +105,7 @@ filters:
     - or:
 ` + InProjects(c) + `
     - 'note.status_category == "todo"'
-properties:
+` + notSubtasks(c) + `properties:
   note.key:
     displayName: Key
   note.title:
@@ -160,4 +160,19 @@ views:
       - note.priority
       - note.updated
 `
+}
+
+// notSubtasks keeps work that lives inside a task out of the backlog.
+//
+// A sub-task is not a thing to schedule; a backlog listing it beside the task
+// it belongs to counts the same work twice. Jira does this by hierarchy level
+// and so does this — but only for a vault that has said what its levels are.
+func notSubtasks(c *project.Config) string {
+	var out strings.Builder
+	for _, t := range c.Types {
+		if t.Level < project.LevelStandard {
+			fmt.Fprintf(&out, "    - 'note.type != %q'\n", t.Name)
+		}
+	}
+	return out.String()
 }

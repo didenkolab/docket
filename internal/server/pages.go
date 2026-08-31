@@ -72,6 +72,11 @@ type card struct {
 	// Blocked is set when something this card waits on is unfinished. The one
 	// relation that changes what somebody picks up next, so it is on the card.
 	Blocked bool
+	// Epic is the container this card belongs to, when the vault has levels and
+	// the card has a parent above it. Jira puts this on the card because "which
+	// larger thing is this part of" is the question a board is scanned for.
+	Epic      string
+	EpicTitle string
 	// order is where somebody put this card in its column, if anybody has.
 	// Cards without one follow the ones with, in key order.
 	order *int
@@ -196,6 +201,16 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 		if selected != "" && e.Project != selected {
 			continue
 		}
+
+		// The container this card is part of, if the vault says what its levels
+		// are and this card's parent is above it.
+		epic, epicTitle := "", ""
+		if own := configOf(e.Project); own.Layered() && e.Task.Parent != "" {
+			if parent, ok := known[e.Task.Parent]; ok && parent.Task != nil &&
+				own.LevelOf(parent.Task.Type) > own.LevelOf(e.Task.Type) {
+				epic, epicTitle = parent.Key, parent.Task.Title
+			}
+		}
 		for i := range view.Columns {
 			if view.Columns[i].Status.Name == e.Task.Status {
 				view.Columns[i].Cards = append(view.Columns[i].Cards, card{
@@ -206,6 +221,7 @@ func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
 					Reachable: reachableList(configOf(e.Project), e.Task.Status),
 					order:     e.Task.Order,
 					Blocked:   blocked(e.Task, known),
+					Epic:      epic, EpicTitle: epicTitle,
 				})
 				view.Total++
 			}
@@ -546,6 +562,11 @@ type hitTask struct {
 	// Blocked is set when something this card waits on is unfinished. The one
 	// relation that changes what somebody picks up next, so it is on the card.
 	Blocked bool
+	// Epic is the container this card belongs to, when the vault has levels and
+	// the card has a parent above it. Jira puts this on the card because "which
+	// larger thing is this part of" is the question a board is scanned for.
+	Epic      string
+	EpicTitle string
 }
 
 // filters is what a person narrowed the search to. Every field is empty by
@@ -615,7 +636,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Filters:  f,
 		Projects: c.ProjectKeys(),
 		Statuses: c.Statuses,
-		Types:    c.Types,
+		Types:    c.TypeNames(),
 		Prios:    c.Priorities,
 	}
 	view.Assignees, view.Labels, view.Tags = vocabulary(entries)

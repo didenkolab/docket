@@ -65,7 +65,7 @@ type Config struct {
 	Name       string    `yaml:"name"`
 	Projects   []Project `yaml:"projects"`
 	Statuses   []Status  `yaml:"statuses"`
-	Types      []string  `yaml:"types"`
+	Types      []Type    `yaml:"types"`
 	Priorities []string  `yaml:"priorities"`
 
 	// Transitions is the workflow: which statuses each status can move to.
@@ -341,8 +341,6 @@ func (c *Config) DropFromTransitions(name string) {
 func (c *Config) FirstStatus() Status { return c.Statuses[0] }
 
 // HasType reports whether the vault defines a task type.
-func (c *Config) HasType(t string) bool { return contains(c.Types, t) }
-
 // HasPriority reports whether the vault defines a priority.
 func (c *Config) HasPriority(v string) bool { return contains(c.Priorities, v) }
 

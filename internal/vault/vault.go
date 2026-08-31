@@ -155,7 +155,18 @@ func DefaultConfig(key, name string) *project.Config {
 			{Name: "Done", Category: project.CategoryDone},
 			{Name: "Dropped", Category: project.CategoryDone},
 		},
-		Types:      []string{"task", "bug", "story", "epic"},
+		// Levels are what makes an epic a container rather than a word: a
+		// parent has to sit above its child, and a sub-task never appears in a
+		// backlog on its own. See project.Type.
+		// `task` first among the standard types, because it is the default and
+		// the default is what somebody means when they say nothing.
+		Types: []project.Type{
+			{Name: "epic", Level: project.LevelEpic},
+			{Name: "task"},
+			{Name: "bug"},
+			{Name: "story"},
+			{Name: "subtask", Level: project.LevelSubtask},
+		},
 		Priorities: []string{"low", "normal", "high", "urgent"},
 	}
 }

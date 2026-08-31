@@ -103,8 +103,12 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 	parents := map[string]string{}
 	exists := map[string]bool{}
 
+	typeOf := map[string]string{}
 	for _, e := range entries {
 		exists[e.Key] = true
+		if e.Task != nil {
+			typeOf[e.Key] = e.Task.Type
+		}
 	}
 
 	for _, e := range entries {
@@ -141,6 +145,16 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 			if !exists[t.Parent] {
 				add(Finding{e.Path, t.PropertyLine("parent"), RuleParent,
 					fmt.Sprintf("parent %q does not exist", t.Parent)})
+			} else if c.Layered() {
+				// A parent has to sit above its child, or an epic is a word
+				// rather than a container. Only checked in a vault that has
+				// said what its levels are — see project.Layered.
+				if parent, ok := typeOf[t.Parent]; ok && !c.CanParent(parent, t.Type) {
+					add(Finding{e.Path, t.PropertyLine("parent"), RuleParent,
+						fmt.Sprintf("a parent sits above its child, and %q is at level %d "+
+							"while %q is at level %d",
+							parent, c.LevelOf(parent), t.Type, c.LevelOf(t.Type))})
+				}
 			}
 		}
 
@@ -193,7 +207,7 @@ func checkVocabulary(add func(Finding), e vault.Entry, c *project.Config) {
 	t := e.Task
 	if !c.HasType(t.Type) {
 		add(Finding{e.Path, t.PropertyLine("type"), RuleVocabulary,
-			fmt.Sprintf("type %q is not one of %s", t.Type, strings.Join(c.Types, ", "))})
+			fmt.Sprintf("type %q is not one of %s", t.Type, strings.Join(c.TypeNames(), ", "))})
 	}
 	if !c.HasPriority(t.Priority) {
 		add(Finding{e.Path, t.PropertyLine("priority"), RuleVocabulary,

@@ -29,8 +29,11 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		Key, Version                                  string
 		Title, Status, Priority, Description, Comment *string
 		Assignee                                      *string
-		Labels                                        *[]string
-		Tags                                          *[]string
+		// Parent moves the task under another, or out from under one when it
+		// is the empty string. Hierarchy, not a relation — see task.Relations.
+		Parent *string
+		Labels *[]string
+		Tags   *[]string
 		// Relations is keyed by the property name — blocks, blocked_by,
 		// relates — with task keys as the values.
 		Relations map[string][]string
@@ -106,6 +109,27 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 	if args.Assignee != nil && *args.Assignee != t.Assignee {
 		t.Set("assignee", *args.Assignee)
 		changed = append(changed, "assignee")
+	}
+	if args.Parent != nil && *args.Parent != t.Parent {
+		note := ""
+		if *args.Parent != "" {
+			owner, inVault, _, err := s.Space.Locate(*args.Parent)
+			if err != nil {
+				return nil, fmt.Errorf("parent %s is not in this space", *args.Parent)
+			}
+			_ = owner
+			note = strings.TrimSuffix(path.Base(inVault), ".md")
+
+			// A parent sits above its child when the vault says what its levels
+			// are. Refusing here beats writing it and reporting it later.
+			if parent := s.taskAt(*args.Parent); parent != nil && !c.CanParent(parent.Type, t.Type) {
+				return nil, fmt.Errorf("a %q cannot hold a %q: a parent sits above its child, "+
+					"and they are at levels %d and %d",
+					parent.Type, t.Type, c.LevelOf(parent.Type), c.LevelOf(t.Type))
+			}
+		}
+		t.SetParent(note)
+		changed = append(changed, "parent")
 	}
 	if args.Labels != nil {
 		t.SetLabels(*args.Labels)
@@ -354,4 +378,22 @@ func relationNames() string {
 		names = append(names, r.Field)
 	}
 	return strings.Join(names, ", ")
+}
+
+// taskAt reads one task, or nil when it cannot be read. Used where a missing
+// task is already being reported for another reason.
+func (s *Server) taskAt(key string) *task.Task {
+	owner, inVault, _, err := s.Space.Locate(key)
+	if err != nil {
+		return nil
+	}
+	raw, err := os.ReadFile(owner.Abs(inVault))
+	if err != nil {
+		return nil
+	}
+	t, err := task.Parse(raw)
+	if err != nil {
+		return nil
+	}
+	return t
 }
