@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -84,5 +85,64 @@ func TestQuickChangesAllReachTheRemote(t *testing.T) {
 		if !strings.Contains(string(out), key) {
 			t.Errorf("%s never reached the remote:\n%s", key, out)
 		}
+	}
+}
+
+// A commit the board did not make is sent too.
+//
+// This is what the count knows and a flag could not. The first version of the
+// retry remembered that the board had written something and went round again
+// for it — so a commit made in the folder by an agent, or by `docket new` on the
+// command line, was invisible to it and sat there. Asking git what is unpushed
+// covers every way a commit can appear, which is the point of keeping no record
+// beside the repository.
+func TestACommitTheBoardDidNotMakeIsSentToo(t *testing.T) {
+	s, handler, root := newServer(t)
+
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
+		}
+	}
+	run(t.TempDir(), "init", "-q", "--bare", remote)
+	run(root, "remote", "add", "origin", remote)
+	run(root, "push", "-q", "-u", "origin", "HEAD")
+
+	// Somebody else writes in the folder and commits, the way an agent does.
+	if err := os.WriteFile(filepath.Join(root, "docs", "by-hand.md"),
+		[]byte("---\ntitle: by-hand\ntype: page\n---\n\nWritten in the folder.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(root, "add", "-A")
+	run(root, "-c", "user.email=agent@example.com", "-c", "user.name=Agent",
+		"commit", "-q", "-m", "a commit the board never saw")
+
+	// Then the board makes one of its own, which is what starts a push.
+	w := as(t, handler, nil, http.MethodPost, "/task/ACME-1/status",
+		url.Values{"status": {"In review"}})
+	if w.Code != http.StatusSeeOther && w.Code != http.StatusOK {
+		t.Fatalf("the move was refused: %d %s", w.Code, w.Body)
+	}
+
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if n, err := s.sp().Vaults()[0].Repo.Unpushed(); err == nil && n == 0 {
+			break
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+
+	cmd := exec.Command("git", "log", "--format=%s", "-4")
+	cmd.Dir = remote
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("reading the remote: %v: %s", err, out)
+	}
+	if !strings.Contains(string(out), "a commit the board never saw") {
+		t.Errorf("a commit made in the folder never reached the remote:\n%s", out)
 	}
 }

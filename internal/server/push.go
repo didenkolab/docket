@@ -49,18 +49,6 @@ type pushing struct {
 	// running says a push for that repository is in flight, so a second write
 	// does not start a second one.
 	running map[string]bool
-	// again says a write arrived while a push was in flight.
-	//
-	// It used to be dropped. Two pushes at once would race, so the second write
-	// simply returned — and because git push sends every commit on the branch,
-	// that was usually covered by whatever came next. Usually is the problem:
-	// drag three cards quickly and the last one's commit sits in the folder
-	// until something else happens to write. The board said nothing, because as
-	// far as it knew the push it started had succeeded.
-	//
-	// So the write is remembered instead, and the push runs again the moment
-	// the one in flight finishes.
-	again map[string]bool
 }
 
 // pushState is what to say about one repository.
@@ -110,7 +98,7 @@ func (p pushState) Settled() bool {
 
 func newPushing() *pushing {
 	return &pushing{state: map[string]pushState{}, running: map[string]bool{},
-		again: map[string]bool{}, arrived: map[string]int{}}
+		arrived: map[string]int{}}
 }
 
 // after sends what was just committed, in the background.
@@ -141,10 +129,9 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 
 	s.pushes.mu.Lock()
 	if s.pushes.running[prefix] {
-		// Not dropped: remembered, and sent as soon as the one in flight is
-		// done. Dropping it left the last of a quick run of changes in the
-		// folder with the board reporting nothing wrong.
-		s.pushes.again[prefix] = true
+		// One at a time, and nothing is lost by returning: the push in flight
+		// asks git what is left when it finishes, and git knows about this
+		// commit whether or not anybody told it.
 		s.pushes.mu.Unlock()
 		return
 	}
@@ -152,8 +139,36 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 	s.pushes.mu.Unlock()
 
 	go func() {
+		// Push, then ask what is left, and if anything is, push that too.
+		//
+		// The first version of this remembered that a write had arrived while
+		// the push was in the air, and went round again for it. That was a
+		// second record of a fact git already holds — and a worse one, because
+		// it only knew about writes the board made. A commit an agent wrote in
+		// the folder, or `docket new` on the command line, was invisible to it.
+		//
+		// The count is the truth. Asking it after every push covers every way a
+		// commit can appear, which is the whole reason this project keeps no
+		// state beside the repository.
+		// Push, then ask what is left, and if anything is, push that too.
+		//
+		// The count is read while holding the same lock that says whether a
+		// push is running, and that is the whole of the correctness here. A
+		// write commits and then calls after, which takes the lock; if it finds
+		// a push in flight it returns, trusting this loop to notice. Reading
+		// the count outside the lock left a window where it did not: count zero,
+		// commit lands, write returns, loop clears the flag, commit stranded.
+		// One flaky test in ten runs, which is the worst kind.
+		//
+		// An earlier version kept a flag saying "a write arrived" instead. That
+		// was a second record of a fact git already holds, and a narrower one:
+		// it knew nothing of a commit an agent made in the folder or one from
+		// `docket new`. The count knows about every commit however it got there.
+		previous := -1
 		for {
 			err := v.Repo.Push(cred)
+
+			s.pushes.mu.Lock()
 			waiting, countErr := v.Repo.Unpushed()
 
 			state := pushState{Waiting: waiting}
@@ -165,18 +180,22 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 			case err != nil:
 				state.Trouble = err.Error()
 			}
-
-			s.pushes.mu.Lock()
 			s.pushes.state[prefix] = state
-			// Another write arrived while this was in the air. Go round again,
-			// unless this one failed — then the retry is a button, because
-			// pushing at a host that just refused is how a server hammers one.
-			if s.pushes.again[prefix] && state.Trouble == "" {
-				s.pushes.again[prefix] = false
+
+			// Round again while something is still waiting and the last attempt
+			// worked. Not when it failed: pushing at a host that has just
+			// refused is how a server hammers one, and the retry is a button.
+			//
+			// And not when the count has stopped falling. A push that reports
+			// success while leaving the same commits behind is a state nobody
+			// has seen, and a loop that trusted it would spin against a host
+			// forever.
+			if state.Trouble == "" && countErr == nil && waiting > 0 &&
+				(previous < 0 || waiting < previous) {
+				previous = waiting
 				s.pushes.mu.Unlock()
 				continue
 			}
-			s.pushes.again[prefix] = false
 			s.pushes.running[prefix] = false
 			s.pushes.mu.Unlock()
 			return
