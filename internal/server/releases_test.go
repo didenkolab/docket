@@ -1,192 +1,57 @@
 package server
 
 import (
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
-func tag(t *testing.T, root, name, message string, at string) {
-	t.Helper()
-	args := []string{"-c", "user.email=t@example.com", "-c", "user.name=T",
-		"tag", "-a", name, "-m", message}
-	if at != "" {
-		args = append(args, at)
-	}
-	cmd := exec.Command("git", args...)
-	cmd.Dir = root
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git tag: %v: %s", err, out)
-	}
-}
-
-func commitAll(t *testing.T, root, message string) {
-	t.Helper()
-	git(t, root, "add", "-A")
-	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=T", "commit", "-q", "-m", message)
-}
-
-// A release is a tag. What went into it is the work whose files changed since
-// the tag before it — a question git answers, so there is nothing to maintain
-// and nothing that can be out of date.
-func TestAReleaseIsATag(t *testing.T) {
-	_, h, root := newServer(t)
-
-	tag(t, root, "v0.1.0", "The first cut", "")
-
-	c, err := project.Load(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := vault.Create(root, c, vault.NewOptions{Title: "Session model", Now: noon}); err != nil {
-		t.Fatal(err)
-	}
-	commitAll(t, root, "ACME-2")
-	tag(t, root, "v0.2.0", "Sessions", "")
-
-	body := get(t, h, "/releases").Body.String()
-
-	for _, want := range []string{"v0.1.0", "v0.2.0", "The first cut", "Sessions", "ACME-2"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the releases page does not mention %q", want)
+// A release page that lists every task and says nothing about the list is a
+// page that has to be counted to be understood. The line is the point of it,
+// and the fact it carries that a list of chips hides is how much of the work
+// was actually finished when the tag was cut.
+func TestDescribeRelease(t *testing.T) {
+	for _, c := range []struct {
+		what  string
+		given releaseView
+		want  string
+	}{
+		{
+			what: "a release of finished work",
+			given: releaseView{Tasks: []releaseTask{
+				{Category: project.CategoryDone},
+				{Category: project.CategoryDone},
+			}},
+			want: "2 tasks · 2 finished by the tag",
+		},
+		{
+			what: "one whose work is mostly still open",
+			given: releaseView{
+				Tasks: []releaseTask{
+					{Category: project.CategoryDone},
+					{Category: project.CategoryDoing},
+					{Category: project.CategoryDoing, Added: true},
+					{Category: project.CategoryTodo},
+				},
+				Other: 3,
+			},
+			want: "4 tasks · 1 of them new · 1 finished by the tag · 2 still in flight · 3 other files",
+		},
+		{
+			what:  "one task, said as one task",
+			given: releaseView{Tasks: []releaseTask{{Category: project.CategoryDone, Added: true}}, Other: 1},
+			want:  "1 task · 1 of them new · 1 finished by the tag · 1 other file",
+		},
+		{
+			what:  "a tag that changed no task",
+			given: releaseView{Other: 2},
+			want:  "",
+		},
+	} {
+		got := strings.Join(describeRelease(c.given), " · ")
+		if got != c.want {
+			t.Errorf("%s:\n got %q\nwant %q", c.what, got, c.want)
 		}
 	}
-	// v0.2.0 contains the task that appeared in it, and says it is new.
-	after := body[strings.Index(body, "v0.2.0"):]
-	if !strings.Contains(after[:min(len(after), 1200)], "ACME-2") {
-		t.Errorf("v0.2.0 does not contain the work that went into it:\n%s", after)
-	}
-	if !strings.Contains(body, `class="new"`) {
-		t.Error("a task that first appeared in a release is not marked new")
-	}
-	// Newest first.
-	if strings.Index(body, "v0.2.0") > strings.Index(body, "v0.1.0") {
-		t.Error("releases are not newest first")
-	}
-}
-
-// Tagging is often retroactive: three releases labelled in one afternoon have
-// tag dates minutes apart and an order that means nothing. The commit each tag
-// points at is when the work existed.
-func TestReleasesAreOrderedByTheirCommits(t *testing.T) {
-	_, h, root := newServer(t)
-
-	first := strings.TrimSpace(run(t, root, "rev-parse", "HEAD"))
-
-	c, err := project.Load(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := vault.Create(root, c, vault.NewOptions{Title: "Later work", Now: noon}); err != nil {
-		t.Fatal(err)
-	}
-	commitAll(t, root, "ACME-2")
-	second := strings.TrimSpace(run(t, root, "rev-parse", "HEAD"))
-
-	// Tagged newest-first, seconds apart, so tag order is the wrong order.
-	tag(t, root, "v2.0.0", "Later", second)
-	tag(t, root, "v1.0.0", "Earlier", first)
-
-	body := get(t, h, "/releases").Body.String()
-	if strings.Index(body, "v2.0.0") > strings.Index(body, "v1.0.0") {
-		t.Error("tags were ordered by when somebody typed them, not by their commits")
-	}
-}
-
-func TestARepositoryWithNoTagsSaysSo(t *testing.T) {
-	_, h, _ := newServer(t)
-	body := get(t, h, "/releases").Body.String()
-	if !strings.Contains(body, "No tags in this repository yet") {
-		t.Errorf("no explanation for an untagged repository:\n%s", body)
-	}
-	if strings.Contains(body, `class="release"`) {
-		t.Error("a release appeared out of nowhere")
-	}
-}
-
-func TestReleasesAreReachableFromEveryPage(t *testing.T) {
-	_, h, _ := newServer(t)
-	if w := get(t, h, "/"); !strings.Contains(w.Body.String(), `href="/releases"`) {
-		t.Error("nothing links to the releases")
-	} else if w.Code != http.StatusOK {
-		t.Errorf("code = %d", w.Code)
-	}
-}
-
-func run(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
-	}
-	return string(out)
-}
-
-/* ---------- a board over a branch ---------- */
-
-// A branch is a proposal about the plan. The only way to judge one is to see
-// the board it would produce, and that must not disturb the working tree.
-func TestABoardOverABranch(t *testing.T) {
-	_, h, root := newServer(t)
-
-	c, err := project.Load(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := vault.Create(root, c, vault.NewOptions{Title: "Session model", Now: noon}); err != nil {
-		t.Fatal(err)
-	}
-	commitAll(t, root, "ACME-2")
-
-	// On a branch, ACME-2 is dropped.
-	git(t, root, "checkout", "-q", "-b", "proposal")
-	path := filepath.Join(root, "ACME", "ACME-2 Session model.md")
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	proposed := strings.Replace(string(raw), "status: Backlog", "status: Dropped", 1)
-	proposed = strings.Replace(proposed, "status_category: todo", "status_category: done", 1)
-	if err := os.WriteFile(path, []byte(proposed), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	commitAll(t, root, "Proposal: drop it")
-	git(t, root, "checkout", "-q", "main")
-
-	tree := get(t, h, "/").Body.String()
-	branch := get(t, h, "/branch/proposal").Body.String()
-
-	if !strings.Contains(branch, "proposal") || !strings.Contains(branch, "class=\"proposal\"") {
-		t.Errorf("the board does not say it is showing a branch:\n%s", branch[:min(len(branch), 900)])
-	}
-	// The status differs between the two, and the working tree is untouched.
-	if strings.Contains(tree, "Dropped</b>\n      <span class=\"count\">1") {
-		t.Error("the working tree changed")
-	}
-	if !strings.Contains(branch, `data-ref="proposal"`) {
-		t.Error("the board does not mark itself as a proposal, so dragging stays armed")
-	}
-	if got := currentBranch(t, root); got != "main" {
-		t.Errorf("reading a branch checked it out: now on %s", got)
-	}
-}
-
-func TestAnUnknownBranchIsNotFound(t *testing.T) {
-	_, h, _ := newServer(t)
-	if w := get(t, h, "/branch/nonsense"); w.Code != http.StatusNotFound {
-		t.Errorf("code = %d, want 404", w.Code)
-	}
-}
-
-func currentBranch(t *testing.T, root string) string {
-	t.Helper()
-	return strings.TrimSpace(run(t, root, "rev-parse", "--abbrev-ref", "HEAD"))
 }

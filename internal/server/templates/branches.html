@@ -23,33 +23,47 @@
   epic split, a quarter dropped — and the point of having more than one is to look at the board
   a proposal would produce before agreeing to it.
 </p>
-{{else}}
-<ul class="branches">
-  {{range $data.Branches}}
+{{end}}
+
+{{if $data.Here}}
+<ul class="branches here">
   <li>
-    <a class="hit-link" href="{{.Href}}">
-      <span class="key">{{.Name}}</span>
-      {{if .Current}}<span class="new">checked out</span>{{end}}
+    <p class="branch-name">
+      <a class="hit-link" href="{{$data.Here.Href}}"><span class="key">{{$data.Here.Name}}</span></a>
+      <span class="new">checked out</span>
+    </p>
+    {{if $data.Here.Subject}}<p class="context">{{$data.Here.Subject}}</p>{{end}}
+    <p class="branch-when"><time>{{$data.Here.When}}</time> — what the board is drawn from</p>
+  </li>
+</ul>
+{{end}}
+
+{{if $data.Proposals}}
+<h2 class="section">{{plural (len $data.Proposals) "proposal" "proposals"}}</h2>
+<ul class="branches">
+  {{range $data.Proposals}}
+  <li>
+    <p class="branch-name">
+      <a class="hit-link" href="{{.Href}}"><span class="key">{{.Name}}</span></a>
       {{if .Remote}}<span class="remote">on the remote only</span>{{end}}
-    </a>
-    <time>{{.When}}</time>
-    {{if not .Current}}<a class="what-it-does" href="{{.Change}}">What it would do</a>{{end}}
+    </p>
     {{if .Subject}}<p class="context">{{.Subject}}</p>{{end}}
+    <p class="branch-when">
+      <time>{{.When}}</time>
+      <a class="what-it-does" href="{{.Change}}">What it would do</a>
+      <a href="{{.Href}}">The board it would produce</a>
+    </p>
   </li>
   {{end}}
 </ul>
 {{end}}
 
 <p class="footnote">
-  Two ways to read a proposal: the board it would produce, and what it would change. The board
-  answers "what would this be like"; the change answers "what exactly is being decided", which
-  is the question a reviewer has.
-</p>
-
-<p class="footnote">
-  A board on a branch is read out of the repository rather than off the disk, so looking at a
-  proposal cannot disturb whoever is working in the tree. Nothing is written there: a proposal
-  is changed by checking it out.
+  Two ways to read a proposal, and they answer different questions: the board it would produce
+  answers "what would this be like", and what it would change answers "what exactly is being
+  decided" — which is the one a reviewer has. Both are read out of the repository rather than
+  off the disk, so looking at a proposal cannot disturb whoever is working in the tree. Nothing
+  here writes: a proposal is changed by checking it out.
 </p>
 
 {{template "foot" .}}

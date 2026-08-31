@@ -32,9 +32,14 @@ type branchView struct {
 }
 
 type branchesView struct {
-	Branches []branchView
-	Current  string
-	None     bool
+	// Here is the branch checked out — the one the board is drawn from. Kept
+	// apart from the proposals because it is not one: it is the plan, and the
+	// others are arguments about it.
+	Here *branchView
+	// Proposals is everything else, which is what this page is for.
+	Proposals []branchView
+	Current   string
+	None      bool
 	// Asker is the host to paste a pull request address at, named so the box can
 	// say which kind it means. Empty when there is nobody to ask.
 	Asker string
@@ -58,18 +63,21 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, b := range found {
-			if b.Current {
-				view.Current = b.Name
-			}
-			view.Branches = append(view.Branches, branchView{
+			row := branchView{
 				Name: b.Name, Href: "/branch/" + url.PathEscape(b.Name),
 				Change:  "/change/" + url.PathEscape(b.Name),
 				Current: b.Current, Remote: b.Remote, Subject: b.Subject,
 				When: b.When.UTC().Format("2006-01-02"),
-			})
+			}
+			if b.Current {
+				view.Current = b.Name
+				view.Here = &row
+				continue
+			}
+			view.Proposals = append(view.Proposals, row)
 		}
 	}
-	view.None = len(view.Branches) < 2
+	view.None = len(view.Proposals) == 0
 	if _, host, ok := s.pullRequestHost(); ok {
 		view.Asker, view.Kind = host.Name(), host.PullRequestName()
 	}

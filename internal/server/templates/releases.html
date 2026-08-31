@@ -11,39 +11,49 @@
 </p>
 {{else}}
 
+<p class="lede">
+  Each status below is the status as it stood when the tag was cut, not as it stands now. That
+  is the difference between a release page and a report: this one cannot drift, because it is
+  read out of the tag every time it is opened.
+</p>
+
 {{range $data.Repos}}
-{{if $.Data.Repos}}{{if gt (len $.Data.Repos) 1}}<h2 class="repo">{{.Project}}</h2>{{end}}{{end}}
+{{if gt (len $data.Repos) 1}}<h2 class="repo">{{.Project}}</h2>{{end}}
 
 {{range .Releases}}
-<section class="release">
-  <header>
-    <h2>{{.Name}}</h2>
+<details class="release"{{if .Open}} open{{end}}>
+  <summary>
+    <span class="version">{{.Name}}</span>
     <time>{{.When}}</time>
-    <code class="hash">{{.Short}}</code>
-    {{if .Since}}<span class="since">since {{.Since}}</span>{{end}}
-  </header>
+    {{if .Says}}<span class="says">{{range $i, $s := .Says}}{{if $i}} · {{end}}{{$s}}{{end}}</span>{{end}}
+  </summary>
 
-  {{if .Annotation}}<p class="annotation">{{.Annotation}}</p>{{end}}
+  <div class="release-body">
+    <p class="release-where">
+      <code class="hash">{{.Short}}</code>
+      {{if .Since}}<span class="since">the work since {{.Since}}</span>
+      {{else}}<span class="since">the work up to here</span>{{end}}
+      <a href="{{.Board}}">The board as it stood</a>
+    </p>
 
-  <ul class="shipped">
-    {{range .Tasks}}
-    <li>
-      <a class="hit-link" href="/task/{{.Key}}">
-        <span class="key">{{.Key}}</span>
-        <span class="hit-title">{{.Title}}</span>
-      </a>
-      <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
-      {{if .Added}}<span class="new">new</span>{{end}}
-    </li>
-    {{else}}
-    <li class="empty">No task changed in this release.</li>
-    {{end}}
-  </ul>
+    {{if .Annotation}}<p class="annotation">{{.Annotation}}</p>{{end}}
 
-  {{if .Other}}
-  <p class="footnote">And {{plural .Other "other file" "other files"}} — pages, boards, configuration.</p>
-  {{end}}
-</section>
+    <ul class="shipped">
+      {{range .Tasks}}
+      <li>
+        <a class="hit-link" href="/task/{{.Key}}">
+          <span class="key">{{.Key}}</span>
+          <span class="hit-title">{{.Title}}</span>
+        </a>
+        <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+        {{if .Added}}<span class="new">new</span>{{end}}
+      </li>
+      {{else}}
+      <li class="empty">No task changed in this release.</li>
+      {{end}}
+    </ul>
+  </div>
+</details>
 {{end}}
 {{end}}
 

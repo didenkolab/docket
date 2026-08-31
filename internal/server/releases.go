@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
@@ -49,6 +51,19 @@ type releaseView struct {
 	// configuration. Counted rather than listed: it says the release contained
 	// more than the list shows, which is honest, without filling the page.
 	Other int
+	// Says is the release in a line: how much work, how much of it new, how
+	// much of it finished by the time the tag was cut.
+	//
+	// A release page without it is a list of forty rows that has to be counted
+	// to be understood, which is the same as not being understood.
+	Says []string
+	// Open says this release is the one shown expanded. Only the newest is: a
+	// page of every release fully spelled out is a page nobody reaches the
+	// bottom of, and the newest is the one being asked about.
+	Open bool
+	// Board is the board as it stood at the tag, which is a thing git can
+	// answer exactly.
+	Board string
 }
 
 type releaseTask struct {
@@ -138,9 +153,53 @@ func (s *Server) releasesIn(v *space.Vault) ([]releaseView, error) {
 				Added: since != "" && !exists(v.Repo, since, path),
 			})
 		}
+		view.Says = describeRelease(view)
+		view.Board = "/branch/" + url.PathEscape(tag.Name)
+		view.Open = i == 0
 		views = append(views, view)
 	}
 	return views, nil
+}
+
+// describeRelease is the release in a line.
+//
+// Three facts, and only the ones that are true of this release: how much work,
+// how much of it had never been in a release before, and how much of it was
+// actually finished when the tag was cut. The last is the one a list of rows
+// hides — a release whose work is half in flight looks exactly like one whose
+// work is done, until somebody counts the chips.
+func describeRelease(v releaseView) []string {
+	if len(v.Tasks) == 0 {
+		return nil
+	}
+
+	added, done, doing := 0, 0, 0
+	for _, t := range v.Tasks {
+		if t.Added {
+			added++
+		}
+		switch t.Category {
+		case project.CategoryDone:
+			done++
+		case project.CategoryDoing:
+			doing++
+		}
+	}
+
+	says := []string{plural(len(v.Tasks), "task", "tasks")}
+	if added > 0 {
+		says = append(says, fmt.Sprintf("%d of them new", added))
+	}
+	if done > 0 {
+		says = append(says, fmt.Sprintf("%d finished by the tag", done))
+	}
+	if doing > 0 {
+		says = append(says, fmt.Sprintf("%d still in flight", doing))
+	}
+	if v.Other > 0 {
+		says = append(says, plural(v.Other, "other file", "other files"))
+	}
+	return says
 }
 
 // versionOf parses a file as a task at one point in history, or nil when it is

@@ -953,19 +953,96 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
   max-width: 60rem;
 }
 
-.branches { list-style: none; margin: 0; padding: 0; max-width: 52rem; }
+/* A branch's identity is its name, so the name is the biggest thing in the row.
+   It used to be the commit subject — set at body size next to a small
+   monospace name — which read as a list of commits that happened to have
+   branches attached. */
+.branches { list-style: none; margin: 0 0 var(--s5); padding: 0; max-width: 52rem; }
 .branches li { padding: var(--s3) 0; border-bottom: 1px solid var(--rule-soft); }
-.branches time { color: var(--ink-faint); font-size: 0.85rem; margin-left: var(--s2); }
+.branches .branch-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  margin: 0;
+}
+.branches .branch-name .key { font-size: 0.95rem; color: var(--ink); }
+.branches .branch-when {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin: var(--s2) 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+}
+.branches time { color: var(--ink-faint); font-size: 0.85rem; }
 .branches .context { margin: var(--s1) 0 0; color: var(--ink-soft); font-size: 0.9rem; }
+
+/* The checked-out branch is the plan, not a proposal about it. Marked by a rule
+   down the side rather than by a badge alone. */
+.branches.here li { border-bottom: none; border-left: 2px solid var(--accent); padding-left: var(--s3); }
+
+h2.section {
+  margin: var(--s5) 0 var(--s2);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
 
 /* ---- releases ---- */
 
-.release { margin: 0 0 var(--s6); max-width: 60rem; }
-.release header { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding-bottom: var(--s2); }
-.release h2 { margin: 0; font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; text-transform: none; color: var(--ink); }
+/* A release is a summary first and a list second. Every release spelled out in
+   full made a page of two hundred rows, and the question being asked of it —
+   how much shipped, how much of it was actually finished — had to be answered
+   by counting chips. The newest is open; the rest say their line and wait. */
+.release { margin: 0 0 var(--s3); max-width: 60rem; border-bottom: 1px solid var(--rule); }
+.release > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s3) 0;
+  cursor: pointer;
+  list-style: none;
+}
+.release > summary::-webkit-details-marker { display: none; }
+.release > summary::before {
+  content: "›";
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+  transition: transform 120ms ease;
+  display: inline-block;
+}
+.release[open] > summary::before { transform: rotate(90deg); }
+.release > summary:hover .version { color: var(--accent); }
+.release > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.release .version { font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; color: var(--ink); }
 .release time { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+/* The line the page is for. Pushed to the end of the row so a column of
+   releases reads down as a column of summaries. */
+.release .says { margin-left: auto; color: var(--ink-soft); font-size: 0.85rem; }
+.release-body { padding: 0 0 var(--s4) var(--s4); }
+.release-where {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin: 0;
+}
 .release .hash, .release .since { color: var(--ink-faint); font-size: 0.78rem; }
-.release .annotation { margin: var(--s2) 0 0; color: var(--ink-soft); }
+.release-where a { font-size: 0.78rem; }
+.release .annotation { margin: var(--s3) 0 0; color: var(--ink-soft); }
+
+@media (max-width: 40rem) {
+  /* At this width the summary wraps, and a line pushed to the end of a wrapped
+     row lands under the date looking like a caption for it. */
+  .release .says { margin-left: 0; flex-basis: 100%; }
+  .release-body { padding-left: 0; }
+}
 
 .shipped { list-style: none; margin: var(--s3) 0 0; padding: 0; }
 .shipped li { display: flex; align-items: baseline; gap: var(--s2); padding: var(--s1) 0; flex-wrap: wrap; }
@@ -1873,4 +1950,38 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   padding: 0 0.4em;
+}
+
+/* Settings is one form four screens long. A save at the bottom of it means
+   changing the vault name and then scrolling past the workflow matrix to
+   commit it — so the control follows you down instead.
+
+   Sticky rather than fixed: it stays in the flow of the form, so it cannot end
+   up floating over a page it does not belong to, and it needs no script. */
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  margin: var(--s5) 0 0;
+  padding: var(--s3) 0;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+}
+/* A fade above it, so the row it is covering does not stop dead at the border. */
+.save-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--s4);
+  background: linear-gradient(to top, var(--paper), transparent);
+  pointer-events: none;
+}
+.save-bar .hint { color: var(--ink-faint); font-size: 0.85rem; }
+@media (max-width: 40rem) {
+  .save-bar .hint { flex-basis: 100%; }
 }
