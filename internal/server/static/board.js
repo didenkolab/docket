@@ -36,9 +36,27 @@
     board.classList.toggle('scrolls-right', board.scrollLeft < slack - 4);
   }
 
-  markEdges();
+  // The same question down each column, and the one that reads as a fault
+  // rather than as an invitation: this platform draws no scrollbar until you
+  // touch the wheel, so a column of forty cards ends in a card sliced in half
+  // above empty page. Nothing says the rest is one scroll away.
+  function markColumn(cards) {
+    const slack = cards.scrollHeight - cards.clientHeight;
+    cards.classList.toggle('scrolls-up', cards.scrollTop > 4);
+    cards.classList.toggle('scrolls-down', cards.scrollTop < slack - 4);
+  }
+
+  const lists = [...board.querySelectorAll('.cards')];
+  function markAll() {
+    markEdges();
+    lists.forEach(markColumn);
+  }
+
+  markAll();
   board.addEventListener('scroll', markEdges, { passive: true });
-  addEventListener('resize', markEdges);
+  lists.forEach((cards) =>
+    cards.addEventListener('scroll', () => markColumn(cards), { passive: true }));
+  addEventListener('resize', markAll);
 
   /* ---------- feedback ---------- */
 
