@@ -467,6 +467,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	view.Fields = shownFields(c, t)
+	view.People = s.handlesIn(r)
 	s.render(w, r, "task.html", c, t.Key+" "+t.Title, view)
 }
 
@@ -508,6 +509,14 @@ type taskView struct {
 	// Rollup is what its children add up to, for a container. When it is set it
 	// is the answer, because a container has no estimate of its own.
 	Rollup string
+	// People are the handles already at work here, offered beside the assignee.
+	//
+	// This was referenced by the template before it existed on this view, and a
+	// missing field stops template execution where it stands — so the page was
+	// rendered as far as the properties panel and simply ended. Everything
+	// below it, the comments, the history and the delete button, was gone, and
+	// nothing said so.
+	People []string
 	// Fields are the vault's own properties for this type of task, with what
 	// this one holds. Shown in the order declared, and shown even when empty:
 	// a field a type has and this task does not is a fact, and hiding it is how

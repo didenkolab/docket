@@ -82,3 +82,30 @@ func TestAssigneeChangesFromTheTaskPage(t *testing.T) {
 		t.Error("it is still on dana")
 	}
 }
+
+// The task page renders to the end.
+//
+// A template naming a field the view does not have stops where it stands, and
+// what is left is a page that ends early with nothing saying so. That happened:
+// the assignee form referenced People before the task view had it, and
+// everything below the properties — the comments, the history, the delete
+// button — silently vanished. Two other tests caught it on the build; this one
+// says what the fault was.
+func TestTheTaskPageRendersToTheEnd(t *testing.T) {
+	_, handler, _ := newServer(t)
+
+	page := as(t, handler, nil, http.MethodGet, "/task/ACME-1", nil).Body.String()
+
+	// One marker from each region, in the order they appear, so a page cut off
+	// anywhere is caught rather than only a page cut off early.
+	for _, want := range []string{
+		`action="/task/ACME-1/assignee"`, // the properties
+		`action="/task/ACME-1/comment"`,  // the comments
+		`action="/task/ACME-1/delete"`,   // the very bottom
+		"</html>",                        // and the document actually closed
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page has no %s — it ends before that", want)
+		}
+	}
+}
