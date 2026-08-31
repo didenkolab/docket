@@ -68,7 +68,7 @@ func (s *Server) handleReleases(w http.ResponseWriter, r *http.Request) {
 	}
 
 	view := releasesView{}
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		releases, err := s.releasesIn(v)
 		if err != nil {
 			s.fail(w, r, http.StatusInternalServerError, "Cannot read the tags", err.Error())

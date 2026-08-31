@@ -116,7 +116,7 @@ func (s *Server) settingsView(c *project.Config, message, saved string) settings
 func (s *Server) usage(c *project.Config) (byStatus, byProject map[string]int) {
 	byStatus, byProject = map[string]int{}, map[string]int{}
 
-	entries, err := s.space.Entries()
+	entries, err := s.sp().Entries()
 	if err != nil {
 		return byStatus, byProject
 	}
@@ -190,7 +190,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	// The vocabulary belongs to a repository, and in a workspace there is one
 	// per project. Editing them together here would write a merged vocabulary
 	// into every repository and make each of them wrong about itself.
-	home := s.space.Single()
+	home := s.sp().Single()
 	if home == nil {
 		s.rejectSettings(w, r, c, "This is a workspace, and a vocabulary belongs to a "+
 			"repository. Open the project on its own to change its statuses, types and "+
@@ -342,7 +342,7 @@ func (s *Server) applyRenames(r *http.Request, c *project.Config, renames map[st
 		return 0, nil
 	}
 
-	entries, err := s.space.Entries()
+	entries, err := s.sp().Entries()
 	if err != nil {
 		return 0, err
 	}

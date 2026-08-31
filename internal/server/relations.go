@@ -103,7 +103,7 @@ func (s *Server) notesFor(keys []string) ([]string, error) {
 		if key == "" {
 			continue
 		}
-		_, inVault, _, err := s.space.Locate(key)
+		_, inVault, _, err := s.sp().Locate(key)
 		if err != nil {
 			return nil, fmt.Errorf("%s is not in this space", key)
 		}

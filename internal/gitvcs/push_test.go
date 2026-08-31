@@ -88,7 +88,7 @@ func TestATokenIsNeverInTheCommandLine(t *testing.T) {
 
 	// The helper git is given names an environment variable; the value lives in
 	// the environment, which only this user can read.
-	args := pushArgs(Credential{User: "x-access-token", Token: secret})
+	args := PushArgs(Credential{User: "x-access-token", Token: secret})
 	joined := strings.Join(args, " ")
 	if strings.Contains(joined, secret) {
 		t.Errorf("the token is in argv:\n%s", joined)

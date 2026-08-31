@@ -61,17 +61,17 @@ func (r *Repo) Push(cred Credential) error {
 		return errors.New("not on a branch, so there is nothing to push")
 	}
 
-	args := append(pushArgs(cred), "push", "origin", branch)
-	if _, err := r.outputWithEnv(pushEnv(cred), args...); err != nil {
+	args := append(PushArgs(cred), "push", "origin", branch)
+	if _, err := r.outputWithEnv(PushEnv(cred), args...); err != nil {
 		return classify(err)
 	}
 	return nil
 }
 
-// pushArgs is the configuration git is given, and it is a separate function
+// PushArgs is the configuration git is given, and it is a separate function
 // because what is in it is the point: the name of an environment variable, and
-// never the token itself.
-func pushArgs(cred Credential) []string {
+// never the token itself. Exported because cloning needs the same thing.
+func PushArgs(cred Credential) []string {
 	if cred.Token == "" {
 		return nil
 	}
@@ -85,9 +85,9 @@ func pushArgs(cred Credential) []string {
 	}
 }
 
-// pushEnv is where the token actually travels: a process's environment, which
+// PushEnv is where the token actually travels: a process's environment, which
 // only the user running it can read, and which is never written anywhere.
-func pushEnv(cred Credential) []string {
+func PushEnv(cred Credential) []string {
 	env := []string{
 		// Nothing may ask a human: there is nobody at the other end of an HTTP
 		// handler, and a prompt would hang the request until it timed out.

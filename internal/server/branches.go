@@ -40,7 +40,7 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 	}
 
 	view := branchesView{}
-	vaults := s.space.Vaults()
+	vaults := s.sp().Vaults()
 	if len(vaults) > 0 && vaults[0].Repo != nil {
 		found, err := vaults[0].Repo.Branches()
 		if err != nil {
@@ -74,7 +74,7 @@ func (s *Server) handleBranch(w http.ResponseWriter, r *http.Request) {
 			ref+" is not a branch or a tag of this repository.")
 		return
 	}
-	s.board(w, r, s.space.At(ref), ref)
+	s.board(w, r, s.sp().At(ref), ref)
 }
 
 // known reports whether a ref is a branch or a tag of this repository.
@@ -83,7 +83,7 @@ func (s *Server) handleBranch(w http.ResponseWriter, r *http.Request) {
 // argument somebody else chose. Anything that is not a branch or a tag here is
 // refused before it reaches git.
 func (s *Server) known(ref string) bool {
-	vaults := s.space.Vaults()
+	vaults := s.sp().Vaults()
 	if ref == "" || len(vaults) == 0 || vaults[0].Repo == nil {
 		return false
 	}

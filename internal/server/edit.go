@@ -180,7 +180,7 @@ func (s *Server) handleEdit(w http.ResponseWriter, r *http.Request) {
 				t.SetParent("")
 			default:
 				// A parent is a link, and a link resolves by note name.
-				owner, inVault, _, err := s.space.Locate(parent)
+				owner, inVault, _, err := s.sp().Locate(parent)
 				if err != nil {
 					return "", nil, fmt.Errorf("parent %s does not exist", parent)
 				}

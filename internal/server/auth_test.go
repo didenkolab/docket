@@ -299,3 +299,28 @@ func TestWithoutAHostTheServerSaysItIsOpen(t *testing.T) {
 		t.Errorf("board: %d", w.Code)
 	}
 }
+
+// The repository list is read under a mutex, and close() already holds it —
+// calling the accessor there deadlocked the whole server the moment a token
+// stopped working. The symptom was a request that never returned, which is why
+// this asserts on a deadline rather than on a value.
+func TestClosingASessionDoesNotDeadlock(t *testing.T) {
+	_, h, host, _ := guardedServer(t)
+	cookie := signIn(t, h, access.RoleMember)
+
+	// Access is taken away on the host, so the next request has to close the
+	// session — the path that deadlocked.
+	host.revoked[access.RoleMember] = true
+
+	done := make(chan int, 1)
+	go func() { done <- as(t, h, cookie, "GET", "/", nil).Code }()
+
+	select {
+	case code := <-done:
+		if code != http.StatusSeeOther {
+			t.Errorf("code = %d, want a redirect to sign in again", code)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the request never returned: closing the session deadlocked")
+	}
+}

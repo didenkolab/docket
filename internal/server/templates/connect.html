@@ -1,0 +1,61 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<div class="page-head">
+  <h1>Projects</h1>
+</div>
+
+{{if $data.Saved}}<div class="notice ok">{{$data.Saved}}</div>{{end}}
+{{if $data.Error}}<div class="notice">{{$data.Error}}</div>{{end}}
+
+{{if not $data.Workspace}}
+<p class="empty">
+  This is a single vault, so there is no manifest to add a project to. A workspace is a
+  directory holding several project repositories and presenting them as one — make one with
+  <code>docket workspace</code>, put this vault in it, and serve that instead.
+</p>
+{{else}}
+
+<table class="settings">
+  <thead><tr><th>Project</th><th>Folder</th><th>Host</th><th>Remote</th></tr></thead>
+  <tbody>
+    {{range $data.Projects}}
+    <tr>
+      <td><code>{{.Key}}</code></td>
+      <td><code>{{.Path}}</code></td>
+      <td>{{if .Host}}{{.Host}}{{else}}<span class="muted">nobody vouches for it</span>{{end}}</td>
+      <td class="remote">{{if .Remote}}<code>{{.Remote}}</code>{{else}}<span class="muted">none</span>{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+
+{{if .You.CanConfigure}}
+<h2>Add one</h2>
+
+<form class="stacked" method="post" action="/projects">
+  {{template "csrf" $}}
+  <label for="remote">Repository URL</label>
+  <input id="remote" name="remote" required autofocus class="field-wide"
+         placeholder="https://git.example.com/team/their-project.git">
+  <button type="submit">Clone and add</button>
+</form>
+
+<p class="footnote">
+  Whatever you would give <code>git clone</code>. It is cloned into this workspace and added to
+  <code>workspace.yaml</code>; the project's key comes from its own <code>docket.yaml</code>,
+  because a key belongs to the repository rather than to the workspace.
+</p>
+<p class="footnote">
+  A private repository is cloned with your own credentials — the token you signed in with when
+  the host is one already here, and otherwise the credentials this machine already has, the ones
+  git uses to clone by hand.
+</p>
+<p class="footnote">
+  A repository that is not a docket vault is refused rather than scaffolded over: it is somebody
+  else's repository, and <code>docket init</code> in it is a decision to make there.
+</p>
+{{end}}
+{{end}}
+
+{{template "foot" .}}

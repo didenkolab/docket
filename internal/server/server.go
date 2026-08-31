@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
@@ -78,7 +79,10 @@ type Options struct {
 
 // Server serves one space: a vault, or a workspace of them.
 type Server struct {
-	space  *space.Space
+	// space is held atomically because it can be replaced: connecting a
+	// repository to a workspace adds a project, and it has to appear without
+	// anybody restarting the server. Read it through sp().
+	space  atomic.Pointer[space.Space]
 	author gitvcs.Author
 	tmpl   *template.Template
 	auth   *authority
@@ -137,7 +141,6 @@ func New(root string, opts Options) (*Server, error) {
 
 	started := time.Now()
 	s := &Server{
-		space:  sp,
 		author: opts.Author,
 		tmpl:   tmpl,
 		now:    time.Now,
@@ -154,6 +157,7 @@ func New(root string, opts Options) (*Server, error) {
 		onLoopback:     opts.OnLoopback && !opts.BehindProxy,
 		pushes:         newPushing(),
 	}
+	s.space.Store(sp)
 	recheck, life := opts.Recheck, opts.SessionLife
 	if recheck <= 0 {
 		recheck = 5 * time.Minute
@@ -178,9 +182,13 @@ func New(root string, opts Options) (*Server, error) {
 	return s, nil
 }
 
+// sp is the space as it stands. It may have grown since the last request: see
+// reload.
+func (s *Server) sp() *space.Space { return s.space.Load() }
+
 // config is the vocabulary of the whole space: one vault's own, or the union of
 // several. See space.Config for why it is a union rather than a shared file.
-func (s *Server) config() (*project.Config, error) { return s.space.Config() }
+func (s *Server) config() (*project.Config, error) { return s.sp().Config() }
 
 // entries is every task the person asking may see, with paths said from the
 // space root.
@@ -191,7 +199,7 @@ func (s *Server) config() (*project.Config, error) { return s.space.Config() }
 // board that listed tasks out of a repository the reader has no access to would
 // be leaking the one thing the host was asked about.
 func (s *Server) entries(r *http.Request) ([]vault.Entry, error) {
-	all, err := s.space.Entries()
+	all, err := s.sp().Entries()
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +223,7 @@ func visible(st *standing, all []vault.Entry) []vault.Entry {
 
 // abs turns a path in the space into a path on disk, refusing one that belongs
 // to no repository.
-func (s *Server) abs(inSpace string) (string, error) { return s.space.Path(inSpace) }
+func (s *Server) abs(inSpace string) (string, error) { return s.sp().Path(inSpace) }
 
 // configFor is the vocabulary that decides what may happen to one task: its own
 // project's, not the space's.
@@ -229,7 +237,7 @@ func (s *Server) configFor(key string) (*project.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, _, err := s.space.ConfigOf(projectKey)
+	c, _, err := s.sp().ConfigOf(projectKey)
 	return c, err
 }
 
@@ -241,7 +249,7 @@ func (s *Server) configFor(key string) (*project.Config, error) {
 // vault that no longer exists.
 func (s *Server) index() (*index, error) {
 	ix := &index{targets: map[string]string{}}
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		c, err := project.Load(v.Root)
 		if err != nil {
 			return nil, err
@@ -270,7 +278,7 @@ func (s *Server) create(opts vault.NewOptions) (string, *task.Task, error) {
 		}
 	}
 
-	owner, v, err := s.space.ConfigOf(opts.Project)
+	owner, v, err := s.sp().ConfigOf(opts.Project)
 	if err != nil {
 		return "", nil, err
 	}
@@ -319,7 +327,7 @@ func (s *Server) pagesTitled() []titled {
 
 func (s *Server) pages() []string {
 	var paths []string
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		docs := filepath.Join(v.Root, vault.DocsDir)
 		_ = filepath.WalkDir(docs, func(full string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() || !strings.HasSuffix(full, ".md") {
@@ -351,13 +359,13 @@ func (s *Server) pages() []string {
 func (s *Server) commit(r *http.Request, paths []string, message string, author gitvcs.Author) error {
 	byVault := map[*space.Vault][]string{}
 	for _, p := range paths {
-		v, rel, err := s.space.Resolve(p)
+		v, rel, err := s.sp().Resolve(p)
 		if err != nil {
 			return err
 		}
 		byVault[v] = append(byVault[v], rel)
 	}
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		if in := byVault[v]; len(in) > 0 {
 			if err := v.Repo.Commit(in, message, author); err != nil {
 				return err
@@ -407,6 +415,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sign-in/local", s.handleLocalSignIn)
 	mux.HandleFunc("POST /sign-out", s.handleSignOut)
 	mux.HandleFunc("POST /push", s.handlePush)
+	mux.HandleFunc("POST /theme", s.handleTheme)
+	mux.HandleFunc("GET /projects", s.handleConnectForm)
+	mux.HandleFunc("POST /projects", s.handleConnect)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)
@@ -440,7 +451,7 @@ func keyOf(r *http.Request) string { return r.PathValue("key") }
 // not even in a known repository, so this is a lookup — kept in one place so
 // nothing else has to know.
 func (s *Server) locate(key string) (rel, full string, err error) {
-	v, inVault, inSpace, err := s.space.Locate(key)
+	v, inVault, inSpace, err := s.sp().Locate(key)
 	if err != nil {
 		return "", "", err
 	}
@@ -482,7 +493,7 @@ func (s *Server) editTask(
 	s.writes.Lock()
 	defer s.writes.Unlock()
 
-	owner, wasIn, rel, err := s.space.Locate(key)
+	owner, wasIn, rel, err := s.sp().Locate(key)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,5 @@
 {{define "head"}}<!doctype html>
-<html lang="en">
+<html lang="en"{{with .Theme}} data-theme="{{.}}"{{end}}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,12 +24,24 @@
     <a href="/branches">Branches</a>
     {{if .You.CanWrite}}<a href="/new">New task</a>{{end}}
     {{if .You.CanConfigure}}<a href="/settings">Settings</a>{{end}}
+    {{if .Workspace}}<a href="/projects">Projects</a>{{end}}
     {{if .SignedIn}}<a href="/admin">Access</a>{{end}}
   </nav>
   <form class="search" action="/search" method="get">
     <input type="search" name="q" placeholder="Search" aria-label="Search">
   </form>
   {{end}}
+  <form class="theme" method="post" action="/theme">
+    {{template "csrf" $}}
+    <input type="hidden" name="next" value="{{.Here}}">
+    {{range .Themes}}
+    <button type="submit" name="theme" value="{{.Value}}"
+            class="theme-pick{{if .On}} on{{end}}"
+            title="{{.Label}}"{{if .On}} aria-current="true"{{end}}>
+      {{if eq .Value "system"}}A{{else if eq .Value "light"}}☀{{else}}☾{{end}}
+    </button>
+    {{end}}
+  </form>
   {{if .Pushes}}
   <details class="unsent">
     <summary title="not yet where everybody else can read it">

@@ -74,7 +74,7 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	// Every file this task has ever had, from the repository that owns it. The
 	// key is in the name, so this is the task's whole life and nothing else —
 	// see gitvcs.History.
-	owner, _, _, err := s.space.Locate(key)
+	owner, _, _, err := s.sp().Locate(key)
 	if err != nil {
 		s.fail(w, r, http.StatusNotFound, "No such task", key+" is not in this space")
 		return

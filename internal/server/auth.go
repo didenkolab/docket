@@ -45,10 +45,14 @@ func (s *session) has(hostKey string) bool {
 // unauthenticated, and every check below reads as "no authority, no restriction"
 // — which is exactly what --auth none means and what it prints at startup.
 type authority struct {
+	life time.Duration
+
 	// repos is every repository in the space and the host that answers for it,
 	// in space order. See hosts.go for why this is per repository.
+	//
+	// It changes when a repository is connected to a workspace, so it is read
+	// through repositories() under the lock rather than directly.
 	repos []*repository
-	life  time.Duration
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -66,10 +70,40 @@ func newAuthority(repos []*repository, life time.Duration) *authority {
 	}
 }
 
+// repositories is the list as it stands. A copy of the slice header, so a
+// caller iterating it cannot see it change halfway through.
+func (a *authority) repositories() []*repository {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.repos
+}
+
+// adopt replaces the list, keeping the checker of every repository that is
+// still here.
+//
+// Keeping them matters: a checker caches what a host said about a token, and
+// throwing that away would mean an API call per repository per page load for
+// everybody signed in, every time somebody connects a project.
+func (a *authority) adopt(repos []*repository) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	was := map[string]*repository{}
+	for _, r := range a.repositories() {
+		was[r.prefix] = r
+	}
+	for _, r := range repos {
+		if old, ok := was[r.prefix]; ok && old.checker != nil && old.hostKey == r.hostKey {
+			r.checker = old.checker
+		}
+	}
+	a.repos = repos
+}
+
 // hostFor is the host a token would be for, and the repositories it covers.
 func (a *authority) hostFor(hostKey string) (access.Host, string, bool) {
 	hostKey = strings.ToLower(hostKey)
-	for _, r := range a.repos {
+	for _, r := range a.repositories() {
 		if r.host != nil && r.hostKey == hostKey {
 			return r.host, r.clientID, true
 		}
@@ -80,7 +114,7 @@ func (a *authority) hostFor(hostKey string) (access.Host, string, bool) {
 // oneHost is the only host there is, when there is only one. A space of a
 // single repository — the ordinary case — should never make anybody choose.
 func (a *authority) oneHost() (signInHost, bool) {
-	all := hosts(a.repos)
+	all := hosts(a.repositories())
 	if len(all) == 1 {
 		return all[0], true
 	}
@@ -114,8 +148,9 @@ func (a *authority) close(id string) {
 	if !ok {
 		return
 	}
-	// Forgetting the cached answer everywhere the token was used, so signing
-	// out cannot leave a repository still believing in it.
+	// a.repos directly, not repositories(): the lock is already held here, and
+	// that method takes it. Calling it deadlocked the whole server the moment a
+	// token stopped working.
 	for _, r := range a.repos {
 		if r.checker == nil {
 			continue
@@ -411,7 +446,7 @@ func (s *Server) signInPage(r *http.Request, next, problem string) signInView {
 		view.Local, view.LocalHost = true, host.Name
 	}
 
-	for _, h := range hosts(s.auth.repos) {
+	for _, h := range hosts(s.auth.repositories()) {
 		if held[h.Key] {
 			view.Signed = append(view.Signed, h.Name)
 			continue
@@ -613,14 +648,14 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 		current, _ = s.auth.lookup(cookie.Value)
 	}
 
-	for _, h := range hosts(s.auth.repos) {
+	for _, h := range hosts(s.auth.repositories()) {
 		view.Hosts = append(view.Hosts, hostAccess{
 			Key: h.Key, Name: h.Name, Repos: h.Repos,
 			SignedIn: current != nil && current.has(h.Key),
 		})
 	}
 
-	for _, repo := range s.auth.repos {
+	for _, repo := range s.auth.repositories() {
 		row := repoAccess{
 			Name:     repo.name,
 			Projects: repo.projects,
@@ -704,7 +739,7 @@ func (a *authority) verify(ctx context.Context, hostKey, token string) error {
 	hostKey = strings.ToLower(hostKey)
 	var last error
 	asked := false
-	for _, r := range a.repos {
+	for _, r := range a.repositories() {
 		if r.host == nil || r.hostKey != hostKey {
 			continue
 		}
@@ -729,7 +764,7 @@ func (a *authority) stillMissing(id string) bool {
 	if !ok {
 		return false
 	}
-	for _, h := range hosts(a.repos) {
+	for _, h := range hosts(a.repositories()) {
 		if !current.has(h.Key) {
 			return true
 		}

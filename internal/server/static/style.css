@@ -57,6 +57,34 @@
   --s6: 2rem;
   --s7: 3rem;
 
+
+  /* The dark palette, values in one place.
+   *
+   * Applied twice below — once for a browser that says the system is dark, and
+   * once for somebody who chose dark here — because a media query and an
+   * attribute selector cannot share one selector. Only the mapping is repeated;
+   * the colours are written here and nowhere else. */
+  --d-paper: #101317;
+  --d-raised: #171b21;
+  --d-sunken: #1b2027;
+  --d-ink: #e8eaee;
+  --d-ink-soft: #99a1b0;
+  --d-ink-faint: #6e7686;
+  --d-rule: #262b33;
+  --d-rule-soft: #1e232a;
+  --d-accent: #7d9bff;
+  --d-accent-soft: #1b2440;
+  --d-on-accent: #0e1117;
+  --d-on-ink: #101317;
+  --d-todo: #6e7686;
+  --d-doing: #7d9bff;
+  --d-done: #3fbc90;
+  --d-warn: #e0a05a;
+  --d-warn-soft: #2a2016;
+  --d-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --d-shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5);
+  --d-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%2399a1b0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
   --radius: 6px;
   --radius-sm: 4px;
 
@@ -79,33 +107,62 @@
   --edge: 1.5rem;
 }
 
+/* Dark, either because the system says so or because somebody chose it here.
+ *
+ * The choice is a cookie the server reads, and it stamps data-theme on <html> —
+ * so the page arrives already in the right colours. A script that swapped them
+ * after paint would show a flash of the wrong theme on every load, which is the
+ * one thing a theme switch must not do. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #101317;
-    --raised: #171b21;
-    --sunken: #1b2027;
-
-    --ink: #e8eaee;
-    --ink-soft: #99a1b0;
-    --ink-faint: #6e7686;
-
-    --rule: #262b33;
-    --rule-soft: #1e232a;
-
-    --accent: #7d9bff;
-    --accent-soft: #1b2440;
-    --on-accent: #0e1117;
-    --on-ink: #101317;
-    --todo: #6e7686;
-    --doing: #7d9bff;
-    --done: #3fbc90;
-    --warn: #e0a05a;
-    --warn-soft: #2a2016;
-
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5);
+  :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --paper: var(--d-paper);
+  --raised: var(--d-raised);
+  --sunken: var(--d-sunken);
+  --ink: var(--d-ink);
+  --ink-soft: var(--d-ink-soft);
+  --ink-faint: var(--d-ink-faint);
+  --rule: var(--d-rule);
+  --rule-soft: var(--d-rule-soft);
+  --accent: var(--d-accent);
+  --accent-soft: var(--d-accent-soft);
+  --on-accent: var(--d-on-accent);
+  --on-ink: var(--d-on-ink);
+  --todo: var(--d-todo);
+  --doing: var(--d-doing);
+  --done: var(--d-done);
+  --warn: var(--d-warn);
+  --warn-soft: var(--d-warn-soft);
+  --shadow: var(--d-shadow);
+  --shadow-lift: var(--d-shadow-lift);
+  --chevron: var(--d-chevron);
   }
 }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: var(--d-paper);
+  --raised: var(--d-raised);
+  --sunken: var(--d-sunken);
+  --ink: var(--d-ink);
+  --ink-soft: var(--d-ink-soft);
+  --ink-faint: var(--d-ink-faint);
+  --rule: var(--d-rule);
+  --rule-soft: var(--d-rule-soft);
+  --accent: var(--d-accent);
+  --accent-soft: var(--d-accent-soft);
+  --on-accent: var(--d-on-accent);
+  --on-ink: var(--d-on-ink);
+  --todo: var(--d-todo);
+  --doing: var(--d-doing);
+  --done: var(--d-done);
+  --warn: var(--d-warn);
+  --warn-soft: var(--d-warn-soft);
+  --shadow: var(--d-shadow);
+  --shadow-lift: var(--d-shadow-lift);
+  --chevron: var(--d-chevron);
+}
+
 
 * { box-sizing: border-box; }
 
@@ -1452,3 +1509,42 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 
 .unsent-list p { margin: 0 0 var(--s2); }
 .unsent-list code { display: inline-block; }
+
+/* ---- the theme switch ---- */
+
+/* Three buttons in a segmented control: follow the system, light, dark.
+ *
+ * A form rather than a script, so the choice survives a reload and the page
+ * arrives already in the right colours. Three rather than two because "follow
+ * the system" has to stay reachable — a laptop that goes dark in the evening
+ * should take the board with it. */
+.theme {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+.theme-pick {
+  height: 1.4rem;
+  min-width: 1.6rem;
+  padding: 0 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1;
+  color: var(--ink-faint);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+}
+
+.theme-pick:hover { color: var(--ink); background: var(--raised); filter: none; }
+
+.theme-pick.on {
+  color: var(--ink);
+  background: var(--raised);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 46rem) { .theme { display: none; } }

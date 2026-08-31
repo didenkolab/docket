@@ -79,7 +79,7 @@ func (a *authority) standingOf(ctx context.Context, s *session) *standing {
 	out := &standing{byProject: map[string]access.Identity{}}
 	signedInto := map[string]bool{}
 
-	for _, r := range a.repos {
+	for _, r := range a.repositories() {
 		if r.host == nil {
 			// Nobody vouches for it. It is readable — it is on the disk of a
 			// server somebody chose to run — and never writable.
@@ -117,7 +117,7 @@ func (a *authority) standingOf(ctx context.Context, s *session) *standing {
 	// A host holding repositories nobody has signed into yet is something to
 	// offer rather than to hide: half a workspace is not an error, it is a
 	// sign-in that has not happened.
-	for _, h := range hosts(a.repos) {
+	for _, h := range hosts(a.repositories()) {
 		if !s.has(h.Key) {
 			out.missing = append(out.missing, h)
 		}

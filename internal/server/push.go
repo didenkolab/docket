@@ -129,7 +129,7 @@ func (s *Server) credentialFor(r *http.Request, v *space.Vault) gitvcs.Credentia
 	if !ok {
 		return gitvcs.Credential{}
 	}
-	for _, repo := range s.auth.repos {
+	for _, repo := range s.auth.repositories() {
 		if repo.prefix != v.Prefix || repo.host == nil {
 			continue
 		}
@@ -158,7 +158,7 @@ func (s *Server) pushNotes() []pushNote {
 	defer s.pushes.mu.Unlock()
 
 	var notes []pushNote
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		if v.Repo == nil || !v.Repo.HasRemote() {
 			continue
 		}
@@ -184,7 +184,7 @@ func (s *Server) pushNotes() []pushNote {
 
 // handlePush is the retry: somebody read what went wrong and is asking again.
 func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		if v.Repo == nil || !v.Repo.HasRemote() {
 			continue
 		}
@@ -203,7 +203,7 @@ func (s *Server) mayWriteTo(r *http.Request, v *space.Vault) bool {
 	if st == nil {
 		return true
 	}
-	for _, repo := range s.auth.repos {
+	for _, repo := range s.auth.repositories() {
 		if repo.prefix != v.Prefix {
 			continue
 		}

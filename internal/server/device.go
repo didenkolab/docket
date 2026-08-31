@@ -87,7 +87,7 @@ func (s *Server) clientIDFor(hostKey string) string {
 // this server does everywhere else.
 func (s *Server) vaultClientID(hostKey string) string {
 	hostKey = strings.ToLower(hostKey)
-	for _, repo := range s.auth.repos {
+	for _, repo := range s.auth.repositories() {
 		if repo.host == nil || repo.hostKey != hostKey {
 			continue
 		}
@@ -446,8 +446,9 @@ func (s *Server) handleSignInSetup(w http.ResponseWriter, r *http.Request) {
 // key, because that is what somebody looking at the page sees.
 func (s *Server) repositoryAsked(r *http.Request) (*repository, string, bool) {
 	named := strings.ToUpper(strings.TrimSpace(r.FormValue("repo")))
-	for _, repo := range s.auth.repos {
-		if named == "" && len(s.auth.repos) == 1 {
+	all := s.auth.repositories()
+	for _, repo := range all {
+		if named == "" && len(all) == 1 {
 			return repo, s.rootOf(repo), true
 		}
 		for _, key := range repo.projects {
@@ -461,12 +462,12 @@ func (s *Server) repositoryAsked(r *http.Request) (*repository, string, bool) {
 
 // rootOf is where a repository is on disk.
 func (s *Server) rootOf(repo *repository) string {
-	for _, v := range s.space.Vaults() {
+	for _, v := range s.sp().Vaults() {
 		if v.Prefix == repo.prefix {
 			return v.Root
 		}
 	}
-	return s.space.Root
+	return s.sp().Root
 }
 
 func first(keys []string) string {

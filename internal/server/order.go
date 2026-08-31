@@ -107,7 +107,7 @@ func (s *Server) renumber(column []vault.Entry, moved *task.Task, at int) ([]str
 // column corrupts somebody else's order in it. Only somebody who may write to
 // the project gets here.
 func (s *Server) column(c *project.Config, status, without string) ([]vault.Entry, error) {
-	entries, err := s.space.Entries()
+	entries, err := s.sp().Entries()
 	if err != nil {
 		return nil, err
 	}

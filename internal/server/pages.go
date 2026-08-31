@@ -30,6 +30,15 @@ type pageData struct {
 	// CSRF is what this page must send back with a change for the change to be
 	// accepted. Every form carries it; the scripts read it from the head.
 	CSRF string
+	// Theme is the colour scheme this request asked for, stamped on the html
+	// element so the page arrives in the right colours rather than changing
+	// after it paints. Empty means follow the system. See theme.go.
+	Theme  string
+	Themes []themeChoice
+	Here   string
+	// Workspace says this space holds several repositories, so there is a
+	// Projects page worth offering.
+	Workspace bool
 	// Pushes are the repositories with something unsent, or something that went
 	// wrong sending it. Empty when everything is where everybody else can read
 	// it, because a badge that is always there is a badge nobody reads.
@@ -59,12 +68,16 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 	you, signedIn := s.whoIsAsking(r)
 	page := pageData{
 		Config: c, Title: title, Data: data,
-		You:      you,
-		SignedIn: signedIn,
-		CSRF:     tokenOf(r),
-		Sees:     s.showsAnything(r),
-		Pushes:   s.pushNotes(),
-		Refresh:  seconds,
+		You:       you,
+		SignedIn:  signedIn,
+		CSRF:      tokenOf(r),
+		Sees:      s.showsAnything(r),
+		Pushes:    s.pushNotes(),
+		Workspace: s.sp().Workspace,
+		Theme:     themeAttribute(themeOf(r)),
+		Themes:    themeChoices(themeOf(r)),
+		Here:      r.URL.RequestURI(),
+		Refresh:   seconds,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -206,7 +219,7 @@ type projectTab struct {
 // Work crosses projects constantly, so the default is all of them and the
 // project is a chip on the card rather than a separate board to go and find.
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
-	s.board(w, r, s.space, "")
+	s.board(w, r, s.sp(), "")
 }
 
 // board draws the board from one space, which is the working tree or a branch.
