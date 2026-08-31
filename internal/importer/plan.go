@@ -22,6 +22,23 @@ type StatusMap struct {
 	Category string `yaml:"category"`
 }
 
+// TypeMap is what a source type becomes: its name in the vault, and the level
+// that decides what may contain what.
+//
+// The level used to be left for a person to write, on the reasoning that
+// guessing which of somebody's types is an epic is a guess an import should not
+// make. That reasoning was right and the premise was wrong: Jira states the
+// hierarchy. Every issue type carries a hierarchyLevel — 1 for an epic, 0 for
+// ordinary work, -1 for a sub-task — and it is the same numbering docket uses.
+// Reading it is not guessing.
+//
+// A source that says nothing leaves the level at nought, which is the honest
+// answer: everything is ordinary work until somebody says otherwise.
+type TypeMap struct {
+	Name  string `yaml:"name"`
+	Level int    `yaml:"level"`
+}
+
 // FieldMap is what a source custom field becomes. A dropped field is written
 // down rather than omitted, so the file lists everything the source had and
 // nothing disappears by not being mentioned.
@@ -35,7 +52,7 @@ type FieldMap struct {
 // Maps is the whole translation from the source's vocabulary to the vault's.
 type Maps struct {
 	Statuses   map[string]StatusMap `yaml:"statuses"`
-	Types      map[string]string    `yaml:"types"`
+	Types      map[string]TypeMap   `yaml:"types"`
 	Priorities map[string]string    `yaml:"priorities"`
 	People     map[string]string    `yaml:"people"`
 	Fields     map[string]FieldMap  `yaml:"fields"`
@@ -60,7 +77,11 @@ type sourceIssue struct {
 }
 
 type namedValue struct {
-	Name           string `json:"name"`
+	Name string `json:"name"`
+	// HierarchyLevel is what Jira says about an issue type: 1 for an epic, 0 for
+	// ordinary work, -1 for a sub-task. The same numbering docket uses, which is
+	// why it can be read rather than guessed.
+	HierarchyLevel int `json:"hierarchyLevel"`
 	StatusCategory struct {
 		Key string `json:"key"`
 	} `json:"statusCategory"`
@@ -81,7 +102,7 @@ type person struct {
 func Plan(snap Reader) (*Maps, *Report, error) {
 	maps := &Maps{
 		Statuses:   map[string]StatusMap{},
-		Types:      map[string]string{},
+		Types:      map[string]TypeMap{},
 		Priorities: map[string]string{},
 		People:     map[string]string{},
 		Fields:     map[string]FieldMap{},
@@ -114,7 +135,7 @@ func Plan(snap Reader) (*Maps, *Report, error) {
 				}
 			}
 			if t := named(issue.Fields["issuetype"]); t.Name != "" {
-				maps.Types[t.Name] = mapType(t.Name)
+				maps.Types[t.Name] = TypeMap{Name: mapType(t.Name), Level: t.HierarchyLevel}
 			}
 			if p := named(issue.Fields["priority"]); p.Name != "" {
 				maps.Priorities[p.Name] = slug(p.Name)
@@ -206,8 +227,15 @@ func categoryOf(key string) string {
 
 // mapType lands the common source names on the vault's default vocabulary and
 // slugs anything else, so an instance with its own types keeps them.
+// mapType is what a source type is called in the vault.
+//
+// An English name recognised as one of the four the template ships is mapped to
+// it, so an ordinary Jira arrives speaking the vocabulary the boards already
+// use. Anything else keeps its own name, exactly as a status does — a team's
+// word for its work is worth more than a tidy set, and slugging it was how
+// every Cyrillic type in a real project became the empty string.
 func mapType(name string) string {
-	switch strings.ToLower(name) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "task", "sub-task", "subtask", "technical task":
 		return "task"
 	case "bug", "defect", "incident":
@@ -217,7 +245,7 @@ func mapType(name string) string {
 	case "epic", "initiative":
 		return "epic"
 	default:
-		return slug(name)
+		return strings.TrimSpace(name)
 	}
 }
 
@@ -238,7 +266,13 @@ func isEmpty(raw json.RawMessage) bool {
 	return text == "" || text == "null" || text == "[]" || text == "{}" || text == `""`
 }
 
-var notWord = regexp.MustCompile(`[^a-z0-9]+`)
+// notWord is everything that is not a letter or a digit, in any script.
+//
+// It was `[^a-z0-9]+`, which is every character of a name written in anything
+// but Latin — so slugging a Cyrillic type name replaced all of it and trimmed
+// what was left, returning nothing at all. Found by importing a real project
+// whose vocabulary is Russian.
+var notWord = regexp.MustCompile(`[^\p{L}\p{N}]+`)
 
 func slug(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
@@ -254,8 +288,10 @@ const mapsHeader = `# How this import translates the source's vocabulary into th
 # statuses:   the source's own names are kept, because a team's words for its
 #             process are worth more than a tidy set. The category is what
 #             machines act on and must be todo, doing or done.
-# types:      mapped onto the vault's vocabulary where the name is recognised,
-#             slugged otherwise. Every value here ends up in project.yaml.
+# types:      mapped onto the vault's vocabulary where the English name is
+#             recognised, and kept as written otherwise — a team's word for its
+#             work is worth more than a tidy set. The level comes from the
+#             source, which states it: 1 contains 0, and 0 contains -1.
 # priorities: likewise.
 # people:     account ids on the left, handles on the right. This section is
 #             personal data and always wants a human eye.
@@ -317,7 +353,7 @@ func (m *Maps) validate() error {
 		}
 	}
 	for source, mapped := range m.Types {
-		if mapped == "" {
+		if strings.TrimSpace(mapped.Name) == "" {
 			return fmt.Errorf("type %q maps to nothing", source)
 		}
 	}

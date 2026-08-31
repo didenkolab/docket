@@ -154,7 +154,7 @@ func writeConfig(root, key, name string, maps *Maps) error {
 	c := &project.Config{
 		Name:       name,
 		Projects:   []project.Project{{Key: key, Name: name}},
-		Types:      typesOf(Values(maps.Types)),
+		Types:      typesOf(maps.Types),
 		Priorities: Values(maps.Priorities),
 	}
 	for _, mapped := range maps.StatusOrder() {
@@ -225,7 +225,7 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 	key := project.Key(opts.Project, numberOf(issue.Key))
 	t.Set("key", key)
 	t.Set("title", stringField(fields["summary"]))
-	t.Set("type", mappedType)
+	t.Set("type", mappedType.Name)
 	t.SetStatus(mappedStatus.Name, mappedStatus.Category)
 	t.Set("priority", priority)
 	t.Set("assignee", handle(maps, fields["assignee"]))
@@ -438,14 +438,50 @@ func noteNames(projectKey string, issues []sourceIssue) map[string]string {
 	return notes
 }
 
-// typesOf turns imported type names into vault types. Levels are not imported:
-// the source system's hierarchy is a mapping decision, and guessing which of
-// somebody's types is an epic is exactly the kind of guess an import should not
-// make silently. Say so in the plan, and let a person write the level.
-func typesOf(names []string) []project.Type {
-	types := make([]project.Type, 0, len(names))
-	for _, name := range names {
-		types = append(types, project.Type{Name: name})
+// typesOf turns the mapping into the vault's types, levels and all.
+//
+// The levels used to be dropped, on the reasoning that guessing which of
+// somebody's types is an epic is a guess an import should not make silently.
+// The reasoning was right and the premise was wrong: Jira states the hierarchy
+// on every issue type, in the same numbering docket uses. Reading it is not
+// guessing, and dropping it left every imported epic as ordinary work — a
+// container that contains nothing, which is the one thing an epic is for.
+//
+// Deduplicated by name and ordered from the top down, so a board's vocabulary
+// reads epic, story, task, sub-task rather than in whatever order the issues
+// happened to arrive.
+func typesOf(mapped map[string]TypeMap) []project.Type {
+	byName := map[string]project.Type{}
+	for _, m := range mapped {
+		name := strings.TrimSpace(m.Name)
+		if name == "" {
+			continue
+		}
+		// Two source types with one vault name — Sub-task and Подзадача both
+		// becoming "task" — keep the level furthest from ordinary, because a
+		// sub-task wrongly called ordinary work lands in the backlog.
+		if had, seen := byName[name]; seen && abs(had.Level) >= abs(m.Level) {
+			continue
+		}
+		byName[name] = project.Type{Name: name, Level: m.Level}
 	}
+
+	types := make([]project.Type, 0, len(byName))
+	for _, t := range byName {
+		types = append(types, t)
+	}
+	sort.SliceStable(types, func(a, b int) bool {
+		if types[a].Level != types[b].Level {
+			return types[a].Level > types[b].Level
+		}
+		return types[a].Name < types[b].Name
+	})
 	return types
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }

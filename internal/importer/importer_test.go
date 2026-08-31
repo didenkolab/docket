@@ -162,11 +162,11 @@ func TestPlanProposesAWholeMapping(t *testing.T) {
 	if got := maps.Statuses["In Progress"].Category; got != "doing" {
 		t.Errorf("In Progress is in category %q, want doing", got)
 	}
-	if got := maps.Types["Sub-task"]; got != "task" {
-		t.Errorf("Sub-task maps to %q, want task", got)
+	if got := maps.Types["Sub-task"]; got.Name != "task" {
+		t.Errorf("Sub-task maps to %+v, want task", got)
 	}
-	if got := maps.Types["Bug"]; got != "bug" {
-		t.Errorf("Bug maps to %q", got)
+	if got := maps.Types["Bug"]; got.Name != "bug" {
+		t.Errorf("Bug maps to %+v", got)
 	}
 	if got := maps.People["acc-1"]; got != "dana_example" {
 		t.Errorf("the person maps to %q", got)
@@ -539,3 +539,75 @@ func mustJSON(t *testing.T, v any) []byte {
 }
 
 func err2[T any](v T, err error) (T, error) { return v, err }
+
+// A vocabulary that is not English.
+//
+// Every type of a real project came out of the mapping as the empty string,
+// because slugging was `[^a-z0-9]+` — which is every character of a name
+// written in anything but Latin. And every epic came out at level nought,
+// because the level was left for a person to write on the grounds that guessing
+// is wrong. Jira states the hierarchy on each type, so it was never a guess.
+func TestPlanKeepsANonLatinVocabularyAndItsLevels(t *testing.T) {
+	snap, err := snapshot.Create(filepath.Join(t.TempDir(), "snap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := snap.SaveManifest(&snapshot.Manifest{
+		Instance: "example.atlassian.net", Projects: []string{"PIER"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The source states its hierarchy on every type, which is why the level can
+	// be read rather than guessed.
+	levelled := func(key, kind string, level int, status, category string) map[string]any {
+		one := issue(key, "Что-то", status, category, kind, "Обычный", nil)
+		one["fields"].(map[string]any)["issuetype"] = map[string]any{
+			"name": kind, "hierarchyLevel": level,
+		}
+		return one
+	}
+	for _, one := range []map[string]any{
+		levelled("PIER-1", "Эпик", 1, "В работе", "indeterminate"),
+		levelled("PIER-2", "История", 0, "Готово", "done"),
+		levelled("PIER-3", "Подзадача", -1, "К выполнению", "new"),
+		// An English name still maps onto the vocabulary the boards use.
+		levelled("PIER-4", "Bug", 0, "Готово", "done"),
+	} {
+		if err := snap.Append("issues/PIER.jsonl", one); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	maps, _, err := Plan(snap)
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+
+	for _, c := range []struct {
+		source, name string
+		level        int
+	}{
+		{"Эпик", "Эпик", 1},
+		{"История", "История", 0},
+		{"Подзадача", "Подзадача", -1},
+		{"Bug", "bug", 0},
+	} {
+		got := maps.Types[c.source]
+		if got.Name != c.name {
+			t.Errorf("%s maps to %q, want %q — a name in another script must survive",
+				c.source, got.Name, c.name)
+		}
+		if got.Level != c.level {
+			t.Errorf("%s is at level %d, want %d — the source states it", c.source, got.Level, c.level)
+		}
+	}
+
+	if got := maps.Statuses["К выполнению"]; got.Name != "К выполнению" || got.Category != "todo" {
+		t.Errorf("К выполнению maps to %+v", got)
+	}
+	// And a priority in another script is no longer slugged away to nothing.
+	if got := maps.Priorities["Обычный"]; got == "" {
+		t.Error("a priority written in Cyrillic became the empty string")
+	}
+}
