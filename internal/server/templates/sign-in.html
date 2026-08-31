@@ -32,6 +32,19 @@
   </p>
   {{end}}
 
+  {{if $data.Local}}
+  <form method="post" action="/sign-in/local" class="local">
+  {{template "csrf" $}}
+    <input type="hidden" name="next" value="{{$data.Next}}">
+    <button type="submit" class="primary">Continue on this machine</button>
+  </form>
+  <p class="footnote">
+    Using the credentials {{$data.LocalHost}} already has on this machine — the ones git uses to
+    push. Offered because this board is only reachable from here. {{$data.LocalHost}} is still
+    asked who they belong to and what you may do.
+  </p>
+  {{end}}
+
   {{$several := gt (len $data.Hosts) 1}}
   {{range $data.Hosts}}
   <section class="host">

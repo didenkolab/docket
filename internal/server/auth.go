@@ -374,6 +374,11 @@ type signInView struct {
 	// Signed are the hosts already signed into, so a page reached while
 	// half-way through says so rather than looking like a fresh start.
 	Signed []string
+	// Local says the credentials already on this machine can be used, and names
+	// the host they are for. Offered only on a loopback listener that nothing is
+	// proxying — see local.go.
+	Local     bool
+	LocalHost string
 }
 
 // signInHostView is one host to sign into.
@@ -400,6 +405,10 @@ func (s *Server) signInPage(r *http.Request, next, problem string) signInView {
 				held[key] = true
 			}
 		}
+	}
+
+	if host, ok := s.localSignIn(); ok && !held[host.Key] {
+		view.Local, view.LocalHost = true, host.Name
 	}
 
 	for _, h := range hosts(s.auth.repos) {

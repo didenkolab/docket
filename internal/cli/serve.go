@@ -113,6 +113,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		// --auth none means nobody signs in, even though the repositories
 		// could say who vouches for them.
 		Unauthenticated: *auth == "none",
+		// Reachable only from this machine, so the credentials already on it
+		// may be used. --behind-proxy takes it away again, inside New.
+		OnLoopback: onLoopback(*addr),
 
 		DeviceClientID: deviceClientID(*clientID),
 	})
@@ -222,4 +225,18 @@ func deviceClientID(flag string) string {
 		return flag
 	}
 	return strings.TrimSpace(os.Getenv("DOCKET_DEVICE_CLIENT_ID"))
+}
+
+// onLoopback reports whether an address is reachable only from this machine.
+//
+// A hostname is not resolved: this decides whether to trust "you can reach this
+// port" as authentication, and a name that resolves to loopback today may not
+// tomorrow. Only the two literal loopback addresses count.
+func onLoopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(strings.TrimSpace(host))
+	return ip != nil && ip.IsLoopback()
 }

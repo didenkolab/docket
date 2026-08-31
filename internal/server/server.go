@@ -59,6 +59,13 @@ type Options struct {
 	// secret in this flow — and empty means the sign-in page offers the token
 	// field alone. See access/device.go.
 	DeviceClientID string
+	// OnLoopback says this server is reachable only from the machine it runs
+	// on, so the credentials already on that machine may be used to sign in.
+	//
+	// It is not inferred from the address, because --behind-proxy binds
+	// loopback and is reachable from the world: the two facts have to be
+	// combined by whoever knows both. See local.go.
+	OnLoopback bool
 	// Unauthenticated runs the server with nobody signed in, whatever the
 	// repositories say about their hosts.
 	//
@@ -94,6 +101,8 @@ type Server struct {
 	// recheck is how often a host is re-asked about somebody, and so how long a
 	// revocation takes to bite. The Access page says it out loud.
 	recheck time.Duration
+	// onLoopback says the machine's own credentials may sign somebody in.
+	onLoopback bool
 
 	// now is injectable so tests can assert on timestamps.
 	now func() time.Time
@@ -139,6 +148,7 @@ func New(root string, opts Options) (*Server, error) {
 		behindProxy: opts.BehindProxy,
 
 		deviceClientID: strings.TrimSpace(opts.DeviceClientID),
+		onLoopback:     opts.OnLoopback && !opts.BehindProxy,
 	}
 	recheck, life := opts.Recheck, opts.SessionLife
 	if recheck <= 0 {
@@ -348,6 +358,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /sign-in/device", s.handleDeviceStart)
 	mux.HandleFunc("GET /sign-in/device", s.handleDeviceWait)
 	mux.HandleFunc("POST /sign-in/device/stop", s.handleDeviceStop)
+	mux.HandleFunc("POST /sign-in/local", s.handleLocalSignIn)
 	mux.HandleFunc("POST /sign-out", s.handleSignOut)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
