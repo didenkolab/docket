@@ -15,6 +15,7 @@ import (
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 )
 
 var noon = time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
@@ -24,7 +25,7 @@ func newServer(t *testing.T) (*Server, http.Handler, string) {
 	t.Helper()
 
 	root := filepath.Join(t.TempDir(), "vault")
-	if _, err := vault.Init(root, vault.Options{Key: "ACME", Name: "Acme Platform"}); err != nil {
+	if _, err := vault.Init(root, vault.Options{Key: "ACME", Name: "Acme Platform", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatalf("vault.Init: %v", err)
 	}
 	git(t, root, "init", "-q", "-b", "main")
@@ -504,7 +505,7 @@ func TestSearchFormOffersTheVaultsVocabulary(t *testing.T) {
 
 func TestServingADirectoryThatIsNotAGitRepository(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vault")
-	if _, err := vault.Init(root, vault.Options{Key: "ACME"}); err != nil {
+	if _, err := vault.Init(root, vault.Options{Key: "ACME", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatal(err)
 	}
 	// Every write is a commit, so a vault outside git would lose its history

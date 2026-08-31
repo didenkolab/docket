@@ -12,6 +12,7 @@ import (
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 )
 
 // A history is read from git and says what moved, in the tracker's words.
@@ -164,7 +165,7 @@ func TestDeletingAParentIsRefused(t *testing.T) {
 // A vault nobody has written to yet is somebody's first minute with this.
 func TestAnEmptyBoardSaysWhatToDo(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vault")
-	if _, err := vault.Init(root, vault.Options{Key: "NEW", Name: "A New Thing"}); err != nil {
+	if _, err := vault.Init(root, vault.Options{Key: "NEW", Name: "A New Thing", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatal(err)
 	}
 	git(t, root, "init", "-q", "-b", "main")
@@ -229,9 +230,18 @@ func TestRetitlingRepointsLinksInOneCommit(t *testing.T) {
 	if dirty := gitPorcelain(t, root); dirty != "" {
 		t.Errorf("the retitle left files uncommitted:\n%s", dirty)
 	}
-	if files := commitFiles(t, root); len(files) < 3 {
-		t.Errorf("the commit carries %d paths, want the rename and the file that linked: %v",
-			len(files), files)
+	// What matters is that the move and the repointing are one commit, not how
+	// many paths git chooses to print: whether it reports a rename as one path
+	// or as a delete and an add depends on how similar the two files are, which
+	// is nothing to do with this.
+	files := strings.Join(commitFiles(t, root), "\n")
+	for _, want := range []string{
+		"ACME-1 Fix the login redirect for expired sessions.md", // the new name
+		"ACME-2 Session model.md",                               // the file that linked to it
+	} {
+		if !strings.Contains(files, want) {
+			t.Errorf("%q is not in the commit:\n%s", want, files)
+		}
 	}
 }
 

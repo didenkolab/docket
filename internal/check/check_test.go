@@ -8,6 +8,7 @@ import (
 
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 )
 
 // task is a valid task, which each test then breaks in exactly one way.
@@ -31,7 +32,8 @@ A body.
 func newVault(t *testing.T) string {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "vault")
-	if _, err := vault.Init(root, vault.Options{Key: "ACME", Name: "Acme Platform"}); err != nil {
+	if _, err := vault.Init(root, vault.Options{Key: "ACME", Name: "Acme Platform",
+		Template: vaulttest.Template(t)}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 	return root

@@ -17,6 +17,7 @@ import (
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 	"github.com/vadymdidenkolab/docket/internal/workspace"
 )
 
@@ -61,9 +62,11 @@ func workspaceOnTwoHosts(t *testing.T) (*Server, http.Handler, *twoHosts, *twoHo
 	t.Helper()
 
 	root := t.TempDir()
+	template := vaulttest.Template(t)
 	for _, key := range []string{"ONE", "TWO"} {
 		dir := filepath.Join(root, strings.ToLower(key))
-		if _, err := vault.Init(dir, vault.Options{Key: key, Name: key + " Platform"}); err != nil {
+		if _, err := vault.Init(dir, vault.Options{Key: key, Name: key + " Platform",
+			Template: template}); err != nil {
 			t.Fatalf("init %s: %v", key, err)
 		}
 		c, err := project.Load(dir)

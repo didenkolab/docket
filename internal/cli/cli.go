@@ -166,6 +166,9 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	key := flags.String("key", "", "project key: the prefix of every task, such as ACME")
 	name := flags.String("name", "", "project name (defaults to the key)")
 	author := flags.String("author", "", `who to attribute the first commit to, as "Name <email>"`)
+	template := flags.String("template", "",
+		"the repository to scaffold from — any git remote, including a path on disk\n"+
+			"    \t(default "+vault.DefaultTemplate+")")
 	noCommit := flags.Bool("no-commit", false,
 		"scaffold the files and leave them unstaged, rather than committing them")
 
@@ -188,7 +191,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		dir = flags.Arg(0)
 	}
 
-	written, err := vault.Init(dir, vault.Options{Key: *key, Name: *name})
+	written, err := vault.Init(dir, vault.Options{Key: *key, Name: *name, Template: *template})
 	if err != nil {
 		fmt.Fprintf(stderr, "docket init: %v\n", err)
 		return exitError

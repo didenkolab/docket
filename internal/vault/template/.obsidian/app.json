@@ -1,9 +1,0 @@
-{
-  "attachmentFolderPath": "attachments",
-  "newLinkFormat": "shortest",
-  "useMarkdownLinks": false,
-  "alwaysUpdateLinks": true,
-  "showUnsupportedFiles": true,
-  "newFileLocation": "folder",
-  "newFileFolderPath": "docs"
-}
