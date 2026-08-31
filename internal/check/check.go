@@ -35,6 +35,7 @@ const (
 	RuleTags        = 11 // a tag is a set somebody asks for, said once
 	RuleEstimates   = 12 // an estimate is on the scale, and not on a container
 	RuleSprints     = 13 // a sprint is a page, said as a link, and owns its days
+	RuleDocuments   = 14 // a document says what kind it is, and a decision has its shape
 )
 
 // Finding is one problem, located.
@@ -196,6 +197,11 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 	// the sprints.
 	if sprints, err := vault.Sprints(root); err == nil {
 		findings = append(findings, checkSprints(entries, sprints, time.Now().UTC())...)
+	}
+	// A vault with no knowledge base has no documents to judge, which is the
+	// state a new project starts in.
+	if pages, err := vault.Pages(root); err == nil {
+		findings = append(findings, checkDocuments(pages)...)
 	}
 
 	sort.Slice(findings, func(i, j int) bool {
