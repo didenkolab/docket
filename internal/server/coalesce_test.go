@@ -32,7 +32,11 @@ func TestQuickChangesAllReachTheRemote(t *testing.T) {
 			t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
 		}
 	}
-	run(t.TempDir(), "init", "-q", "--bare", remote)
+	// -b main, and every read below names the branch: a bare repository's HEAD
+	// follows the machine's init.defaultBranch, which is main here and master
+	// on the build. The push goes to main either way, so `git log` following
+	// HEAD found an empty master and the test passed at home and failed there.
+	run(t.TempDir(), "init", "-q", "--bare", "-b", "main", remote)
 	run(root, "remote", "add", "origin", remote)
 	run(root, "push", "-q", "-u", "origin", "HEAD")
 
@@ -75,7 +79,7 @@ func TestQuickChangesAllReachTheRemote(t *testing.T) {
 	}
 
 	// And the remote really has them, rather than the count merely agreeing.
-	cmd := exec.Command("git", "log", "--format=%s", "-6")
+	cmd := exec.Command("git", "log", "main", "--format=%s", "-6")
 	cmd.Dir = remote
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -108,7 +112,11 @@ func TestACommitTheBoardDidNotMakeIsSentToo(t *testing.T) {
 			t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
 		}
 	}
-	run(t.TempDir(), "init", "-q", "--bare", remote)
+	// -b main, and every read below names the branch: a bare repository's HEAD
+	// follows the machine's init.defaultBranch, which is main here and master
+	// on the build. The push goes to main either way, so `git log` following
+	// HEAD found an empty master and the test passed at home and failed there.
+	run(t.TempDir(), "init", "-q", "--bare", "-b", "main", remote)
 	run(root, "remote", "add", "origin", remote)
 	run(root, "push", "-q", "-u", "origin", "HEAD")
 
@@ -136,7 +144,7 @@ func TestACommitTheBoardDidNotMakeIsSentToo(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 	}
 
-	cmd := exec.Command("git", "log", "--format=%s", "-4")
+	cmd := exec.Command("git", "log", "main", "--format=%s", "-4")
 	cmd.Dir = remote
 	out, err := cmd.CombinedOutput()
 	if err != nil {
