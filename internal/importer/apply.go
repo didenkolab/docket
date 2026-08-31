@@ -88,7 +88,7 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 			report.Tasks++
 		}
 		if entries := histories[issue.Key]; len(entries) > 0 {
-			if err := writeHistory(opts.Root, opts.Project, numberOf(issue.Key), entries); err != nil {
+			if err := writeHistory(opts.Root, opts.Project, numberOf(issue.Key), entries, maps); err != nil {
 				return nil, fmt.Errorf("%s history: %w", issue.Key, err)
 			}
 			report.Histories++
@@ -270,7 +270,33 @@ func writeTask(opts ApplyOptions, maps *Maps, issue sourceIssue,
 
 // writeHistory keeps the change history the source had, because git never saw
 // it. Files under _history are read-only after an import.
-func writeHistory(root, projectKey string, number int, entries []json.RawMessage) error {
+//
+// What it keeps is what a history is for: who, when, and which field went from
+// what to what. The source's own JSON is written through in full by a first
+// draft of this, and on a real project that was sixty-eight megabytes for eleven
+// hundred tasks — most of it four gravatar URLs and an API self-link per entry,
+// none of which anybody will ever read.
+//
+// It also carried an email address on every entry, thousands of times over. The
+// tasks themselves name people by the handle in maps.people, which is what that
+// mapping is for; a history that kept the raw identity beside it would be two
+// records of one person with only one of them mapped, written into a git
+// history that cannot be edited afterwards.
+type historyEntry struct {
+	When    string          `json:"when"`
+	Who     string          `json:"who,omitempty"`
+	Changes []historyChange `json:"changes"`
+}
+
+// historyChange is one field moving. The values are the ones a person reads —
+// Jira's numeric ids for them are an identifier in a system this vault has left.
+type historyChange struct {
+	Field string `json:"field"`
+	From  string `json:"from,omitempty"`
+	To    string `json:"to,omitempty"`
+}
+
+func writeHistory(root, projectKey string, number int, entries []json.RawMessage, maps *Maps) error {
 	dir := filepath.Join(root, projectKey, vault.HistoryDir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -278,7 +304,44 @@ func writeHistory(root, projectKey string, number int, entries []json.RawMessage
 
 	var body strings.Builder
 	for _, raw := range entries {
-		body.Write(raw)
+		var source struct {
+			Created string `json:"created"`
+			Author  struct {
+				AccountID   string `json:"accountId"`
+				DisplayName string `json:"displayName"`
+			} `json:"author"`
+			Items []struct {
+				Field      string `json:"field"`
+				FromString string `json:"fromString"`
+				ToString   string `json:"toString"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(raw, &source); err != nil {
+			continue // an entry that cannot be read is not worth failing an import for
+		}
+
+		written := source.Created
+		if parsed, err := parseJiraTime(source.Created); err == nil {
+			written = parsed.UTC().Format(task.TimeFormat)
+		}
+		kept := historyEntry{When: written, Who: maps.People[source.Author.AccountID]}
+		if kept.Who == "" {
+			kept.Who = source.Author.DisplayName
+		}
+		for _, item := range source.Items {
+			kept.Changes = append(kept.Changes, historyChange{
+				Field: item.Field, From: item.FromString, To: item.ToString,
+			})
+		}
+		if len(kept.Changes) == 0 {
+			continue
+		}
+
+		line, err := json.Marshal(kept)
+		if err != nil {
+			return err
+		}
+		body.Write(line)
 		body.WriteString("\n")
 	}
 	return os.WriteFile(filepath.Join(dir, strconv.Itoa(number)+".jsonl"), []byte(body.String()), 0o644)
