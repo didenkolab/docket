@@ -945,7 +945,7 @@ a.label { text-decoration: none; }
 
 .edit, .stacked, .sign-in { max-width: 52rem; }
 .edit > label, .stacked > label { margin-top: var(--s4); }
-.edit > input { width: 100%; }
+.edit > input, .edit > textarea { width: 100%; }
 .edit textarea, .editor textarea { font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
 
 .stacked { display: flex; flex-direction: column; align-items: stretch; }
@@ -2173,3 +2173,23 @@ details.sprint > summary:hover .version { color: var(--accent); }
    changes while looking at a task rather than while editing one. */
 .inline-set { display: flex; gap: var(--s2); align-items: center; }
 .inline-set input { min-width: 0; flex: 1 1 10rem; }
+
+/* ---- saved views ---- */
+
+/* Which repository a view belongs to. A workspace has several, and a view named
+ * "board" in three of them is three different questions. */
+.in {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0 var(--s2);
+  margin-left: var(--s1);
+}
+
+/* The filter, which is the point of the row: it is code, and it is long. */
+.views-table { max-width: none; }
+.views-table .filter code { font-size: 0.75rem; color: var(--ink-soft); overflow-wrap: anywhere; }
+.views-table td { padding-top: var(--s1); padding-bottom: var(--s1); }
+.views-table td a.quiet { margin-left: var(--s2); }

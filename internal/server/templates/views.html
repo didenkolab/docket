@@ -1,0 +1,44 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<div class="page-head">
+  <h1>Views</h1>
+  {{if .You.CanWrite}}<a class="button-link" href="/views/new">+ view</a>{{end}}
+</div>
+<p class="lede">
+  A saved view is a file — <code>boards/*.base</code> — in the project it belongs to. Obsidian
+  evaluates the same file, so a filter changed in either place is changed in both, and a view is
+  reviewed in a proposal like anything else here.
+</p>
+
+{{if $data}}
+<table class="settings views-table">
+  <thead>
+    <tr><th>View</th><th>Shows</th><th>Selects</th></tr>
+  </thead>
+  <tbody>
+    {{range $data}}
+    <tr>
+      <td>
+        {{if .Trouble}}<span class="name">{{.Note}}</span>
+        {{else}}<a href="{{.Href}}">{{.Note}}</a>{{end}}
+        {{if .Project}}<span class="in">{{.Project}}</span>{{end}}
+      </td>
+      <td>
+        {{if .Trouble}}<span class="left">cannot be drawn here</span>{{else}}{{.Views}}{{end}}
+        {{if $.You.CanWrite}}<a class="quiet" href="{{.EditHref}}">edit</a>{{end}}
+      </td>
+      <td class="filter">
+        {{if .Trouble}}<code>{{.Trouble}}</code>{{else}}<code>{{.Filter}}</code>{{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">
+  No saved views yet. <code>docket check --fix</code> writes the ones a vault ships with, and any
+  <code>.base</code> file you write in <code>boards/</code> appears here.
+</p>
+{{end}}
+{{template "foot" .}}

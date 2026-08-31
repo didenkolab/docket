@@ -47,6 +47,11 @@ type pageData struct {
 	// sprint is offered to teams that work in sprints, and the way a vault says
 	// it works in sprints is by having written one down.
 	Sprints bool
+	// Views says the vault has saved views — boards/*.base — to offer. Every
+	// scaffolded vault has some, so this is all but always true; it is asked
+	// rather than assumed so that a vault whose boards folder was deleted does
+	// not offer a page of nothing.
+	Views bool
 	// Pushes are the repositories with something unsent, or something that went
 	// wrong sending it. Empty when everything is where everybody else can read
 	// it, because a badge that is always there is a badge nobody reads.
@@ -83,6 +88,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		Pushes:    s.pushNotes(),
 		Workspace: s.sp().Workspace,
 		Sprints:   len(s.sp().Sprints()) > 0,
+		Views:     len(s.sp().Views()) > 0,
 		Theme:     themeAttribute(themeOf(r)),
 		Themes:    themeChoices(themeOf(r)),
 		Here:      r.URL.RequestURI(),

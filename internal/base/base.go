@@ -66,6 +66,21 @@ type Base struct {
 	Filter     Expr
 	Properties map[string]string
 	Views      []View
+	// Formulas are the computed columns, by name without the formula. prefix.
+	// A formula this cannot read is left out and named in Beyond, so a view
+	// that uses it says so instead of drawing a column of nothing.
+	Formulas map[string]Value
+	Beyond   map[string]string
+}
+
+// Compute is what a formula evaluates to for a note, and whether the board can
+// evaluate it at all.
+func (b *Base) Compute(name string, n Note) (string, bool) {
+	f, ok := b.Formulas[strings.TrimPrefix(name, "formula.")]
+	if !ok {
+		return "", false
+	}
+	return f.Eval(n), true
 }
 
 // Displayed is the label a property was given, or the property itself.
@@ -89,6 +104,7 @@ func (b *Base) Matches(n Note) bool {
 func Parse(raw []byte) (*Base, error) {
 	var read struct {
 		Filters    yaml.Node                    `yaml:"filters"`
+		Formulas   map[string]string            `yaml:"formulas"`
 		Properties map[string]map[string]string `yaml:"properties"`
 		Views      []struct {
 			Name    string    `yaml:"name"`
@@ -105,10 +121,25 @@ func Parse(raw []byte) (*Base, error) {
 		return nil, err
 	}
 
-	b := &Base{Properties: map[string]string{}}
+	b := &Base{
+		Properties: map[string]string{},
+		Formulas:   map[string]Value{},
+		Beyond:     map[string]string{},
+	}
 	var err error
 	if b.Filter, err = parseNode(&read.Filters); err != nil {
 		return nil, err
+	}
+	// A formula that cannot be read is not a broken file: the view using it may
+	// not be the view being drawn. It is remembered as beyond us and named
+	// where it matters.
+	for name, written := range read.Formulas {
+		value, err := ParseFormula(written)
+		if err != nil {
+			b.Beyond[name] = err.Error()
+			continue
+		}
+		b.Formulas[name] = value
 	}
 	for property, about := range read.Properties {
 		b.Properties[property] = about["displayName"]

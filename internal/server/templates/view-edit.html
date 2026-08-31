@@ -1,0 +1,52 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>{{if $data.New}}New view{{else}}{{$data.Path}}{{end}}</h1>
+
+{{if $data.Error}}<div class="notice warn">{{$data.Error}}</div>{{end}}
+
+<p class="lede">
+  A view is an Obsidian Bases file. What is written here is what Obsidian reads, so a filter
+  changed here is changed in both places — and it is committed and sent like any other change.
+</p>
+
+<form class="edit" method="post" action="/views/save">
+  {{template "csrf" $}}
+  <input type="hidden" name="path" value="{{$data.Path}}">
+  <input type="hidden" name="version" value="{{$data.Version}}">
+  {{if $data.New}}<input type="hidden" name="new" value="1">{{end}}
+
+  {{if $data.New}}
+  {{if gt (len $data.Repositories) 1}}
+  <label for="in">Project</label>
+  <select id="in" name="in">
+    {{range $data.Repositories}}<option value="{{.}}">{{if .}}{{.}}{{else}}this vault{{end}}</option>{{end}}
+  </select>
+  {{else}}<input type="hidden" name="in" value="{{index $data.Repositories 0}}">{{end}}
+
+  <label for="name">Name</label>
+  <input id="name" name="name" required autofocus placeholder="waiting-on-review">
+  <p class="footnote inline">The file it is saved as, in that project's
+  <code>boards/</code> folder.</p>
+  {{end}}
+
+  <label for="body">The file</label>
+  <textarea id="body" name="body" rows="24" spellcheck="false">{{$data.Body}}</textarea>
+  <p class="footnote inline">
+    <code>file.inFolder("KEY")</code>, <code>note.status_category != "done"</code>,
+    <code>note.labels.contains("server")</code>, joined under <code>and</code> or <code>or</code>.
+  </p>
+
+  <div class="edit-actions save-bar">
+    <button type="submit">Save</button>
+    {{if $data.New}}
+    <a class="cancel" href="/views">Cancel</a>
+    {{else}}
+    <a class="cancel" href="/view/{{$data.Path}}">Cancel</a>
+    {{end}}
+    <span class="hint">
+      The filter is read before anything is written: a file that would not draw is refused here.
+    </span>
+  </div>
+</form>
+{{template "foot" .}}
