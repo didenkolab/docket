@@ -114,8 +114,29 @@ task in a column the board cannot render. Both change in the same edit.
 ## Writing documentation
 
 Pages go anywhere under `docs/`, in whatever tree makes sense. There is no schema — it is a
-wiki. The one convention: connect pages with `[[wikilinks]]`, so the graph and backlinks stay
-useful. A page that nothing links to is a page nobody will find.
+wiki. Connect pages with `[[wikilinks]]`, so the graph and backlinks stay useful.
+
+**Do not write a page whose purpose is to list other pages.** No index of labels, no "see all",
+no front page linking every epic. A link is a relationship, not a route: a list connects
+everything on it, so it lands in the middle of the graph and collapses the distance between
+clusters that have nothing to do with each other. On a vault of forty notes, two such pages were
+the two most connected notes in it and accounted for eighteen per cent of every edge.
+
+Finding a page is what the file explorer, the tag pane, the quick switcher and backlinks are
+for. None of them draws an edge. A front page may link the three or four pages somebody must
+read first — that is a relationship. It may not link everything.
+
+## Labels and tags: which to use
+
+- **A label is a theme work gathers around**, and it is a link, so it costs the graph an edge.
+  One or two per task. A task with five has labels that each mean too little.
+- **A label page never links another label page.** Its value is its backlinks; linking siblings
+  turns the labels themselves into a blob.
+- **A tag is a slice to search by**, and it is not a node, so it costs the graph nothing. Use
+  tags liberally: `area/...` for where the work is, plus whatever a search would want.
+- **Never say the same thing twice.** A task with both `labels: ["[[payments]]"]` and
+  `tags: [payments]` records one fact in two places, and the copy is the one that goes stale.
+- **A sub-task usually needs no labels.** It is inside a task that has them.
 
 ## Committing
 

@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
@@ -164,6 +165,9 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 
 	key := flags.String("key", "", "project key: the prefix of every task, such as ACME")
 	name := flags.String("name", "", "project name (defaults to the key)")
+	author := flags.String("author", "", `who to attribute the first commit to, as "Name <email>"`)
+	noCommit := flags.Bool("no-commit", false,
+		"scaffold the files and leave them unstaged, rather than committing them")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -190,8 +194,23 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	fmt.Fprintf(stdout, "Created a vault for %s in %s — %d files.\n\n", *key, dir, len(written))
-	fmt.Fprint(stdout, "Next:\n")
+	fmt.Fprintf(stdout, "Created a vault for %s in %s — %d files.\n", *key, dir, len(written))
+
+	// The scaffold is a commit, because the history is the record.
+	//
+	// A vault whose first state is uncommitted has a beginning nobody can read:
+	// `git log` on a task starts at whatever commit somebody happened to make
+	// first, and the AGENTS.md an agent is supposed to read is not in the
+	// repository until then. A new project's first commit says what it is.
+	if !*noCommit {
+		switch committed, err := commitScaffold(dir, *key, *author); {
+		case err != nil:
+			fmt.Fprintf(stderr, "\ndocket init: the files are written but not committed: %v\n", err)
+		case committed:
+			fmt.Fprint(stdout, "Committed as the repository's first commit.\n")
+		}
+	}
+	fmt.Fprint(stdout, "\nNext:\n")
 	if dir != "." {
 		fmt.Fprintf(stdout, "  cd %s\n", dir)
 	}
@@ -204,4 +223,37 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprint(stdout, "\nRead AGENTS.md before letting an agent loose in it.\n")
 	return exitOK
+}
+
+// commitScaffold makes the vault's first commit, and reports whether it did.
+//
+// It does nothing rather than failing when there is no git repository or the
+// repository already has commits: `docket init` into an existing repository is a
+// normal thing to do, and taking over its history would be a surprise.
+func commitScaffold(dir, key, author string) (bool, error) {
+	repo, err := gitvcs.Open(dir)
+	if err != nil {
+		return false, nil // not a repository, which init does not require
+	}
+	// A repository with commits of its own has a history to respect.
+	if past, err := repo.History(".", 1); err == nil && len(past) > 0 {
+		return false, nil
+	}
+
+	who := gitvcs.Author{Name: "docket", Email: "docket@localhost"}
+	if strings.TrimSpace(author) != "" {
+		parsed, err := gitvcs.ParseAuthor(author)
+		if err != nil {
+			return false, err
+		}
+		who = parsed
+	}
+
+	message := key + ": a vault for tasks and pages, kept as files in git\n\n" +
+		"Scaffolded by docket. AGENTS.md is how an agent works in here; docket.yaml is the\n" +
+		"projects this vault holds and the vocabulary they share."
+	if err := repo.Commit([]string{"."}, message, who); err != nil {
+		return false, err
+	}
+	return true, nil
 }

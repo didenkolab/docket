@@ -424,3 +424,64 @@ func TestABoardWithoutTheMarkerIsLeftAlone(t *testing.T) {
 		t.Errorf("--fix overwrote a board it does not own: %v, %v", written, err)
 	}
 }
+
+// withFront is a valid task with its key, title and a line or two of extra
+// frontmatter — for the rules that can only be broken across several files.
+func withFront(t *testing.T, key, title, extra string) string {
+	t.Helper()
+	body := strings.Replace(validTask, "key: ACME-1", "key: "+key, 1)
+	body = strings.Replace(body, "title: A task", "title: "+title, 1)
+	// Two labels: keys would be a duplicate property, which is a different
+	// finding from the one under test.
+	if strings.Contains(extra, "labels:") {
+		body = strings.Replace(body, "labels: []\n", "", 1)
+	}
+	return strings.Replace(body, "aliases: []", "aliases: []\n"+extra, 1)
+}
+
+// A tag's whole value is the list of what carries it, so the two ways of
+// producing a tag nobody will ever ask for are both findings.
+func TestATagThatIsNotASetIsReported(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "ACME-1 Alone.md", withFront(t, "ACME-1", "Alone",
+		"tags: [only-here, area/auth]"))
+	put(t, root, "ACME-2 Company.md", withFront(t, "ACME-2", "Company",
+		"tags: [area/auth]"))
+	// The label lives on a third task, so the clash is across files.
+	put(t, root, "ACME-3 Labelled.md", withFront(t, "ACME-3", "Labelled",
+		`labels: ["[[auth]]"]`))
+
+	var about []string
+	for _, f := range run(t, root) {
+		if f.Rule == RuleTags {
+			about = append(about, f.Message)
+		}
+	}
+	joined := strings.Join(about, "\n")
+
+	if !strings.Contains(joined, `"only-here"`) {
+		t.Errorf("a tag on one task and nothing else was not reported:\n%s", joined)
+	}
+	if !strings.Contains(joined, "set of one") {
+		t.Errorf("the reason is not said:\n%s", joined)
+	}
+	// area/auth is on two tasks, so it is a set — but `auth` is also a label,
+	// which makes it one fact in two places.
+	if !strings.Contains(joined, `"area/auth"`) || !strings.Contains(joined, "two places") {
+		t.Errorf("a label said again as a tag was not reported:\n%s", joined)
+	}
+}
+
+// A tag several notes carry, that is not also a label, is exactly what a tag is
+// for and must not be reported.
+func TestATagThatIsASetIsLeftAlone(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "ACME-1 One.md", withFront(t, "ACME-1", "One", "tags: [risk/money]"))
+	put(t, root, "ACME-2 Two.md", withFront(t, "ACME-2", "Two", "tags: [risk/money]"))
+
+	for _, f := range run(t, root) {
+		if f.Rule == RuleTags {
+			t.Errorf("a real set was reported: %s", f.Message)
+		}
+	}
+}

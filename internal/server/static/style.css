@@ -59,6 +59,15 @@
 
   --radius: 6px;
   --radius-sm: 4px;
+
+  /* One control height, so a field, a dropdown and a button in a row line up
+   * without anybody nudging a margin. */
+  --control: 2.125rem;
+
+  /* Our own dropdown arrow, inline so the page needs nothing from the network.
+   * The faint one is for a disabled dropdown. */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%235c6270' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --chevron-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%238b91a0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --shadow: 0 1px 2px rgb(20 23 28 / 0.05), 0 1px 3px rgb(20 23 28 / 0.04);
   --shadow-lift: 0 2px 4px rgb(20 23 28 / 0.07), 0 4px 12px rgb(20 23 28 / 0.06);
 
@@ -204,16 +213,38 @@ main { padding: var(--s5) var(--edge) var(--s7); }
 
 /* ---- fields and buttons ---- */
 
+/* One control, four elements.
+ *
+ * A field, a dropdown, a button and a text area are the same box: the same
+ * height, the same border, the same radius, the same focus ring. They were not,
+ * and a form of them looked assembled rather than designed — a select is a
+ * different height from an input in every browser, and it carried the operating
+ * system's own arrow next to our own borders.
+ *
+ * --control is that height, once, so a row of a field and a button lines up
+ * without anybody nudging a margin.
+ */
+
 input, select, textarea, button { font: inherit; }
 
 input[type="search"], input[type="text"], input[type="password"], input:not([type]),
-input[type="number"], select, textarea {
+input[type="number"], input[type="date"], select, textarea {
+  box-sizing: border-box;
   color: var(--ink);
   background: var(--raised);
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
-  padding: 0.4rem 0.55rem;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  padding: 0 var(--s3);
+  height: var(--control);
+  transition: border-color 0.12s, box-shadow 0.12s, background-color 0.12s;
+}
+
+textarea { height: auto; padding: var(--s3); line-height: 1.6; }
+
+input::placeholder, textarea::placeholder { color: var(--ink-faint); }
+
+input:hover:not(:focus), select:hover:not(:focus), textarea:hover:not(:focus) {
+  border-color: var(--ink-faint);
 }
 
 input:focus, select:focus, textarea:focus {
@@ -222,35 +253,97 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-label { display: block; margin-bottom: var(--s1); }
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--sunken);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+/* A dropdown is our box with our arrow.
+ *
+ * appearance:none takes the platform widget away, which is what makes the
+ * height honest; the arrow comes back as a background image so it sits where
+ * the padding says rather than where the operating system puts it. The menu
+ * itself stays the browser's own — it cannot be styled, and it should not be:
+ * on a phone it is the system picker, and with a keyboard it already does
+ * everything a hand-built one would have to be taught.
+ */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: calc(var(--s3) + 1.1rem);
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--s3) center;
+  background-size: 0.7rem;
+  cursor: pointer;
+}
+
+select:disabled { background-image: var(--chevron-faint); cursor: not-allowed; }
+
+/* A field says how wide it is by what goes in it, rather than every form
+ * setting a width of its own. */
+.field-short { width: 9rem; }
+.field-medium { width: 16rem; }
+.field-wide { width: 100%; max-width: 34rem; }
+
+label {
+  display: block;
+  margin-bottom: var(--s1);
+  font-size: 0.8rem;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
 
 button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  height: var(--control);
   font-weight: 550;
   font-size: 0.875rem;
   color: var(--on-accent);
   background: var(--accent);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 0.4rem 0.9rem;
+  padding: 0 var(--s4);
   cursor: pointer;
-  transition: filter 0.12s;
+  white-space: nowrap;
+  transition: filter 0.12s, border-color 0.12s, color 0.12s;
 }
 
 button:hover { filter: brightness(1.08); }
 button:active { filter: brightness(0.94); }
+button:disabled { filter: none; background: var(--sunken); color: var(--ink-faint); cursor: not-allowed; }
 
-.button-link, .cancel {
+/* The second and third kinds of button. A page has at most one thing it wants
+ * you to do; everything else is quieter than that, and destructive is quieter
+ * still until you are on it. */
+button.quiet, .button-link, .cancel {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: var(--control);
   font-size: 0.875rem;
+  font-weight: 550;
   color: var(--ink-soft);
   text-decoration: none;
+  background: var(--raised);
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
-  padding: 0.4rem 0.8rem;
-  background: var(--raised);
+  padding: 0 var(--s4);
+  cursor: pointer;
 }
 
-.button-link:hover { color: var(--ink); border-color: var(--ink-faint); }
+button.quiet:hover, .button-link:hover { color: var(--ink); border-color: var(--ink-faint); filter: none; }
 .cancel { border-color: transparent; background: transparent; }
+.cancel:hover { color: var(--ink); }
+
+button.danger { color: var(--warn); background: transparent; border-color: var(--rule); }
+button.danger:hover { color: var(--on-accent); background: var(--warn); border-color: var(--warn); filter: none; }
 
 /* ---- projects ---- */
 

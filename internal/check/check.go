@@ -31,6 +31,7 @@ const (
 	RuleLinks       = 8  // every wikilink resolves
 	RuleProjects    = 9  // docket.yaml, the folders and the boards agree
 	RuleRelations   = 10 // a relationship is a link, not a string
+	RuleTags        = 11 // a tag is a set somebody asks for, said once
 )
 
 // Finding is one problem, located.
@@ -177,6 +178,7 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 
 	findings = append(findings, checkPageLinks(root, names, byKey)...)
 	findings = append(findings, checkProjects(root, c)...)
+	findings = append(findings, checkTags(entries)...)
 
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].Path != findings[j].Path {

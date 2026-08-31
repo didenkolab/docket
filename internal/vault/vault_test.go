@@ -35,6 +35,9 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 		".obsidian/core-plugins.json",
 		"ACME/.gitkeep",
 		"AGENTS.md",
+		// CLAUDE.md points at AGENTS.md rather than repeating it: two copies of
+		// a rule is one copy that goes stale.
+		"CLAUDE.md",
 		"README.md",
 		"attachments/.gitkeep",
 		"boards/backlog.base",
