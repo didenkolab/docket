@@ -307,3 +307,28 @@ func TestARefusalSaysWhichProblemItIs(t *testing.T) {
 		t.Errorf("the refusal does not say where to sign in:\n%s", body)
 	}
 }
+
+// --auth none means nobody signs in, and it has to keep meaning that now that
+// the hosts come from the repositories' own remotes rather than from a flag.
+func TestAuthNoneMeansNobodySignsIn(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "one")
+	if _, err := vault.Init(dir, vault.Options{Key: "ONE", Template: vaulttest.Template(t)}); err != nil {
+		t.Fatal(err)
+	}
+	gitInit(t, dir, remotes["ONE"])
+
+	s, err := New(dir, Options{
+		Author:          gitvcs.Author{Name: "Server", Email: "server@example.com"},
+		Unauthenticated: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.auth != nil {
+		t.Fatal("a remote turned sign-in on when it was asked to stay off")
+	}
+	if w := as(t, s.Handler(), nil, "GET", "/", nil); w.Code != http.StatusOK {
+		t.Errorf("the board asks for a sign-in anyway: code = %d", w.Code)
+	}
+}

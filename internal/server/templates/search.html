@@ -10,82 +10,25 @@
            placeholder="Words in a task or a page">
     <button type="submit">Search</button>
   </div>
-
-  <div class="finder-filters">
-    <label>
-      <span>Project</span>
-      <select name="project">
-        <option value="">Any</option>
-        {{range $data.Projects}}
-        <option value="{{.}}" {{if eq . $f.Project}}selected{{end}}>{{.}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    <label>
-      <span>Status</span>
-      <select name="status">
-        <option value="">Any</option>
-        {{range $data.Statuses}}
-        <option value="{{.Name}}" {{if eq .Name $f.Status}}selected{{end}}>{{.Name}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    <label>
-      <span>Type</span>
-      <select name="type">
-        <option value="">Any</option>
-        {{range $data.Types}}
-        <option value="{{.}}" {{if eq . $f.Type}}selected{{end}}>{{.}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    <label>
-      <span>Priority</span>
-      <select name="priority">
-        <option value="">Any</option>
-        {{range $data.Prios}}
-        <option value="{{.}}" {{if eq . $f.Priority}}selected{{end}}>{{.}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    <label>
-      <span>Assignee</span>
-      <select name="assignee">
-        <option value="">Anyone</option>
-        <option value="!unassigned" {{if eq "!unassigned" $f.Assignee}}selected{{end}}>Nobody</option>
-        {{range $data.Assignees}}
-        <option value="{{.}}" {{if eq . $f.Assignee}}selected{{end}}>{{.}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    <label>
-      <span>Label</span>
-      <select name="label">
-        <option value="">Any</option>
-        {{range $data.Labels}}
-        <option value="{{.}}" {{if eq . $f.Label}}selected{{end}}>{{.}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    <label>
-      <span>Tag</span>
-      <select name="tag">
-        <option value="">Any</option>
-        {{range $data.Tags}}
-        <option value="{{.}}" {{if sameTag . $f.Tag}}selected{{end}}>#{{.}}</option>
-        {{end}}
-      </select>
-    </label>
-
-    {{if not $f.Empty}}<a class="button-link clear" href="/search">Clear</a>{{end}}
-  </div>
 </form>
+
+<div class="finder-bar">
+  {{range $data.Menus}}
+  <details class="menu{{if .On}} on{{end}}">
+    <summary>
+      {{if .On}}<span class="menu-name">{{.Name}}</span> {{.Shown}}
+      {{else}}{{.Name}}{{end}}
+    </summary>
+    <div class="menu-list" role="menu">
+      {{range .Options}}
+      <a href="{{.Href}}" role="menuitem" {{if .On}}class="on" aria-current="true"{{end}}>{{.Label}}</a>
+      {{end}}
+    </div>
+  </details>
+  {{end}}
+
+  {{if $f.Narrowed}}<a class="menu-clear" href="{{$data.Cleared}}">Clear filters</a>{{end}}
+</div>
 
 {{if $f.Empty}}
 <p class="empty">

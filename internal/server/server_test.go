@@ -495,10 +495,10 @@ func TestSearchFormOffersTheVaultsVocabulary(t *testing.T) {
 	}
 
 	body := get(t, h, "/search").Body.String()
-	for _, want := range []string{`value="dana"`, `value="security"`, `value="agent/claude"`,
-		`value="Backlog"`, `value="bug"`, `value="ACME"`} {
+	for _, want := range []string{">dana<", ">security<", ">agent/claude<",
+		">Backlog<", ">bug<", ">ACME<"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("the form does not offer %s", want)
+			t.Errorf("the filter bar does not offer %s", want)
 		}
 	}
 }

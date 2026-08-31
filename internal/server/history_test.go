@@ -343,10 +343,13 @@ func TestTheSearchFormOffersEveryTagLevel(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The filter bar offers each level as a link that narrows to it. Asserting
+	// on the label rather than on the href, because a href is percent-encoded
+	// and this is about the vocabulary being offered, not about URL escaping.
 	body := get(t, h, "/search").Body.String()
-	for _, want := range []string{`value="area"`, `value="area/auth"`, `value="area/auth/session"`} {
+	for _, want := range []string{">#area<", ">#area/auth<", ">#area/auth/session<"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("the form does not offer %s", want)
+			t.Errorf("the filter bar does not offer %s", want)
 		}
 	}
 }

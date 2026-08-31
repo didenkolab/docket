@@ -657,6 +657,20 @@ type searchView struct {
 	Assignees []string
 	Labels    []string
 	Tags      []string
+	// Menus is the filter bar: one per dimension, each option a link carrying
+	// the rest of the bar. See finder.go.
+	Menus []finderMenu
+	// Cleared is where to go to drop every filter but the words.
+	Cleared string
+}
+
+// StatusNames is the vocabulary the status menu offers.
+func (v searchView) StatusNames() []string {
+	names := make([]string, 0, len(v.Statuses))
+	for _, s := range v.Statuses {
+		names = append(names, s.Name)
+	}
+	return names
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -691,6 +705,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Prios:    c.Priorities,
 	}
 	view.Assignees, view.Labels, view.Tags = vocabulary(entries)
+	view.Menus = f.menus(view)
+	view.Cleared = filters{Query: f.Query}.href()
 	if !f.Empty() {
 		view.Hits = s.search(f, entries)
 	}

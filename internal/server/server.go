@@ -59,6 +59,14 @@ type Options struct {
 	// secret in this flow — and empty means the sign-in page offers the token
 	// field alone. See access/device.go.
 	DeviceClientID string
+	// Unauthenticated runs the server with nobody signed in, whatever the
+	// repositories say about their hosts.
+	//
+	// It has to be said rather than inferred from Host being nil: the hosts are
+	// resolved per repository from their own remotes now, so a vault with a
+	// remote would otherwise start asking people to sign in even when whoever
+	// started it said not to. This is --auth none.
+	Unauthenticated bool
 }
 
 // Server serves one space: a vault, or a workspace of them.
@@ -144,12 +152,14 @@ func New(root string, opts Options) (*Server, error) {
 	// An authority exists when anybody can be asked about anybody: either a
 	// host was named, or a repository has a remote that says who vouches for
 	// it. A space where nothing can be asked runs unauthenticated, and says so.
-	repos, err := newRepositories(sp, opts.Host, recheck)
-	if err != nil {
-		return nil, err
-	}
-	if opts.Host != nil || anyHost(repos) {
-		s.auth = newAuthority(repos, life)
+	if !opts.Unauthenticated {
+		repos, err := newRepositories(sp, opts.Host, recheck)
+		if err != nil {
+			return nil, err
+		}
+		if opts.Host != nil || anyHost(repos) {
+			s.auth = newAuthority(repos, life)
+		}
 	}
 	return s, nil
 }

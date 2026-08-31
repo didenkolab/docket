@@ -1157,3 +1157,105 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---- a menu ---- */
+
+/* Our own dropdown, where the browser's own will not do: it shows what it is
+ * narrowed to rather than the word "Any", and its options are links.
+ *
+ * A <details> and a list of anchors, which means no script. The browser opens
+ * and closes it, gives it keyboard focus and closes it on Escape; each option
+ * is a URL carrying the whole filter bar, so it is bookmarkable and back works.
+ * The one thing missing without a script is closing when you click elsewhere,
+ * and clicking elsewhere on this bar is clicking an option. */
+
+.finder-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  margin: var(--s3) 0 var(--s5);
+}
+
+.menu { position: relative; }
+
+.menu > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: var(--control);
+  padding: 0 var(--s3);
+  padding-right: calc(var(--s3) + 0.9rem);
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  list-style: none;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right var(--s2) center;
+  background-size: 0.6rem;
+}
+
+.menu > summary::-webkit-details-marker { display: none; }
+.menu > summary:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* A filter that is doing something looks like it. The dimension keeps its name
+ * in front of the value, because "Баг" on its own does not say which axis it
+ * is on. */
+.menu.on > summary {
+  color: var(--ink);
+  font-weight: 550;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+  background-color: var(--accent-soft);
+}
+
+.menu .menu-name { color: var(--ink-soft); font-weight: 400; }
+
+.menu-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 11rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--s1);
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+}
+
+.menu-list a {
+  padding: 0.3rem var(--s2);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.menu-list a:hover { background: var(--sunken); }
+
+/* The one in force is marked rather than merely coloured, so it is legible
+ * without relying on the accent. */
+.menu-list a.on { font-weight: 600; }
+.menu-list a.on::before { content: "✓ "; color: var(--accent); }
+.menu-list a:not(.on)::before { content: ""; padding-left: 0.95rem; }
+
+.menu-clear {
+  margin-left: var(--s2);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 46rem) {
+  .menu, .menu > summary { width: 100%; }
+  .menu-list { width: 100%; }
+}

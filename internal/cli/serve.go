@@ -110,6 +110,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		Recheck:     *recheck,
 		SessionLife: *life,
 		BehindProxy: *proxied,
+		// --auth none means nobody signs in, even though the repositories
+		// could say who vouches for them.
+		Unauthenticated: *auth == "none",
 
 		DeviceClientID: deviceClientID(*clientID),
 	})
