@@ -293,6 +293,9 @@ type Branch struct {
 	// Current is the branch the working tree is on. A board reading files from
 	// disk is reading this one.
 	Current bool
+	// Remote says this branch is only on the remote — somebody else's proposal,
+	// which is the usual case for one you are reviewing rather than writing.
+	Remote  bool
 	Subject string
 	When    time.Time
 }
@@ -303,12 +306,53 @@ type Branch struct {
 // A branch is a proposal about the plan: re-scoping a release, splitting an
 // epic, dropping a quarter's work. This is what lets a board show one without
 // applying it — see docs/design/git-as-the-database.md.
+// Branches is every branch worth reading a proposal from: the local ones, and
+// the remote-tracking ones nobody here has checked out.
+//
+// The remote ones matter more than they look. A proposal you are reviewing is
+// usually somebody else's, which means it is on the remote and not in this
+// clone — a branch list that showed only local branches showed only your own
+// proposals, which is the half you did not need to review.
 func (r *Repo) Branches() ([]Branch, error) {
+	local, err := r.branchesIn("refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	remote, err := r.branchesIn("refs/remotes")
+	if err != nil {
+		return local, nil // a repository with no remote is not a problem
+	}
+
+	// A remote branch that has a local one of the same name is the same
+	// proposal, and the local one is the one to read.
+	here := map[string]bool{}
+	for _, b := range local {
+		here[b.Name] = true
+	}
+	for _, b := range remote {
+		// A remote ref is <remote>/<branch>, and the branch may itself hold
+		// slashes: origin/предложение/сроки. What has no slash at all is the
+		// remote's symbolic HEAD, which git shortens to just "origin" — not a
+		// proposal, and it looked like one until a board showed it.
+		remoteName, branch, ok := strings.Cut(b.Name, "/")
+		if !ok || branch == "HEAD" || remoteName == "" || here[branch] {
+			continue
+		}
+		b.Remote = true
+		local = append(local, b)
+	}
+
+	sort.SliceStable(local, func(a, b int) bool { return local[a].When.After(local[b].When) })
+	sort.SliceStable(local, func(a, b int) bool { return local[a].Current && !local[b].Current })
+	return local, nil
+}
+
+func (r *Repo) branchesIn(where string) ([]Branch, error) {
 	const fields = 4
 	out, err := r.output("-c", "core.quotePath=false", "for-each-ref",
 		"--sort=-committerdate",
 		"--format=%(refname:short)%0a%(HEAD)%0a%(committerdate:iso-strict)%0a%(contents:subject)",
-		"refs/heads")
+		where)
 	if err != nil {
 		return nil, err
 	}
@@ -325,9 +369,17 @@ func (r *Repo) Branches() ([]Branch, error) {
 			When: when, Subject: lines[i+3],
 		})
 	}
-
-	sort.SliceStable(branches, func(a, b int) bool { return branches[a].Current && !branches[b].Current })
 	return branches, nil
+}
+
+// Fetch brings a ref down from the remote without touching the working tree.
+//
+// For a proposal somebody else pushed: reviewing it should not need a checkout,
+// and it must not disturb whoever is working in the tree.
+func (r *Repo) Fetch(cred Credential, ref string) error {
+	args := append(PushArgs(cred), "fetch", "--quiet", "origin", ref)
+	_, err := r.outputWithEnv(PushEnv(cred), args...)
+	return err
 }
 
 // Current is the branch the working tree is on, or "" in a detached head.

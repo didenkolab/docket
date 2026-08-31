@@ -55,13 +55,13 @@
           — this branch tracks nothing, so there is nowhere to send it. Set an upstream:
           <code>git push -u origin HEAD</code>.
         {{else if .Moved}}
-          — {{.Waiting}} commit(s) here, and the remote has moved on since. That needs a rebase,
+          — {{plural .Waiting "commit" "commits"}} here, and the remote has moved on since. That needs a rebase,
           which is a decision rather than something a server does behind you:
           <code>git pull --rebase &amp;&amp; git push</code>.
         {{else if .Trouble}}
-          — {{.Waiting}} commit(s) not sent: {{.Trouble}}
+          — {{plural .Waiting "commit" "commits"}} not sent: {{.Trouble}}
         {{else}}
-          — {{.Waiting}} commit(s) written here and not yet sent.
+          — {{plural .Waiting "commit" "commits"}} written here and not yet sent.
         {{end}}
       </p>
       {{end}}

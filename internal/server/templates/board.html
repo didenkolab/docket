@@ -13,7 +13,7 @@
 
 {{if $data.Broken}}
 <div class="notice">
-  <strong>{{len $data.Broken}} file(s) could not be read.</strong>
+  <strong>{{plural (len $data.Broken) "file" "files"}} could not be read.</strong>
   <ul>
     {{range $data.Broken}}<li><code>{{.Path}}</code> — {{.Err}}</li>{{end}}
   </ul>

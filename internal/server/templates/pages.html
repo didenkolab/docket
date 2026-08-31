@@ -7,7 +7,7 @@
 </div>
 
 {{if $data.Tree}}
-<p class="count-line">{{$data.Total}} page(s)</p>
+<p class="count-line">{{plural $data.Total "page" "pages"}}</p>
 
 <div class="tree">
   {{template "branch" $data.Tree}}

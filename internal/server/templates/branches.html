@@ -3,6 +3,20 @@
 
 <h1>Branches</h1>
 
+{{if $data.Asker}}
+<form class="review-by-link" method="post" action="/review">
+  {{template "csrf" $}}
+  <label for="url">Review by link</label>
+  <input id="url" name="url" type="text" autocomplete="off" spellcheck="false"
+         placeholder="{{$data.Asker}} {{$data.Kind}} address, or a branch name">
+  <button type="submit">Open</button>
+  <p class="hint">
+    A {{$data.Kind}} is a branch, said in a URL. {{$data.Asker}} is asked which branch, and
+    that branch is fetched — nothing is checked out.
+  </p>
+</form>
+{{end}}
+
 {{if $data.None}}
 <p class="empty">
   One branch is not a choice. A branch is a proposal about the plan — a release re-scoped, an
@@ -16,9 +30,10 @@
     <a class="hit-link" href="{{.Href}}">
       <span class="key">{{.Name}}</span>
       {{if .Current}}<span class="new">checked out</span>{{end}}
+      {{if .Remote}}<span class="remote">on the remote only</span>{{end}}
     </a>
     <time>{{.When}}</time>
-    {{if not .Current}}<a class="what-it-does" href="/change/{{.Name}}">What it would do</a>{{end}}
+    {{if not .Current}}<a class="what-it-does" href="{{.Change}}">What it would do</a>{{end}}
     {{if .Subject}}<p class="context">{{.Subject}}</p>{{end}}
   </li>
   {{end}}

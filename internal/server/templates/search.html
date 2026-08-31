@@ -39,7 +39,7 @@
 </p>
 {{else}}
 <p class="count-line">
-  {{len $data.Hits}} result(s)
+  {{plural (len $data.Hits) "result" "results"}}
   {{if $f.Query}}for “{{$f.Query}}”{{end}}
   {{if $f.Narrowed}}<span class="muted">· narrowed</span>{{end}}
 </p>

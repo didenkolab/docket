@@ -56,7 +56,7 @@
   <p class="footnote inline">
     Compared with <code>{{.Base}}</code>, where it parted company — not with the working tree, so
     nothing that has happened since is reported as though this proposal undid it.
-    {{.Ahead}} commit(s) on the branch{{if .Behind}}, {{.Behind}} here it does not have{{end}}.
+    {{plural .Ahead "commit" "commits"}} on the branch{{if .Behind}}, {{.Behind}} here it does not have{{end}}.
   </p>
 
   {{if .Trouble}}
@@ -89,7 +89,7 @@
   {{template "changed" .Change.Changed}}
   {{end}}
 
-  <p class="footnote">{{.Change.Untouched}} task(s) are left alone.</p>
+  <p class="footnote">{{plural .Change.Untouched "task" "tasks"}} left alone.</p>
   {{end}}
 </section>
 {{end}}

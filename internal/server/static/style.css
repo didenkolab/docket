@@ -1836,3 +1836,41 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 @media (max-width: 72rem) {
   .beside { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Reviewing a proposal you were sent a link to. The box comes before the list
+   because arriving with a link is the commoner way in than knowing a branch
+   name. */
+.review-by-link {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s2);
+  align-items: center;
+  margin: 0 0 var(--s4);
+  padding: var(--s2) var(--s4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+.review-by-link label {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.review-by-link input { min-width: 0; }
+.review-by-link .hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+/* A branch nobody here has checked out. Said quietly: it is a fact about this
+   clone, not about the proposal. */
+.branches .remote {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 0 0.4em;
+}

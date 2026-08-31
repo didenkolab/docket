@@ -142,6 +142,9 @@ func New(root string, opts Options) (*Server, error) {
 		// Two tags are the same tag when they differ only in case, which is
 		// what Obsidian does.
 		"sameTag": func(a, b string) bool { return strings.EqualFold(a, b) },
+		// "1 commit(s)" is a sentence nobody wrote on purpose. The count is
+		// known when the page is rendered, so the word can be right.
+		"plural": plural,
 	}).ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, err
@@ -408,6 +411,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /branches", s.handleBranches)
 	mux.HandleFunc("GET /branch/{ref}", s.handleBranch)
 	mux.HandleFunc("GET /change/{ref}", s.handlePlanChange)
+	mux.HandleFunc("POST /review", s.handleReview)
 	mux.HandleFunc("GET /pages/new", s.handlePageNewForm)
 	mux.HandleFunc("POST /pages/save", s.handlePageSave)
 	mux.HandleFunc("POST /preview", s.handlePreview)

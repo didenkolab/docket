@@ -19,9 +19,14 @@ import (
 
 // branchView is one branch, ready to render.
 type branchView struct {
-	Name    string
-	Href    string
+	Name string
+	Href string
+	// Change is the same proposal read as what it would do.
+	Change  string
 	Current bool
+	// Remote says nobody here has checked this one out — the usual shape of a
+	// proposal you are being asked about rather than making.
+	Remote  bool
 	Subject string
 	When    string
 }
@@ -30,6 +35,11 @@ type branchesView struct {
 	Branches []branchView
 	Current  string
 	None     bool
+	// Asker is the host to paste a pull request address at, named so the box can
+	// say which kind it means. Empty when there is nobody to ask.
+	Asker string
+	// Kind is what that host calls one: "pull request", "merge request".
+	Kind string
 }
 
 func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
@@ -53,12 +63,16 @@ func (s *Server) handleBranches(w http.ResponseWriter, r *http.Request) {
 			}
 			view.Branches = append(view.Branches, branchView{
 				Name: b.Name, Href: "/branch/" + url.PathEscape(b.Name),
-				Current: b.Current, Subject: b.Subject,
+				Change:  "/change/" + url.PathEscape(b.Name),
+				Current: b.Current, Remote: b.Remote, Subject: b.Subject,
 				When: b.When.UTC().Format("2006-01-02"),
 			})
 		}
 	}
 	view.None = len(view.Branches) < 2
+	if _, host, ok := s.pullRequestHost(); ok {
+		view.Asker, view.Kind = host.Name(), host.PullRequestName()
+	}
 
 	s.render(w, r, "branches.html", c, "Branches", view)
 }
