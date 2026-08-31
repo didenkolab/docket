@@ -49,6 +49,18 @@ type pushing struct {
 	// running says a push for that repository is in flight, so a second write
 	// does not start a second one.
 	running map[string]bool
+	// again says a write arrived while a push was in flight.
+	//
+	// It used to be dropped. Two pushes at once would race, so the second write
+	// simply returned — and because git push sends every commit on the branch,
+	// that was usually covered by whatever came next. Usually is the problem:
+	// drag three cards quickly and the last one's commit sits in the folder
+	// until something else happens to write. The board said nothing, because as
+	// far as it knew the push it started had succeeded.
+	//
+	// So the write is remembered instead, and the push runs again the moment
+	// the one in flight finishes.
+	again map[string]bool
 }
 
 // pushState is what to say about one repository.
@@ -98,7 +110,7 @@ func (p pushState) Settled() bool {
 
 func newPushing() *pushing {
 	return &pushing{state: map[string]pushState{}, running: map[string]bool{},
-		arrived: map[string]int{}}
+		again: map[string]bool{}, arrived: map[string]int{}}
 }
 
 // after sends what was just committed, in the background.
@@ -129,6 +141,10 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 
 	s.pushes.mu.Lock()
 	if s.pushes.running[prefix] {
+		// Not dropped: remembered, and sent as soon as the one in flight is
+		// done. Dropping it left the last of a quick run of changes in the
+		// folder with the board reporting nothing wrong.
+		s.pushes.again[prefix] = true
 		s.pushes.mu.Unlock()
 		return
 	}
@@ -136,23 +152,35 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 	s.pushes.mu.Unlock()
 
 	go func() {
-		err := v.Repo.Push(cred)
-		waiting, countErr := v.Repo.Unpushed()
+		for {
+			err := v.Repo.Push(cred)
+			waiting, countErr := v.Repo.Unpushed()
 
-		state := pushState{Waiting: waiting}
-		switch {
-		case errors.Is(countErr, gitvcs.ErrNoUpstream):
-			state.NoUpstream = true
-		case err != nil && errors.Is(err, gitvcs.ErrNotFastForward):
-			state.Trouble, state.Moved = err.Error(), true
-		case err != nil:
-			state.Trouble = err.Error()
+			state := pushState{Waiting: waiting}
+			switch {
+			case errors.Is(countErr, gitvcs.ErrNoUpstream):
+				state.NoUpstream = true
+			case err != nil && errors.Is(err, gitvcs.ErrNotFastForward):
+				state.Trouble, state.Moved = err.Error(), true
+			case err != nil:
+				state.Trouble = err.Error()
+			}
+
+			s.pushes.mu.Lock()
+			s.pushes.state[prefix] = state
+			// Another write arrived while this was in the air. Go round again,
+			// unless this one failed — then the retry is a button, because
+			// pushing at a host that just refused is how a server hammers one.
+			if s.pushes.again[prefix] && state.Trouble == "" {
+				s.pushes.again[prefix] = false
+				s.pushes.mu.Unlock()
+				continue
+			}
+			s.pushes.again[prefix] = false
+			s.pushes.running[prefix] = false
+			s.pushes.mu.Unlock()
+			return
 		}
-
-		s.pushes.mu.Lock()
-		s.pushes.state[prefix] = state
-		s.pushes.running[prefix] = false
-		s.pushes.mu.Unlock()
 	}()
 }
 
