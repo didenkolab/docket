@@ -44,6 +44,8 @@ type pageNode struct {
 	// the only way to put a page in docs/design was to type docs/design into a
 	// box. A folder you are looking at is the folder you meant.
 	In string
+	// Start is where to go to make a section inside this one.
+	Start string
 	// Make is where to go to make a page here, empty when the reader may not.
 	//
 	// Decided in Go rather than in the template. A nested template rebinds `$`
@@ -61,6 +63,7 @@ func offerMaking(nodes []pageNode, may bool) []pageNode {
 	for i := range nodes {
 		if nodes[i].IsFolder() {
 			nodes[i].Make = "/pages/new?in=" + url.QueryEscape(nodes[i].In)
+			nodes[i].Start = nodes[i].Make + "&section=1"
 			nodes[i].Children = offerMaking(nodes[i].Children, may)
 		}
 	}

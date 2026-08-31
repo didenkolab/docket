@@ -2089,6 +2089,8 @@ details.sprint > summary:hover .version { color: var(--accent); }
    tree of folders each shouting "+ page" is a tree nobody can read. */
 .tree summary .here {
   margin-left: auto;
+  display: flex;
+  gap: var(--s3);
   font-size: 0.78rem;
   color: var(--ink-faint);
   text-decoration: none;

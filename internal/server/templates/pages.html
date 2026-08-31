@@ -3,7 +3,10 @@
 
 <div class="page-head">
   <h1>Pages</h1>
-  {{if .You.CanWrite}}<a class="button-link" href="/pages/new">New page</a>{{end}}
+  {{if .You.CanWrite}}
+  <a class="button-link" href="/pages/new">New page</a>
+  <a class="button-link quiet" href="/pages/new?in=docs&section=1">New section</a>
+  {{end}}
 </div>
 
 {{if $data.Tree}}
@@ -30,7 +33,10 @@
       <summary>
         <span class="folder">{{.Name}}</span>
         <span class="count">{{.Pages}}</span>
-        {{if .Make}}<a class="here" href="{{.Make}}" title="a new page in {{.In}}">+ page</a>{{end}}
+        {{if .Make}}<span class="here">
+          <a href="{{.Make}}" title="a new page in {{.In}}">+ page</a>
+          <a href="{{.Start}}" title="a new section inside {{.In}}">+ section</a>
+        </span>{{end}}
       </summary>
       {{template "branch" .Children}}
     </details>

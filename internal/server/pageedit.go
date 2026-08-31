@@ -35,12 +35,26 @@ type pageForm struct {
 	In string
 	// Name is the file name inside In, without .md.
 	Name string
+	// Section is a folder to make inside In, when a page is starting one.
+	//
+	// A folder in git exists only because a file is in it, so making a section
+	// is making its first page. The form says that rather than pretending
+	// otherwise: an empty folder is not a thing that can be committed, and a
+	// tool that appeared to make one would be lying about what happened.
+	Section string
+	// Starting says this form is making a section, so it asks for both.
+	Starting bool
 }
 
 func (s *Server) handlePageNewForm(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
 	in := strings.Trim(strings.TrimSpace(r.URL.Query().Get("in")), "/")
-	s.render(w, r, "page-edit.html", c, "New page", pageForm{In: in, New: true})
+	starting := r.URL.Query().Get("section") != ""
+	title := "New page"
+	if starting {
+		title = "New section"
+	}
+	s.render(w, r, "page-edit.html", c, title, pageForm{In: in, New: true, Starting: starting})
 }
 
 func (s *Server) handlePageEditForm(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +100,7 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 		Path:    strings.TrimSpace(r.FormValue("path")),
 		In:      strings.Trim(strings.TrimSpace(r.FormValue("in")), "/"),
 		Name:    strings.Trim(strings.TrimSpace(r.FormValue("name")), "/"),
+		Section: strings.Trim(strings.TrimSpace(r.FormValue("section")), "/"),
 		Title:   strings.TrimSpace(r.FormValue("title")),
 		Body:    normaliseNewlines(r.FormValue("body")),
 		Version: r.FormValue("version"),
@@ -102,10 +117,12 @@ func (s *Server) handlePageSave(w http.ResponseWriter, r *http.Request) {
 	// accepted, because somebody who knows where a page goes should not have to
 	// go and find the folder first.
 	if form.Path == "" && form.Name != "" {
+		form.Path = form.Name
+		if form.Section != "" {
+			form.Path = form.Section + "/" + form.Path
+		}
 		if form.In != "" {
-			form.Path = form.In + "/" + form.Name
-		} else {
-			form.Path = form.Name
+			form.Path = form.In + "/" + form.Path
 		}
 	}
 	if form.Path == "" {

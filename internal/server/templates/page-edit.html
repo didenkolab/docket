@@ -18,7 +18,23 @@
   <input type="hidden" name="version" value="{{$data.Version}}">
   <input type="hidden" name="new" value="{{if $data.New}}1{{else}}0{{end}}">
 
-  {{if and $data.New $data.In}}
+  {{if and $data.New $data.Starting}}
+  <input type="hidden" name="in" value="{{$data.In}}">
+  <label for="section">Section</label>
+  <p class="where">
+    <code>{{if $data.In}}{{$data.In}}/{{end}}</code><input id="section" name="section"
+      value="{{$data.Section}}" required placeholder="runbooks" autofocus><code>/</code>
+  </p>
+  <label for="name">…and its first page</label>
+  <p class="where">
+    <input id="name" name="name" value="{{$data.Name}}" required
+      placeholder="Reconciliation"><code>.md</code>
+  </p>
+  <p class="footnote inline">A folder exists in git because a file is in it, so a section starts
+  with a page. There is nothing else to it — no schema, no index, and no page listing the
+  others, which <a href="/page/docs/design/how-things-connect">costs the graph more than it
+  gives</a>.</p>
+  {{else if and $data.New $data.In}}
   <input type="hidden" name="in" value="{{$data.In}}">
   <label for="name">Name</label>
   <p class="where">
@@ -26,7 +42,8 @@
       placeholder="session-model" autofocus><code>.md</code>
   </p>
   <p class="footnote inline">The name is what a <code>[[wikilink]]</code> to this page says, and
-  what the graph labels it — so it is the title in words, not a slug.</p>
+  what the graph labels it — so it is the title in words, not a slug. A name with a
+  <code>/</code> in it starts a section.</p>
   {{else if $data.New}}
   <label for="name">Path</label>
   <input id="name" name="name" value="{{$data.Name}}" required
