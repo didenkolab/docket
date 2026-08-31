@@ -332,3 +332,41 @@ func TestAuthNoneMeansNobodySignsIn(t *testing.T) {
 		t.Errorf("the board asks for a sign-in anyway: code = %d", w.Code)
 	}
 }
+
+// The navigation offered a stranger four pages, every one of which bounced back
+// to the sign-in page they were already on.
+func TestTheNavigationIsHiddenUntilYouCanSeeSomething(t *testing.T) {
+	_, h, first, _ := workspaceOnTwoHosts(t)
+
+	stranger := as(t, h, nil, "GET", "/sign-in", nil).Body.String()
+	if strings.Contains(stranger, "<nav>") {
+		t.Error("the sign-in page offers the navigation to somebody who cannot use it")
+	}
+
+	dana := signInTo(t, h, nil, first.HostName(), "dana")
+	inside := as(t, h, dana, "GET", "/", nil).Body.String()
+	if !strings.Contains(inside, "<nav>") {
+		t.Error("the navigation is missing for somebody who is signed in")
+	}
+}
+
+// Without an authority everybody sees everything, so the navigation is there.
+func TestTheNavigationIsThereWithoutSignIn(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "one")
+	if _, err := vault.Init(dir, vault.Options{Key: "ONE", Template: vaulttest.Template(t)}); err != nil {
+		t.Fatal(err)
+	}
+	gitInit(t, dir, remotes["ONE"])
+
+	s, err := New(dir, Options{
+		Author:          gitvcs.Author{Name: "Server", Email: "server@example.com"},
+		Unauthenticated: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body := as(t, s.Handler(), nil, "GET", "/", nil).Body.String(); !strings.Contains(body, "<nav>") {
+		t.Error("a server with nobody to sign in hid its own navigation")
+	}
+}

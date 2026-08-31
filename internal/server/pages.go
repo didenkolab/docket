@@ -58,7 +58,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		You:      you,
 		SignedIn: signedIn,
 		CSRF:     tokenOf(r),
-		Sees:     standingIn(r).Sees(),
+		Sees:     s.showsAnything(r),
 		Refresh:  seconds,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
@@ -74,6 +74,21 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 // right for a server with no authority and wrong here. So on a server that does
 // sign people in, no identity means no role — an empty nav and no claim about
 // who you are — and only a real session says otherwise.
+// showsAnything reports whether the navigation has anywhere to send the reader.
+//
+// A nil standing means two different things and they must not be confused: on a
+// server with nobody to sign in it means everything is visible, and on a server
+// that signs people in it means this request has not — the guard puts no
+// standing on the sign-in page, which is an open path. Only the server knows
+// which it is.
+func (s *Server) showsAnything(r *http.Request) bool {
+	if s.auth == nil {
+		return true
+	}
+	st := standingIn(r)
+	return st != nil && st.Sees()
+}
+
 func (s *Server) whoIsAsking(r *http.Request) (access.Identity, bool) {
 	if s.auth == nil {
 		return identityOf(r), false
