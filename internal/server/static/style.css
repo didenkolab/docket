@@ -1334,3 +1334,66 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
  * anchor inside an anchor is not markup a browser will keep — it closes the
  * outer one at the inner, and every card spills its metadata onto the page. */
 .card .meta .epic { order: -1; max-width: 100%; }
+
+/* ---- the knowledge base tree ---- */
+
+/* Folders and pages, indented, with a guide line so a deep page can be traced
+ * back to what it is under. The line is drawn on the list rather than per item,
+ * because a border per row breaks wherever a row is taller than one line. */
+.tree { max-width: 46rem; margin-top: var(--s3); }
+
+.tree ul { list-style: none; margin: 0; padding: 0; }
+.tree ul ul {
+  margin-left: 0.55rem;
+  padding-left: var(--s3);
+  border-left: 1px solid var(--rule);
+}
+
+.tree li { margin: 0; }
+
+.tree summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 0.2rem 0.3rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary:hover { background: var(--sunken); }
+
+/* A folder is marked by a triangle that turns, drawn in text so it needs no
+ * asset and follows the type size. */
+.tree summary::before {
+  content: "▸";
+  flex: none;
+  width: 0.9rem;
+  color: var(--ink-faint);
+  line-height: 1;
+  text-align: center;
+  transition: transform 0.12s;
+}
+.tree details[open] > summary::before { transform: rotate(90deg); }
+
+.tree .folder { font-weight: 550; }
+.tree .count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+
+.tree .leaf {
+  display: block;
+  padding: 0.2rem 0.3rem 0.2rem 1.6rem;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+}
+.tree .leaf:hover { background: var(--sunken); color: var(--accent); }
+
+/* A heading with one thing to do next to it. */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
+.page-head h1 { margin-bottom: 0; }

@@ -1,15 +1,42 @@
 {{template "head" .}}
+{{$data := .Data}}
 
-<h1>Pages</h1>
+<div class="page-head">
+  <h1>Pages</h1>
+  {{if .You.CanWrite}}<a class="button-link" href="/pages/new">New page</a>{{end}}
+</div>
 
-{{if .You.CanWrite}}<p><a class="button-link" href="/pages/new">New page</a></p>{{end}}
+{{if $data.Tree}}
+<p class="count-line">{{$data.Total}} page(s)</p>
 
-<ul class="pages">
-  {{range .Data}}
-  <li><a href="/page/{{.}}">{{.}}</a></li>
-  {{else}}
-  <li class="empty">The knowledge base is empty. Pages live under <code>docs/</code>.</li>
-  {{end}}
-</ul>
+<div class="tree">
+  {{template "branch" $data.Tree}}
+</div>
+{{else}}
+<p class="empty">
+  The knowledge base is empty. Pages live under <code>docs/</code>, in whatever tree makes
+  sense — there is no schema, because a wiki that demands one stops getting written in.
+</p>
+{{end}}
 
 {{template "foot" .}}
+
+{{define "branch"}}
+<ul>
+  {{range .}}
+  <li>
+    {{if .IsFolder}}
+    <details open>
+      <summary>
+        <span class="folder">{{.Name}}</span>
+        <span class="count">{{.Pages}}</span>
+      </summary>
+      {{template "branch" .Children}}
+    </details>
+    {{else}}
+    <a class="leaf" href="/page/{{.Path}}">{{.Name}}</a>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
