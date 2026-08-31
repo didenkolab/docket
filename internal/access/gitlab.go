@@ -17,6 +17,9 @@ type GitLab struct {
 // Name is what to call this host in the interface.
 func (g *GitLab) Name() string { return "GitLab" }
 
+// HostName is the host a token for this repository is good for.
+func (g *GitLab) HostName() string { return g.Ref.Host }
+
 // Repository is the project path, groups and all.
 func (g *GitLab) Repository() string { return g.Ref.Path() }
 

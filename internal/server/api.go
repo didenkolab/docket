@@ -76,7 +76,7 @@ func (s *Server) apiListTasks(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	entries, err := s.entries()
+	entries, err := s.entries(r)
 	if err != nil {
 		apiError(w, http.StatusInternalServerError, err.Error())
 		return

@@ -136,7 +136,7 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	// A parent that vanishes leaves its children pointing at nothing, which
 	// rule 5 would report. Say so before doing it, not after.
-	if children := s.childrenOf(c, key); len(children) > 0 {
+	if children := s.childrenOf(r, c, key); len(children) > 0 {
 		s.fail(w, r, http.StatusBadRequest, "It still has children", fmt.Sprintf(
 			"%s is the parent of %d task(s). Move them somewhere else first, or they will "+
 				"point at nothing.", key, len(children)))

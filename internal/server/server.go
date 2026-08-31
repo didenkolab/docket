@@ -83,6 +83,9 @@ type Server struct {
 	// deviceClientID is what this application calls itself when asking the
 	// host for a sign-in code. Empty turns the button off.
 	deviceClientID string
+	// recheck is how often a host is re-asked about somebody, and so how long a
+	// revocation takes to bite. The Access page says it out loud.
+	recheck time.Duration
 
 	// now is injectable so tests can assert on timestamps.
 	now func() time.Time
@@ -129,15 +132,24 @@ func New(root string, opts Options) (*Server, error) {
 
 		deviceClientID: strings.TrimSpace(opts.DeviceClientID),
 	}
-	if opts.Host != nil {
-		recheck, life := opts.Recheck, opts.SessionLife
-		if recheck <= 0 {
-			recheck = 5 * time.Minute
-		}
-		if life <= 0 {
-			life = 12 * time.Hour
-		}
-		s.auth = newAuthority(opts.Host, recheck, life)
+	recheck, life := opts.Recheck, opts.SessionLife
+	if recheck <= 0 {
+		recheck = 5 * time.Minute
+	}
+	if life <= 0 {
+		life = 12 * time.Hour
+	}
+	s.recheck = recheck
+
+	// An authority exists when anybody can be asked about anybody: either a
+	// host was named, or a repository has a remote that says who vouches for
+	// it. A space where nothing can be asked runs unauthenticated, and says so.
+	repos, err := newRepositories(sp, opts.Host, recheck)
+	if err != nil {
+		return nil, err
+	}
+	if opts.Host != nil || anyHost(repos) {
+		s.auth = newAuthority(repos, life)
 	}
 	return s, nil
 }
@@ -146,8 +158,36 @@ func New(root string, opts Options) (*Server, error) {
 // several. See space.Config for why it is a union rather than a shared file.
 func (s *Server) config() (*project.Config, error) { return s.space.Config() }
 
-// entries is every task in the space, with paths said from the space root.
-func (s *Server) entries() ([]vault.Entry, error) { return s.space.Entries() }
+// entries is every task the person asking may see, with paths said from the
+// space root.
+//
+// It takes the request rather than being a plain reader, so that filtering by
+// what somebody may see is what happens by default and reading past it has to
+// be written out. A workspace can span repositories on different hosts, and a
+// board that listed tasks out of a repository the reader has no access to would
+// be leaking the one thing the host was asked about.
+func (s *Server) entries(r *http.Request) ([]vault.Entry, error) {
+	all, err := s.space.Entries()
+	if err != nil {
+		return nil, err
+	}
+	return visible(standingIn(r), all), nil
+}
+
+// visible keeps the entries whose project the reader may see. A nil standing —
+// no authority — sees everything, which is what --auth none means.
+func visible(st *standing, all []vault.Entry) []vault.Entry {
+	if st == nil {
+		return all
+	}
+	kept := make([]vault.Entry, 0, len(all))
+	for _, e := range all {
+		if st.CanRead(e.Project) {
+			kept = append(kept, e)
+		}
+	}
+	return kept
+}
 
 // abs turns a path in the space into a path on disk, refusing one that belongs
 // to no repository.
@@ -292,6 +332,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings", s.handleSettings)
 	mux.HandleFunc("POST /settings", s.handleSaveSettings)
 	mux.HandleFunc("GET /admin", s.handleAdmin)
+	mux.HandleFunc("POST /admin/sign-in", s.handleSignInSetup)
 	mux.HandleFunc("GET /sign-in", s.handleSignInForm)
 	mux.HandleFunc("POST /sign-in", s.handleSignIn)
 	mux.HandleFunc("POST /sign-in/device", s.handleDeviceStart)

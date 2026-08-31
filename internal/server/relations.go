@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"net/http"
 	"path"
 	"strings"
 
@@ -35,8 +36,8 @@ type relatedTask struct {
 // backlinks, which already show everything pointing here — so a task blocked by
 // another shows it under "is blocked by" if it says so, and under "Referenced
 // by" either way.
-func (s *Server) relationsOf(t *task.Task) []relationGroup {
-	entries, err := s.entries()
+func (s *Server) relationsOf(r *http.Request, t *task.Task) []relationGroup {
+	entries, err := s.entries(r)
 	if err != nil {
 		return nil
 	}

@@ -19,6 +19,9 @@ type Bitbucket struct {
 // Name is what to call this host in the interface.
 func (b *Bitbucket) Name() string { return "Bitbucket" }
 
+// HostName is the host a token for this repository is good for.
+func (b *Bitbucket) HostName() string { return b.Ref.Host }
+
 // Repository is workspace/repo.
 func (b *Bitbucket) Repository() string { return b.Ref.Path() }
 

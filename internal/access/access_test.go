@@ -282,6 +282,7 @@ type countingHost struct {
 }
 
 func (c *countingHost) Name() string        { return "Stub" }
+func (c *countingHost) HostName() string    { return "stub.example.com" }
 func (c *countingHost) Repository() string  { return "acme/platform" }
 func (c *countingHost) SettingsURL() string { return "" }
 func (c *countingHost) Identify(context.Context, string) (Identity, error) {

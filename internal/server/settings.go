@@ -107,10 +107,16 @@ func (s *Server) settingsView(c *project.Config, message, saved string) settings
 
 // usage counts how many tasks hold each status, and how many each project has.
 // Both are there to make the consequences of an edit visible before it is made.
+// usage counts every task in the space, filtered by nothing.
+//
+// It answers "would removing this status orphan work", and the answer has to
+// cover tasks the person asking cannot see: a status removed because it looked
+// unused is a status that takes somebody else's tasks with it. Only an
+// administrator of the repository gets this far.
 func (s *Server) usage(c *project.Config) (byStatus, byProject map[string]int) {
 	byStatus, byProject = map[string]int{}, map[string]int{}
 
-	entries, err := s.entries()
+	entries, err := s.space.Entries()
 	if err != nil {
 		return byStatus, byProject
 	}
@@ -336,7 +342,7 @@ func (s *Server) applyRenames(c *project.Config, renames map[string]project.Stat
 		return 0, nil
 	}
 
-	entries, err := s.entries()
+	entries, err := s.space.Entries()
 	if err != nil {
 		return 0, err
 	}

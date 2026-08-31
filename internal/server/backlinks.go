@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http"
 	"os"
 	"path"
 	"sort"
@@ -40,8 +41,8 @@ type mention struct {
 // Read on every request, like everything else. Obsidian keeps an index and
 // warns that it can fall out of step with the files; there is no index here to
 // fall out of step.
-func (s *Server) backlinks(note, selfPath string) []mention {
-	entries, err := s.entries()
+func (s *Server) backlinks(r *http.Request, note, selfPath string) []mention {
+	entries, err := s.entries(r)
 	if err != nil {
 		return nil
 	}

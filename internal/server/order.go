@@ -100,8 +100,14 @@ func (s *Server) renumber(column []vault.Entry, moved *task.Task, at int) ([]str
 
 // column is the tasks in one status, in the order the board draws them, without
 // the task being moved.
+// column reads every task in a status, filtered by nothing.
+//
+// Ordering is a property of the whole column: the numbers have to stay
+// consistent with cards the person dragging cannot see, or renumbering one
+// column corrupts somebody else's order in it. Only somebody who may write to
+// the project gets here.
 func (s *Server) column(c *project.Config, status, without string) ([]vault.Entry, error) {
-	entries, err := s.entries()
+	entries, err := s.space.Entries()
 	if err != nil {
 		return nil, err
 	}

@@ -73,8 +73,11 @@ func (s *Server) whoIsAsking(r *http.Request) (access.Identity, bool) {
 	if s.auth == nil {
 		return identityOf(r), false
 	}
-	identity, ok := r.Context().Value(identityKey{}).(access.Identity)
-	return identity, ok
+	st := standingIn(r)
+	if st == nil {
+		return access.Identity{}, false
+	}
+	return st.Best, st.SignedIn
 }
 
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, code int, title, message string) {
@@ -197,6 +200,10 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return
 	}
+	// Filtered here rather than through s.entries, because a board can be drawn
+	// over any space — the working tree, or a branch — and the one being read is
+	// the argument. What may be seen is the same question either way.
+	entries = visible(standingIn(r), entries)
 
 	selected := r.URL.Query().Get("project")
 	if selected != "" && !c.HasProject(selected) {
@@ -334,9 +341,9 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		ProjectName: c.ProjectName(projectKey),
 		Description: renderMarkdown(t.Description(), ix),
 		Comments:    renderComments(t.Comments(), ix),
-		Children:    s.childrenOf(c, key),
-		Relations:   s.relationsOf(t),
-		Backlinks:   s.backlinks(strings.TrimSuffix(path.Base(rel), ".md"), rel),
+		Children:    s.childrenOf(r, c, key),
+		Relations:   s.relationsOf(r, t),
+		Backlinks:   s.backlinks(r, strings.TrimSuffix(path.Base(rel), ".md"), rel),
 		Version:     ver,
 		Path:        rel,
 	})
@@ -387,8 +394,8 @@ func renderComments(comments []task.Comment, ix *index) []renderedComment {
 
 // childrenOf lists the tasks that name this one as their parent. A hierarchy
 // written only downwards is a hierarchy you can only read from the wrong end.
-func (s *Server) childrenOf(c *project.Config, key string) []childTask {
-	entries, err := s.entries()
+func (s *Server) childrenOf(r *http.Request, c *project.Config, key string) []childTask {
+	entries, err := s.entries(r)
 	if err != nil {
 		return nil
 	}
@@ -670,7 +677,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		Tag:      task.CleanTag(r.FormValue("tag")),
 	}
 
-	entries, err := s.entries()
+	entries, err := s.entries(r)
 	if err != nil {
 		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
 		return

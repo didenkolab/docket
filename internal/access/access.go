@@ -57,6 +57,10 @@ type Collaborator struct {
 type Host interface {
 	// Name is what to call it in the interface.
 	Name() string
+	// HostName is the host itself — "github.com", "git.example.com". Two
+	// repositories with the same one share a sign-in, because a token belongs
+	// to a host rather than to a repository.
+	HostName() string
 	// Repository is owner/name, for showing and for linking.
 	Repository() string
 	// SettingsURL is where access is actually granted.

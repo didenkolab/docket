@@ -2,14 +2,18 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/vadymdidenkolab/docket/internal/project"
 )
 
 // deviceStub is a host that can also hand out codes. It answers the way a real
@@ -270,4 +274,116 @@ func TestTheButtonIsOfferedWhenTheHostCanDoIt(t *testing.T) {
 	if !strings.Contains(body, `name="token"`) {
 		t.Error("the token field is gone, so a host that cannot do this has no way in")
 	}
+}
+
+// The id belongs to the repository, so the Access page writes it to docket.yaml
+// and commits it. Setting it takes effect at once: the next sign-in page has
+// the button.
+func TestTheAccessPageSetsUpSigningIn(t *testing.T) {
+	host := &deviceStub{stubHost: stubHost{revoked: map[string]bool{}}, answer: access.ErrDevicePending}
+	root := vaultUnderGit(t)
+	s, err := New(root, Options{
+		Author:      gitvcs.Author{Name: "Server", Email: "server@example.com"},
+		Host:        host,
+		Recheck:     time.Nanosecond,
+		SessionLife: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := s.Handler()
+	admin := signIn(t, h, access.RoleAdmin)
+
+	// Nothing set: the token field is the only way in.
+	if body := as(t, h, nil, "GET", "/sign-in", nil).Body.String(); strings.Contains(body, "/sign-in/device") {
+		t.Fatal("a button is offered before anything is set up")
+	}
+
+	w := as(t, h, admin, "POST", "/admin/sign-in",
+		url.Values{"device_client_id": {"Ov23liFROMTHEPAGE"}})
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("saving: code = %d; body:\n%s", w.Code, w.Body)
+	}
+
+	// Written to the vault, and committed.
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.DeviceClientID(); got != "Ov23liFROMTHEPAGE" {
+		t.Errorf("docket.yaml holds %q", got)
+	}
+	if got := lastCommit(t, root); !strings.Contains(got, "sign in") {
+		t.Errorf("not committed as a change to signing in: %q", got)
+	}
+
+	// And in effect, without a restart.
+	if body := as(t, h, nil, "GET", "/sign-in", nil).Body.String(); !strings.Contains(body, "/sign-in/device") {
+		t.Error("the button is not there after being set up")
+	}
+
+	// Clearing it turns the button off again and leaves no empty section behind.
+	if w := as(t, h, admin, "POST", "/admin/sign-in", url.Values{"device_client_id": {"  "}}); w.Code != http.StatusSeeOther {
+		t.Fatalf("clearing: code = %d", w.Code)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, project.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "sign_in") {
+		t.Errorf("clearing left the section behind:\n%s", raw)
+	}
+}
+
+// An id the host will not accept must not be saved: it would leave a button
+// that fails for everybody, and the host's own refusal is the useful message.
+func TestAnIdTheHostRefusesIsNotSaved(t *testing.T) {
+	host := &refusingStub{deviceStub: deviceStub{
+		stubHost: stubHost{revoked: map[string]bool{}}, answer: access.ErrDevicePending}}
+	root := vaultUnderGit(t)
+	s, err := New(root, Options{
+		Author:      gitvcs.Author{Name: "Server", Email: "server@example.com"},
+		Host:        host,
+		Recheck:     time.Nanosecond,
+		SessionLife: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := s.Handler()
+
+	w := as(t, h, signIn(t, h, access.RoleAdmin), "POST", "/admin/sign-in",
+		url.Values{"device_client_id": {"not-an-application"}})
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("code = %d", w.Code)
+	}
+	if got := w.Header().Get("Location"); !strings.Contains(got, "problem=") {
+		t.Errorf("redirected to %q, want the page saying why", got)
+	}
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.DeviceClientID(); got != "" {
+		t.Errorf("saved anyway: %q", got)
+	}
+}
+
+// A member cannot change how everybody signs in.
+func TestOnlyAnAdministratorSetsUpSigningIn(t *testing.T) {
+	s, h, _ := deviceServer(t)
+	_ = s
+
+	w := as(t, h, signIn(t, h, access.RoleMember), "POST", "/admin/sign-in",
+		url.Values{"device_client_id": {"Ov23liSNEAKY"}})
+	if w.Code != http.StatusForbidden {
+		t.Errorf("code = %d, want it refused", w.Code)
+	}
+}
+
+type refusingStub struct{ deviceStub }
+
+func (r *refusingStub) StartDevice(context.Context, string) (access.Device, error) {
+	return access.Device{}, errors.New("unknown client")
 }

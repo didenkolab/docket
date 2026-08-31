@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,18 +21,34 @@ import (
 // honest consequence.
 const sessionCookie = "docket_session"
 
+// session is one person's sign-ins: a token per host, and nothing else.
+//
+// The tokens live here, in memory, and are never written anywhere — not to the
+// cookie, not to disk. The browser holds an opaque id. A restart signs everyone
+// out, which is the honest consequence of not storing them.
 type session struct {
-	token    string
-	identity access.Identity
-	started  time.Time
+	tokens  map[string]string // host → token
+	started time.Time
+}
+
+func (s *session) tokenFor(hostKey string) (string, bool) {
+	token, ok := s.tokens[strings.ToLower(hostKey)]
+	return token, ok
+}
+
+func (s *session) has(hostKey string) bool {
+	_, ok := s.tokenFor(hostKey)
+	return ok
 }
 
 // authority is the signed-in half of the server. It is nil when the server runs
 // unauthenticated, and every check below reads as "no authority, no restriction"
 // — which is exactly what --auth none means and what it prints at startup.
 type authority struct {
-	checker *access.Checker
-	life    time.Duration
+	// repos is every repository in the space and the host that answers for it,
+	// in space order. See hosts.go for why this is per repository.
+	repos []*repository
+	life  time.Duration
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -40,33 +57,74 @@ type authority struct {
 	pending map[string]*waiting
 }
 
-func newAuthority(host access.Host, recheck, life time.Duration) *authority {
+func newAuthority(repos []*repository, life time.Duration) *authority {
 	return &authority{
-		checker:  access.NewChecker(host, recheck),
+		repos:    repos,
 		life:     life,
 		sessions: map[string]*session{},
 		pending:  map[string]*waiting{},
 	}
 }
 
-func (a *authority) open(token string, identity access.Identity) (string, error) {
-	id, err := randomID()
-	if err != nil {
-		return "", err
+// hostFor is the host a token would be for, and the repositories it covers.
+func (a *authority) hostFor(hostKey string) (access.Host, string, bool) {
+	hostKey = strings.ToLower(hostKey)
+	for _, r := range a.repos {
+		if r.host != nil && r.hostKey == hostKey {
+			return r.host, r.clientID, true
+		}
 	}
+	return nil, "", false
+}
+
+// oneHost is the only host there is, when there is only one. A space of a
+// single repository — the ordinary case — should never make anybody choose.
+func (a *authority) oneHost() (signInHost, bool) {
+	all := hosts(a.repos)
+	if len(all) == 1 {
+		return all[0], true
+	}
+	return signInHost{}, false
+}
+
+// keep records a token against the host it identifies somebody on, opening a
+// session if this is the first one. Signing into a second host adds to the
+// session rather than replacing it.
+func (a *authority) keep(id, hostKey, token string) (string, error) {
 	a.mu.Lock()
-	a.sessions[id] = &session{token: token, identity: identity, started: time.Now()}
-	a.mu.Unlock()
+	defer a.mu.Unlock()
+
+	current, ok := a.sessions[id]
+	if !ok || id == "" {
+		fresh, err := randomID()
+		if err != nil {
+			return "", err
+		}
+		id, current = fresh, &session{tokens: map[string]string{}, started: time.Now()}
+		a.sessions[id] = current
+	}
+	current.tokens[strings.ToLower(hostKey)] = token
 	return id, nil
 }
 
 func (a *authority) close(id string) {
 	a.mu.Lock()
-	if s, ok := a.sessions[id]; ok {
-		a.checker.Forget(s.token)
-		delete(a.sessions, id)
+	defer a.mu.Unlock()
+	s, ok := a.sessions[id]
+	if !ok {
+		return
 	}
-	a.mu.Unlock()
+	// Forgetting the cached answer everywhere the token was used, so signing
+	// out cannot leave a repository still believing in it.
+	for _, r := range a.repos {
+		if r.checker == nil {
+			continue
+		}
+		if token, held := s.tokenFor(r.hostKey); held {
+			r.checker.Forget(token)
+		}
+	}
+	delete(a.sessions, id)
 }
 
 func (a *authority) lookup(id string) (*session, bool) {
@@ -90,19 +148,22 @@ func randomID() (string, error) {
 
 /* ---------- the request's identity ---------- */
 
-type identityKey struct{}
-
-// identityOf is who is asking. Without an authority everyone is an admin,
-// because there is nobody to be anyone else.
+// identityOf is who is asking, taken as one role for the whole space.
+//
+// It is the widest role held anywhere, and it exists for the parts of the
+// interface that are not about one repository: whether to offer "New task" at
+// all. Anything that acts on a task asks about that task's project instead —
+// standingIn(r).CanWrite(projectKey) — because that is where the host draws
+// the line. See hosts.go.
 func identityOf(r *http.Request) access.Identity {
-	if identity, ok := r.Context().Value(identityKey{}).(access.Identity); ok {
-		return identity
+	if st := standingIn(r); st != nil {
+		return st.Best
 	}
 	return access.Identity{Role: access.RoleAdmin}
 }
 
-// guard resolves the session, enforces what the role may do, and puts the
-// identity where handlers can read it.
+// guard resolves the session, works out what it may do in each repository, and
+// refuses what it may not.
 func (s *Server) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.auth == nil {
@@ -125,21 +186,23 @@ func (s *Server) guard(next http.Handler) http.Handler {
 			return
 		}
 
-		// Re-ask the host on a timer, so access removed there stops working
-		// here without waiting for the session to expire.
-		identity, err := s.auth.checker.Identify(r.Context(), current.token)
-		if err != nil {
+		// Every repository is re-asked on its own timer, so access removed on
+		// one host stops working here without waiting for the session to
+		// expire, and without a cached answer from another host masking it.
+		st := s.auth.standingOf(r.Context(), current)
+		if !st.SignedIn {
+			// Every token in the session has stopped working. That is a
+			// sign-out, not an error.
 			s.auth.close(cookie.Value)
 			s.demandSignIn(w, r)
 			return
 		}
-		current.identity = identity
 
-		if !allowed(identity, r) {
-			s.refuse(w, identity, r)
+		if refusal := allowed(st, r); refusal != "" {
+			s.refuse(w, r, refusal)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), identityKey{}, identity)))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), standingKey{}, st)))
 	})
 }
 
@@ -150,22 +213,95 @@ func open(path string) bool {
 		path == "/healthz" || strings.HasPrefix(path, "/static/")
 }
 
-func allowed(identity access.Identity, r *http.Request) bool {
-	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+// allowed says why a request is refused, or "" when it is not.
+//
+// It returns a sentence rather than a boolean because the reason is the useful
+// part: "you may read this project but not change it" and "you have not signed
+// into the host that holds it" are different problems with different next
+// steps, and a bare 403 tells somebody neither.
+//
+// Which project a request is about decides who answers. A request about none of
+// them in particular — the board, a search — is allowed through and filtered:
+// see standing.readable.
+func allowed(st *standing, r *http.Request) string {
+	reading := r.Method == http.MethodGet || r.Method == http.MethodHead
+	key := projectOf(r)
+
+	if reading {
 		// The vault's vocabulary is not a secret, but the page that edits it
-		// should not be offered to someone who cannot save.
-		if strings.HasPrefix(r.URL.Path, "/settings") {
-			return identity.CanConfigure()
+		// should not be offered to somebody who cannot save.
+		if strings.HasPrefix(r.URL.Path, "/settings") && !st.canConfigureAnything() {
+			return "Changing what the vault calls things needs administrator access to the " +
+				"repository, which is granted on its host rather than here."
 		}
-		return true
+		if key != "" && !st.CanRead(key) {
+			return notYours(st, key, "see")
+		}
+		return ""
 	}
+
 	if r.URL.Path == "/sign-out" {
-		return true
+		return ""
 	}
-	if strings.HasPrefix(r.URL.Path, "/settings") {
-		return identity.CanConfigure()
+	// How the vault describes itself, and how people get into it, are the two
+	// things a member may read and may not change. /admin is a page anybody
+	// signed in may look at — it says who has access — but writing there sets
+	// up signing in for everybody.
+	if strings.HasPrefix(r.URL.Path, "/settings") || strings.HasPrefix(r.URL.Path, "/admin") {
+		if key == "" && !st.canConfigureAnything() {
+			return "Changing what the vault calls things, or how people sign in, needs " +
+				"administrator access to the repository."
+		}
+		if key != "" && !st.CanConfigure(key) {
+			return notYours(st, key, "configure")
+		}
+		return ""
 	}
-	return identity.CanWrite()
+
+	if key == "" {
+		// A write that does not name a project — creating a task with none
+		// chosen, say. It is allowed only if any project would take it, and the
+		// handler picks one it may write to.
+		if !st.canWriteAnything() {
+			return "Your access to every project here is read-only. Access is granted on the " +
+				"host that holds each repository, not here."
+		}
+		return ""
+	}
+	if !st.CanWrite(key) {
+		return notYours(st, key, "change")
+	}
+	return ""
+}
+
+// notYours is the sentence for a project you may not do that to, and it says
+// which of the two reasons it is.
+func notYours(st *standing, key, verb string) string {
+	if st.In(key).Role == "" {
+		if host := st.hostHolding(key); host != "" {
+			return "That is in " + key + ", which is on " + host + ". You have not signed " +
+				"into " + host + " yet."
+		}
+		return "You have no access to " + key + ". Access is granted on the host that holds " +
+			"its repository, not here."
+	}
+	return "Your access to " + key + " is " + plainly(st.In(key).Role) + ", so this is not " +
+		"yours to " + verb + ". Access is granted on the host that holds it, not here."
+}
+
+// plainly is a role in the words somebody would use about it. The three names
+// are the product's own vocabulary and belong on the Access page, where they are
+// defined; a refusal should say what you can and cannot do.
+func plainly(role string) string {
+	switch role {
+	case access.RoleViewer:
+		return "read-only"
+	case access.RoleMember:
+		return "write"
+	case access.RoleAdmin:
+		return "administrator"
+	}
+	return "none"
 }
 
 func (s *Server) demandSignIn(w http.ResponseWriter, r *http.Request) {
@@ -176,14 +312,7 @@ func (s *Server) demandSignIn(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/sign-in?next="+urlEscape(r.URL.RequestURI()), http.StatusSeeOther)
 }
 
-func (s *Server) refuse(w http.ResponseWriter, identity access.Identity, r *http.Request) {
-	message := "Your access to " + s.auth.checker.Host.Repository() + " is read-only, so this " +
-		"is not yours to change. Access is granted on " + s.auth.checker.Host.Name() +
-		", not here."
-	if strings.HasPrefix(r.URL.Path, "/settings") && identity.CanWrite() {
-		message = "Changing the vault's vocabulary needs administrator access to " +
-			s.auth.checker.Host.Repository() + ". Yours is write."
-	}
+func (s *Server) refuse(w http.ResponseWriter, r *http.Request, message string) {
 	if wantsJSON(r) {
 		apiError(w, http.StatusForbidden, message)
 		return
@@ -232,32 +361,57 @@ func (s *Server) handleSignInForm(w http.ResponseWriter, r *http.Request) {
 	}
 	c, _ := s.config()
 	s.render(w, r, "sign-in.html", c, "Sign in",
-		s.signInPage(r.URL.Query().Get("next"), ""))
+		s.signInPage(r, r.URL.Query().Get("next"), ""))
 }
 
 type signInView struct {
-	Host       string
-	Repository string
-	Next       string
-	Error      string
-	// Device says the host can hand over a token without anybody pasting one,
-	// so the page leads with a button and keeps the token field as the way out
-	// for a host that cannot, or a person who would rather.
+	Next  string
+	Error string
+	// Hosts are the hosts holding repositories in this space, in space order.
+	// Usually one; a workspace may span several, and then signing in is
+	// something you do once per host rather than once.
+	Hosts []signInHostView
+	// Signed are the hosts already signed into, so a page reached while
+	// half-way through says so rather than looking like a fresh start.
+	Signed []string
+}
+
+// signInHostView is one host to sign into.
+type signInHostView struct {
+	Key  string
+	Name string
+	// Repos is what signing in here gets you, so a choice between two hosts is
+	// a choice between named things rather than between two brand names.
+	Repos []string
+	// Device says this host can hand over a token without anybody pasting one.
 	Device bool
 	Scope  string
 }
 
-// signInPage is everything the sign-in screen needs, in one place, so the four
+// signInPage is everything the sign-in screen needs, in one place, so the
 // callers that render it cannot drift from each other.
-func (s *Server) signInPage(next, problem string) signInView {
-	view := signInView{
-		Host:       s.auth.checker.Host.Name(),
-		Repository: s.auth.checker.Host.Repository(),
-		Next:       next,
-		Error:      problem,
+func (s *Server) signInPage(r *http.Request, next, problem string) signInView {
+	view := signInView{Next: next, Error: problem}
+
+	held := map[string]bool{}
+	if cookie, err := r.Cookie(sessionCookie); err == nil {
+		if current, ok := s.auth.lookup(cookie.Value); ok {
+			for key := range current.tokens {
+				held[key] = true
+			}
+		}
 	}
-	if host, ok := s.deviceHost(); ok {
-		view.Device, view.Scope = true, host.DeviceScope()
+
+	for _, h := range hosts(s.auth.repos) {
+		if held[h.Key] {
+			view.Signed = append(view.Signed, h.Name)
+			continue
+		}
+		one := signInHostView{Key: h.Key, Name: h.Name, Repos: h.Repos}
+		if device, ok := s.deviceHostFor(h.Key); ok {
+			one.Device, one.Scope = true, device.DeviceScope()
+		}
+		view.Hosts = append(view.Hosts, one)
 	}
 	return view
 }
@@ -274,20 +428,57 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
 	fail := func(message string) {
 		w.WriteHeader(http.StatusUnauthorized)
-		s.render(w, r, "sign-in.html", c, "Sign in", s.signInPage(next, message))
+		s.render(w, r, "sign-in.html", c, "Sign in", s.signInPage(r, next, message))
 	}
 
+	hostKey, ok := s.askedHost(r)
+	if !ok {
+		fail("Say which host this token is for.")
+		return
+	}
+	host, _, ok := s.auth.hostFor(hostKey)
+	if !ok {
+		fail("No repository here is on that host.")
+		return
+	}
 	if token == "" {
-		fail("A token is needed to ask " + s.auth.checker.Host.Name() + " who you are.")
+		fail("A token is needed to ask " + host.Name() + " who you are.")
 		return
 	}
 
-	identity, err := s.auth.checker.Identify(r.Context(), token)
-	if err != nil {
+	// The token has to work for at least one repository on that host, or it is
+	// not a sign-in — it is a token for somewhere else.
+	if err := s.auth.verify(r.Context(), hostKey, token); err != nil {
 		fail(err.Error())
 		return
 	}
-	id, err := s.auth.open(token, identity)
+	s.establish(w, r, hostKey, token, next, fail)
+}
+
+// askedHost is which host a sign-in is for. A space with one host never asks.
+func (s *Server) askedHost(r *http.Request) (string, bool) {
+	if named := strings.TrimSpace(r.FormValue("host")); named != "" {
+		return strings.ToLower(named), true
+	}
+	if only, ok := s.auth.oneHost(); ok {
+		return only.Key, true
+	}
+	return "", false
+}
+
+// establish keeps the token and points the browser at what it was after.
+//
+// Signing into a second host adds to the session that already exists, so
+// somebody who signed into GitHub and then into GitLab is one person with two
+// tokens rather than two half-sessions.
+func (s *Server) establish(w http.ResponseWriter, r *http.Request,
+	hostKey, token, next string, fail func(string)) {
+
+	existing := ""
+	if cookie, err := r.Cookie(sessionCookie); err == nil {
+		existing = cookie.Value
+	}
+	id, err := s.auth.keep(existing, hostKey, token)
 	if err != nil {
 		fail(err.Error())
 		return
@@ -302,6 +493,13 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 		MaxAge:   int(s.auth.life.Seconds()),
 	})
+
+	// Still a host to sign into, and the page asked for is in it? Then the
+	// place to go is back to the sign-in page, which now offers what is left.
+	if s.auth.stillMissing(id) && next != "/sign-in" {
+		http.Redirect(w, r, "/sign-in?next="+urlEscape(next), http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
@@ -321,15 +519,59 @@ func (s *Server) handleSignOut(w http.ResponseWriter, r *http.Request) {
 
 /* ---------- who has access ---------- */
 
+// adminView is the Access page: every repository, who vouches for it, and what
+// you may do there.
+//
+// One row per repository rather than one page per repository, because the thing
+// somebody comes here to understand is exactly the thing that used to be
+// invisible: that these are separate repositories on separate hosts, and access
+// to one says nothing about the next.
 type adminView struct {
-	Host          string
-	Repository    string
-	SettingsURL   string
-	Recheck       string
-	You           access.Identity
+	Repos    []repoAccess
+	Hosts    []hostAccess
+	Recheck  string
+	You      access.Identity
+	Note     string
+	Unauthed bool
+	Saved    string
+	Problem  string
+}
+
+// repoAccess is one repository on the Access page.
+type repoAccess struct {
+	Name        string
+	Projects    []string
+	Host        string
+	HostKey     string
+	Repository  string
+	SettingsURL string
+	// Role is what you may do here, or "" when you have not signed into this
+	// host or the host says this repository is not yours.
+	Role string
+	// SignedIn says the host knows you; Role empty with SignedIn true means the
+	// host was asked and said no.
+	SignedIn bool
+	// ReadOnly says nobody can vouch for it at all, so it can only be read.
+	ReadOnly bool
+	Why      string
+	// Collaborators are who else has access, when the host will say.
 	Collaborators []access.Collaborator
-	Note          string
-	Unauthed      bool
+	Trouble       string
+	// Configurable says you may change how people sign into this repository.
+	Configurable bool
+	// ClientID and CanDevice are the sign-in setup for this repository's host.
+	CanDevice bool
+	ClientID  string
+	FromFlag  bool
+	Scope     string
+}
+
+// hostAccess is one host, for the summary at the top.
+type hostAccess struct {
+	Key      string
+	Name     string
+	SignedIn bool
+	Repos    []string
 }
 
 // handleAdmin shows who has access and where it is granted. It grants nothing:
@@ -343,29 +585,72 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 			Unauthed: true,
 			Note: "This server is running unauthenticated. Anyone who can reach it can write, " +
 				"and every change is attributed to the author it was started with. Start it " +
-				"against a vault with a GitHub remote to sign people in as themselves.",
+				"against a vault whose repositories have remotes to sign people in as " +
+				"themselves.",
 		})
 		return
 	}
 
-	host := s.auth.checker.Host
+	st := standingIn(r)
 	view := adminView{
-		Host:        host.Name(),
-		Repository:  host.Repository(),
-		SettingsURL: host.SettingsURL(),
-		Recheck:     s.auth.checker.TTL.String(),
-		You:         identityOf(r),
+		Recheck: s.recheck.String(),
+		You:     identityOf(r),
+		Saved:   r.URL.Query().Get("saved"),
+		Problem: r.URL.Query().Get("problem"),
 	}
 
+	var current *session
 	if cookie, err := r.Cookie(sessionCookie); err == nil {
-		if current, ok := s.auth.lookup(cookie.Value); ok {
-			people, err := host.Collaborators(r.Context(), current.token)
-			if err != nil {
-				view.Note = "Cannot list who has access: " + err.Error() +
-					". " + host.Name() + " only answers that for an administrator's token."
-			}
-			view.Collaborators = people
+		current, _ = s.auth.lookup(cookie.Value)
+	}
+
+	for _, h := range hosts(s.auth.repos) {
+		view.Hosts = append(view.Hosts, hostAccess{
+			Key: h.Key, Name: h.Name, Repos: h.Repos,
+			SignedIn: current != nil && current.has(h.Key),
+		})
+	}
+
+	for _, repo := range s.auth.repos {
+		row := repoAccess{
+			Name:     repo.name,
+			Projects: repo.projects,
+			ReadOnly: repo.readOnly(),
+			Why:      repo.why,
+			FromFlag: s.deviceClientID != "" && s.onlyHost(repo.hostKey),
 		}
+		if repo.host != nil {
+			row.Host, row.HostKey = repo.host.Name(), repo.hostKey
+			row.Repository, row.SettingsURL = repo.host.Repository(), repo.host.SettingsURL()
+			row.SignedIn = current != nil && current.has(repo.hostKey)
+			if device, ok := repo.host.(access.DeviceHost); ok {
+				row.CanDevice, row.Scope = true, device.DeviceScope()
+				row.ClientID = s.clientIDFor(repo.hostKey)
+			}
+		}
+
+		// The role is per repository, so it is asked per repository — this is
+		// the whole point of the page.
+		if len(repo.projects) > 0 {
+			identity := st.In(repo.projects[0])
+			row.Role = identity.Role
+			row.Configurable = identity.CanConfigure()
+		}
+
+		// Who else has access, when the host will say. Most hosts only answer
+		// that for an administrator, so a member's page shows what it can and
+		// says why it cannot show more.
+		if current != nil && repo.host != nil && row.Role != "" {
+			if token, held := current.tokenFor(repo.hostKey); held {
+				people, err := repo.host.Collaborators(r.Context(), token)
+				if err != nil {
+					row.Trouble = repo.host.Name() + " only answers who has access for an " +
+						"administrator's token: " + err.Error()
+				}
+				row.Collaborators = people
+			}
+		}
+		view.Repos = append(view.Repos, row)
 	}
 
 	s.render(w, r, "admin.html", c, "Access", view)
@@ -374,12 +659,17 @@ func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request) {
 // authorFor is who a write is attributed to.
 //
 // With an authority it is the signed-in person, using the name and email the
-// host reports, so git log becomes a truthful record of who moved what. Without
-// one it is the author the server was started with, which is the only honest
-// answer available.
+// host that vouches for the repository being written to reports — so git log
+// becomes a truthful record of who moved what, in the words of the host that
+// knows them. Without one it is the author the server was started with, which
+// is the only honest answer available.
 func (s *Server) authorFor(r *http.Request) gitvcs.Author {
-	if s.auth != nil {
-		if identity, ok := r.Context().Value(identityKey{}).(access.Identity); ok {
+	if st := standingIn(r); st != nil {
+		identity := st.In(projectOf(r))
+		if identity.Role == "" {
+			identity = st.Best
+		}
+		if identity.Email != "" || identity.DisplayName() != "" {
 			return gitvcs.Author{Name: identity.DisplayName(), Email: identity.Email}
 		}
 	}
@@ -394,4 +684,46 @@ func (s *Server) authorFor(r *http.Request) gitvcs.Author {
 		}
 	}
 	return s.author
+}
+
+// verify asks a host whether a token is good for anything here.
+//
+// At least one repository on that host has to accept it. A token that no
+// repository accepts is not a sign-in, and saying so at once is better than
+// letting somebody in to an empty board.
+func (a *authority) verify(ctx context.Context, hostKey, token string) error {
+	hostKey = strings.ToLower(hostKey)
+	var last error
+	asked := false
+	for _, r := range a.repos {
+		if r.host == nil || r.hostKey != hostKey {
+			continue
+		}
+		asked = true
+		if _, err := r.checker.Identify(ctx, token); err == nil {
+			return nil
+		} else {
+			last = err
+		}
+	}
+	if !asked {
+		return errors.New("no repository here is on that host")
+	}
+	return last
+}
+
+// stillMissing reports whether a session has a host left to sign into.
+func (a *authority) stillMissing(id string) bool {
+	a.mu.Lock()
+	current, ok := a.sessions[id]
+	a.mu.Unlock()
+	if !ok {
+		return false
+	}
+	for _, h := range hosts(a.repos) {
+		if !current.has(h.Key) {
+			return true
+		}
+	}
+	return false
 }

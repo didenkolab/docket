@@ -53,10 +53,10 @@ func (s *Server) handleEditForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, "edit.html", c, "Edit "+t.Key, s.editView(c, t, version, rel, ""))
+	s.render(w, r, "edit.html", c, "Edit "+t.Key, s.editView(r, c, t, version, rel, ""))
 }
 
-func (s *Server) editView(c *project.Config, t *task.Task, version, rel, message string) editView {
+func (s *Server) editView(r *http.Request, c *project.Config, t *task.Task, version, rel, message string) editView {
 	view := editView{
 		Task:      t,
 		Version:   version,
@@ -70,7 +70,7 @@ func (s *Server) editView(c *project.Config, t *task.Task, version, rel, message
 
 	// Any task but this one, and not one of its own descendants — a task
 	// cannot be its own ancestor, and offering the choice invites the cycle.
-	entries, _ := s.entries()
+	entries, _ := s.entries(r)
 	descendants := descendantsOf(entries, t.Key)
 	for _, e := range entries {
 		if e.Task == nil || e.Key == t.Key || descendants[e.Key] {
@@ -238,7 +238,7 @@ func (s *Server) rejectEdit(w http.ResponseWriter, r *http.Request, c *project.C
 	rel, _, _ := s.locate(key)
 
 	w.WriteHeader(http.StatusBadRequest)
-	s.render(w, r, "edit.html", c, "Edit "+key, s.editView(c, t, version, rel, message))
+	s.render(w, r, "edit.html", c, "Edit "+key, s.editView(r, c, t, version, rel, message))
 }
 
 func normaliseNewlines(s string) string {

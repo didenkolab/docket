@@ -56,8 +56,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		"a reverse proxy sits in front, so rate limits follow the client it names "+
 			"rather than the proxy")
 	clientID := flags.String("device-client-id", "",
-		"the OAuth application id to sign people in with, so nobody has to paste a token\n"+
-			"    \t(public, not a secret; defaults to docket's own, or $DOCKET_DEVICE_CLIENT_ID)")
+		"override the OAuth application people sign in with, for this server only\n"+
+			"    \t(public, not a secret; normally set on the Access page and kept in docket.yaml)")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -207,25 +207,16 @@ func resolveHost(auth, kind, api, root string, stdout, stderr io.Writer) (access
 	}
 }
 
-// deviceClientID is which OAuth application to sign people in as.
+// deviceClientID is an OAuth application named for this server rather than for
+// the vault.
 //
-// The flag wins, then the environment, then the one built in. It is public —
-// the device flow has no client secret, which is the whole reason it fits a
-// program anybody can run — so shipping one costs nothing and means signing in
-// works out of the box. Somebody who would rather use their own says so.
+// The flag wins, then the environment. Neither being set is the normal case:
+// the id then comes out of docket.yaml, where the Access page writes it, so it
+// travels with the repository and nobody has to remember a flag. This is the
+// override for somebody who wants a different application on one server.
 func deviceClientID(flag string) string {
 	if flag = strings.TrimSpace(flag); flag != "" {
 		return flag
 	}
-	if env := strings.TrimSpace(os.Getenv("DOCKET_DEVICE_CLIENT_ID")); env != "" {
-		return env
-	}
-	return builtInClientID
+	return strings.TrimSpace(os.Getenv("DOCKET_DEVICE_CLIENT_ID"))
 }
-
-// builtInClientID is docket's own OAuth application on github.com.
-//
-// Empty until one is registered, and empty is a working state: the sign-in
-// page offers the token field alone and says nothing about a button that is
-// not there.
-const builtInClientID = ""

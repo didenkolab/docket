@@ -88,6 +88,11 @@ type DeviceHost interface {
 // anybody agrees.
 func (g *GitHub) DeviceScope() string { return "repo" }
 
+// OnGitHubCom reports whether this is the public GitHub rather than an
+// Enterprise server, which decides whether docket's own OAuth application
+// applies: one is registered per instance.
+func (g *GitHub) OnGitHubCom() bool { return strings.EqualFold(g.Ref.Host, "github.com") }
+
 // StartDevice asks GitHub for a code pair.
 func (g *GitHub) StartDevice(ctx context.Context, clientID string) (Device, error) {
 	var out struct {

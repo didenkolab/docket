@@ -7,50 +7,124 @@
 <div class="notice"><strong>Running without sign-in.</strong> {{$data.Note}}</div>
 {{else}}
 
+{{if $data.Saved}}<div class="notice ok">{{$data.Saved}}</div>{{end}}
+{{if $data.Problem}}<div class="notice">{{$data.Problem}}</div>{{end}}
+
 <p>
-  This board is <code>{{$data.Repository}}</code> on {{$data.Host}}. Who may do what here is
-  whatever that host says, re-asked every {{$data.Recheck}} — so access removed there stops
-  working here within that long, not at once.
+  A repository is the unit of access here. Each one is on a host, and that host decides who may
+  do what in it — re-asked every {{$data.Recheck}}, so access removed there stops working here
+  within that long rather than at once. Access to one repository says nothing about the next.
 </p>
 
-<dl class="properties">
-  <dt>You are</dt><dd>{{$data.You.DisplayName}} ({{$data.You.Login}})</dd>
-  <dt>Your role</dt><dd><span class="pill">{{$data.You.Role}}</span></dd>
-  <dt>Granted on</dt><dd><a href="{{$data.SettingsURL}}">{{$data.Host}}</a></dd>
-</dl>
-
-{{if $data.Note}}
-<div class="notice">{{$data.Note}}</div>
-{{end}}
-
-{{if $data.Collaborators}}
+{{if gt (len $data.Hosts) 1}}
+<h2>Hosts</h2>
 <table class="settings">
-  <thead><tr><th>Login</th><th>Name</th><th>Role here</th></tr></thead>
+  <thead><tr><th>Host</th><th>Repositories</th><th>You</th></tr></thead>
   <tbody>
-    {{range $data.Collaborators}}
+    {{range $data.Hosts}}
     <tr>
-      <td><code>{{.Login}}</code></td>
       <td>{{.Name}}</td>
-      <td><span class="pill">{{.Role}}</span></td>
+      <td>{{range $i, $r := .Repos}}{{if $i}}, {{end}}<code>{{$r}}</code>{{end}}</td>
+      <td>
+        {{if .SignedIn}}<span class="pill">signed in</span>
+        {{else}}<a href="/sign-in">sign in</a>{{end}}
+      </td>
     </tr>
     {{end}}
   </tbody>
 </table>
 {{end}}
 
+{{range $data.Repos}}
+<section class="repo-access">
+  <h2>{{.Name}}{{if .Host}} <span class="muted">on {{.Host}}</span>{{end}}</h2>
+
+  <dl class="properties">
+    {{if .Repository}}<dt>Repository</dt><dd><code>{{.Repository}}</code></dd>{{end}}
+    <dt>Your role</dt>
+    <dd>
+      {{if .ReadOnly}}<span class="pill">read-only for everybody</span>
+      {{else if .Role}}<span class="pill">{{.Role}}</span>
+      {{else if .SignedIn}}<span class="pill">none</span> — {{.Host}} was asked and says this is not yours
+      {{else}}<a href="/sign-in">not signed into {{.Host}} yet</a>{{end}}
+    </dd>
+    {{if .SettingsURL}}<dt>Granted on</dt><dd><a href="{{.SettingsURL}}">{{.Host}}</a></dd>{{end}}
+  </dl>
+
+  {{if .ReadOnly}}
+  <p class="footnote">
+    Nobody can vouch for this repository: {{.Why}}. It can be read and never written — treating
+    "cannot ask" as "anyone may" is how one repository in a workspace ends up unguarded. Give it
+    a remote, or change it with commits.
+  </p>
+  {{end}}
+
+  {{if .Collaborators}}
+  <table class="settings">
+    <thead><tr><th>Login</th><th>Name</th><th>Role here</th></tr></thead>
+    <tbody>
+      {{range .Collaborators}}
+      <tr>
+        <td><code>{{.Login}}</code></td>
+        <td>{{.Name}}</td>
+        <td><span class="pill">{{.Role}}</span></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+  {{if .Trouble}}<p class="footnote">{{.Trouble}}</p>{{end}}
+
+  {{if and .CanDevice .Configurable}}
+  <h3>How people sign in</h3>
+  <p class="footnote">
+    With an application registered on {{.Host}}, people press a button and confirm a short code
+    on {{.Host}}'s own site instead of finding and pasting a token. Nothing secret is stored:
+    the device flow has no client secret, and the id below is meant to be published.
+  </p>
+
+  <form method="post" action="/admin/sign-in" class="stacked">
+    {{template "csrf" $}}
+    <input type="hidden" name="repo" value="{{index .Projects 0}}">
+    <label for="client-{{.HostKey}}-{{index .Projects 0}}">{{.Host}} application id</label>
+    <input id="client-{{.HostKey}}-{{index .Projects 0}}" name="device_client_id"
+           value="{{.ClientID}}" placeholder="empty — people paste a token instead"
+           {{if .FromFlag}}disabled{{end}}>
+    <button type="submit" {{if .FromFlag}}disabled{{end}}>Save</button>
+  </form>
+
+  {{if .FromFlag}}
+  <p class="footnote">
+    This server was started with <code>--device-client-id</code>, which wins over the vault.
+    Drop the flag to manage it here.
+  </p>
+  {{else}}
+  <p class="footnote">
+    Checked with {{.Host}} before it is saved, then kept in this repository's
+    <code>docket.yaml</code> and committed — so it travels with the repository and every board
+    over it has it. Clearing it turns the button off; a token still works either way. On
+    {{.Host}} the application needs the device flow enabled, the scope <code>{{.Scope}}</code>,
+    and to be public rather than confidential.
+  </p>
+  {{end}}
+  {{end}}
+</section>
+{{end}}
+
 <h2>Why there is no button here</h2>
 
 <p class="footnote">
-  Granting access is not something this program can do. Anyone who can clone the repository has
-  every task, every page and the whole history, and no check inside a web interface changes
-  that. A button here would appear to hand out something it cannot. Access is granted on
-  {{$data.Host}}, where it is actually enforced.
+  Granting access is not something this program can do. Anyone who can clone a repository has
+  every task, every page and the whole history in it, and no check inside a web interface
+  changes that. A button here would appear to hand out something it cannot. Access is granted
+  on the host that holds each repository, where it is actually enforced.
 </p>
 
 <p class="footnote">
   What the roles mean: <strong>viewer</strong> reads. <strong>member</strong> creates tasks,
-  moves them and comments. <strong>admin</strong> also changes the vault's vocabulary. They come
-  from the host's own read, write and administer permissions rather than being invented here.
+  moves them and comments. <strong>admin</strong> also changes what the vault calls things. They
+  come from each host's own read, write and administer permissions rather than being invented
+  here — and you may hold different ones in different repositories.
 </p>
 
 <form method="post" action="/sign-out">

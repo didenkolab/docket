@@ -8,39 +8,69 @@
   <div class="notice">{{$data.Error}}</div>
   {{end}}
 
-  <p>
-    This board is <code>{{$data.Repository}}</code> on {{$data.Host}}. It keeps no accounts of
-    its own: it asks {{$data.Host}} who you are and what you may do with that repository, and
-    what {{$data.Host}} answers is what you get here.
-  </p>
-
-  {{if $data.Device}}
-  <form method="post" action="/sign-in/device">
-  {{template "csrf" $}}
-    <input type="hidden" name="next" value="{{$data.Next}}">
-    <button type="submit" class="primary">Sign in with {{$data.Host}}</button>
-  </form>
-
-  <p class="footnote">
-    {{$data.Host}} shows you a code to confirm, on its own site. Nothing secret is typed here.
-  </p>
-
-  <details class="alternative">
-    <summary>Use a token instead</summary>
+  {{if $data.Signed}}
+  <div class="notice ok">
+    Signed into {{range $i, $h := $data.Signed}}{{if $i}}, {{end}}{{$h}}{{end}}.
+    {{if $data.Hosts}}The projects below are on another host, so they need their own sign-in.{{end}}
+  </div>
   {{end}}
 
-  <form method="post" action="/sign-in">
-  {{template "csrf" $}}
-    <input type="hidden" name="next" value="{{$data.Next}}">
-    <label for="token">{{$data.Host}} token</label>
-    <input id="token" name="token" type="password" autocomplete="current-password" required
-           {{if not $data.Device}}autofocus{{end}}
-           placeholder="a token with read access to {{$data.Repository}}">
-    <button type="submit">Sign in</button>
-  </form>
+  {{if not $data.Hosts}}
+    {{if not $data.Signed}}
+    <p>
+      Nothing here can sign anybody in: no repository has a remote to ask about. The server is
+      running with an author of its own instead.
+    </p>
+    {{end}}
+  {{end}}
 
-  {{if $data.Device}}
-  </details>
+  {{if gt (len $data.Hosts) 1}}
+  <p>
+    This board reads several repositories, and they are not all on the same host. Access to one
+    says nothing about the next, so signing in happens once per host — you can do one now and
+    the other later.
+  </p>
+  {{end}}
+
+  {{range $data.Hosts}}
+  <section class="host">
+    <h2>{{.Name}}</h2>
+    <p class="what">
+      {{if .Repos}}For {{range $i, $r := .Repos}}{{if $i}}, {{end}}<code>{{$r}}</code>{{end}}.{{end}}
+      It keeps no accounts of its own: it asks {{.Name}} who you are and what you may do with
+      each repository, and what {{.Name}} answers is what you get here.
+    </p>
+
+    {{if .Device}}
+    <form method="post" action="/sign-in/device">
+    {{template "csrf" $}}
+      <input type="hidden" name="next" value="{{$data.Next}}">
+      <input type="hidden" name="host" value="{{.Key}}">
+      <button type="submit" class="primary">Sign in with {{.Name}}</button>
+    </form>
+
+    <p class="footnote">
+      {{.Name}} shows you a code to confirm, on its own site. Nothing secret is typed here.
+    </p>
+
+    <details class="alternative">
+      <summary>Use a token instead</summary>
+    {{end}}
+
+    <form method="post" action="/sign-in">
+    {{template "csrf" $}}
+      <input type="hidden" name="next" value="{{$data.Next}}">
+      <input type="hidden" name="host" value="{{.Key}}">
+      <label for="token-{{.Key}}">{{.Name}} token</label>
+      <input id="token-{{.Key}}" name="token" type="password" autocomplete="current-password"
+             required placeholder="a token with read access to these repositories">
+      <button type="submit">Sign in</button>
+    </form>
+
+    {{if .Device}}
+    </details>
+    {{end}}
+  </section>
   {{end}}
 
   <p class="footnote">
@@ -49,9 +79,9 @@
   </p>
   <p class="footnote">
     Read access lets you read. Write access lets you create and move tasks. Administrator access
-    also lets you change the vault's vocabulary. Which one you have is granted on {{$data.Host}},
-    not here — because what actually matters is who can clone the repository, and that is the
-    host's to give.
+    also lets you change what the vault calls things. Which one you have is granted on the host
+    that holds each repository, not here — because what actually matters is who can clone it,
+    and that is the host's to give.
   </p>
 </div>
 

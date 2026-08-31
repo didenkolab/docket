@@ -42,6 +42,33 @@ var Reserved = map[string]bool{
 	"DOCS": true, "BOARDS": true, "TEMPLATES": true, "ATTACHMENTS": true, "SCRIPTS": true,
 }
 
+// SignIn is how people get into a board over this vault.
+//
+// It lives in docket.yaml, and therefore in the repository, because it belongs
+// to the repository: the host is whoever holds the remote, and the application
+// is registered on that host. Clone the vault and signing in already works —
+// which is the same reason the vocabulary lives here rather than in a config
+// file beside the server.
+//
+// There is nothing secret in it. The device flow has no client secret; the id
+// identifies the application and is meant to be published. Anything that were
+// secret would not go in a file that gets committed.
+type SignIn struct {
+	// Kind is which API is behind the remote: github, gitlab or bitbucket.
+	//
+	// Needed only for a self-hosted host, because a hostname does not say what
+	// is behind it. github.com, gitlab.com and bitbucket.org say so themselves.
+	// A repository declares this about its own host — nothing central has a
+	// list — which is the same reason the vocabulary lives here.
+	Kind string `yaml:"kind,omitempty"`
+	// API is the host's API base URL, for a self-hosted one that does not put
+	// it where the convention says.
+	API string `yaml:"api,omitempty"`
+	// DeviceClientID is the OAuth application to sign people in as. Empty
+	// means the sign-in page offers the token field alone.
+	DeviceClientID string `yaml:"device_client_id,omitempty"`
+}
+
 // Status is a name people use paired with a category machines act on.
 type Status struct {
 	Name     string `yaml:"name"`
@@ -67,6 +94,10 @@ type Config struct {
 	Statuses   []Status  `yaml:"statuses"`
 	Types      []Type    `yaml:"types"`
 	Priorities []string  `yaml:"priorities"`
+
+	// SignIn is how people sign in, when the vault has said. Omitted otherwise,
+	// so a vault that never cared keeps a file it recognises.
+	SignIn *SignIn `yaml:"sign_in,omitempty"`
 
 	// Transitions is the workflow: which statuses each status can move to.
 	//
@@ -219,6 +250,70 @@ func ValidKey(key string) error {
 		return fmt.Errorf("project key %q is a name the vault already uses", key)
 	}
 	return nil
+}
+
+// DeviceClientID is the application to sign people in as, or empty.
+func (c *Config) DeviceClientID() string {
+	if c.SignIn == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.SignIn.DeviceClientID)
+}
+
+// HostKind is which API is behind this repository's remote, or empty when the
+// hostname says so by itself.
+func (c *Config) HostKind() string {
+	if c.SignIn == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.SignIn.Kind)
+}
+
+// HostAPI is where this repository's host serves its API, or empty for the
+// convention.
+func (c *Config) HostAPI() string {
+	if c.SignIn == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.SignIn.API)
+}
+
+// SetHost records what kind of host vouches for this repository.
+func (c *Config) SetHost(kind, api string) {
+	kind, api = strings.TrimSpace(kind), strings.TrimSpace(api)
+	if kind == "" && api == "" {
+		if c.SignIn != nil {
+			c.SignIn.Kind, c.SignIn.API = "", ""
+			if c.SignIn.DeviceClientID == "" {
+				c.SignIn = nil
+			}
+		}
+		return
+	}
+	if c.SignIn == nil {
+		c.SignIn = &SignIn{}
+	}
+	c.SignIn.Kind, c.SignIn.API = kind, api
+}
+
+// SetDeviceClientID records it, or forgets it when given nothing. Forgetting
+// drops the whole section when nothing else is in it, so the file says either
+// something or nothing.
+func (c *Config) SetDeviceClientID(id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		if c.SignIn != nil {
+			c.SignIn.DeviceClientID = ""
+			if c.SignIn.Kind == "" && c.SignIn.API == "" {
+				c.SignIn = nil
+			}
+		}
+		return
+	}
+	if c.SignIn == nil {
+		c.SignIn = &SignIn{}
+	}
+	c.SignIn.DeviceClientID = id
 }
 
 // HasProject reports whether the vault holds a project.

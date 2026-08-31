@@ -20,6 +20,9 @@ type GitHub struct {
 // Name is what to call this host in the interface.
 func (g *GitHub) Name() string { return "GitHub" }
 
+// HostName is the host a token for this repository is good for.
+func (g *GitHub) HostName() string { return g.Ref.Host }
+
 // Repository is owner/name.
 func (g *GitHub) Repository() string { return g.Ref.Path() }
 
