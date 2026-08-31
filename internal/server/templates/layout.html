@@ -13,6 +13,10 @@
 <header>
   <div class="shell bar">
   <a class="brand" href="/">{{with .Config}}{{.Name}}{{else}}docket{{end}}</a>
+{{/* Nothing to offer somebody who cannot see anything yet: every link here
+     would bounce them back to the page they are already on. Sees is true
+     without an authority, which is what --auth none means. */}}
+  {{if .Sees}}
   <nav>
     <a href="/">Board</a>
     <a href="/pages">Pages</a>
@@ -25,6 +29,7 @@
   <form class="search" action="/search" method="get">
     <input type="search" name="q" placeholder="Search" aria-label="Search">
   </form>
+  {{end}}
   {{if .SignedIn}}
   <span class="who" title="{{.You.Login}} — {{.You.Role}}">
     {{.You.DisplayName}} <span class="role">{{.You.Role}}</span>

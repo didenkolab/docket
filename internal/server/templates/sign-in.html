@@ -32,9 +32,10 @@
   </p>
   {{end}}
 
+  {{$several := gt (len $data.Hosts) 1}}
   {{range $data.Hosts}}
   <section class="host">
-    <h2>{{.Name}}</h2>
+    {{if $several}}<h2>{{.Name}}</h2>{{end}}
     <p class="what">
       {{if .Repos}}For {{range $i, $r := .Repos}}{{if $i}}, {{end}}<code>{{$r}}</code>{{end}}.{{end}}
       It keeps no accounts of its own: it asks {{.Name}} who you are and what you may do with

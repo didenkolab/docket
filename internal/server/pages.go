@@ -30,6 +30,10 @@ type pageData struct {
 	// CSRF is what this page must send back with a change for the change to be
 	// accepted. Every form carries it; the scripts read it from the head.
 	CSRF string
+	// Sees says the reader may look at something here. False only on a server
+	// that signs people in, for somebody who has not — and then the navigation
+	// has nothing to offer, because every link in it would bounce them back.
+	Sees bool
 	// Refresh, when set, makes the page reload itself after that many seconds.
 	// One page needs it — the one waiting for somebody to type a code on
 	// GitHub — and it is a meta tag rather than a script so that waiting works
@@ -54,6 +58,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		You:      you,
 		SignedIn: signedIn,
 		CSRF:     tokenOf(r),
+		Sees:     standingIn(r).Sees(),
 		Refresh:  seconds,
 	}
 	if err := s.tmpl.ExecuteTemplate(w, name, page); err != nil {
