@@ -134,4 +134,3 @@ func newPagesView(paths []string) pagesView {
 	}
 	return view
 }
-
