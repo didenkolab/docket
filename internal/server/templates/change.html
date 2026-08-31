@@ -5,26 +5,57 @@
   <a href="/branches">Branches</a>
   <span aria-hidden="true">/</span>
   <span class="key">{{$data.Ref}}</span>
+  {{if $data.Beside}}<span aria-hidden="true">beside</span><span class="key">{{$data.Beside}}</span>{{end}}
 </nav>
 
-<h1>What this proposal would do</h1>
+<h1>{{if $data.Beside}}Two proposals{{else}}What this proposal would do{{end}}</h1>
 
 <p class="lede">
+  {{if $data.Beside}}
+  Two plans on one screen, because comparing two things in two tabs is comparing one thing twice.
+  {{else}}
   <code>{{$data.Ref}}</code> read as a change to the plan, in the vault's own words rather than
   as a diff. <a href="/branch/{{$data.Ref}}">See the board it would produce</a>.
+  {{end}}
 </p>
 
 {{if $data.Missing}}
 <p class="empty">That branch is in none of this space's repositories.</p>
 {{end}}
 
-{{range $data.Repos}}
+{{if $data.Beside}}
+<div class="beside">
+  <div>
+    <h2 class="beside-head"><code>{{$data.Ref}}</code>
+      <a class="footnote" href="/change/{{$data.Ref}}">alone</a></h2>
+    {{range $data.Repos}}{{template "onechange" .}}{{end}}
+  </div>
+  <div>
+    <h2 class="beside-head"><code>{{$data.Beside}}</code>
+      <a class="footnote" href="/change/{{$data.Beside}}">alone</a></h2>
+    {{range $data.Besides}}{{template "onechange" .}}{{end}}
+  </div>
+</div>
+{{else}}
+{{range $data.Repos}}{{template "onechange" .}}{{end}}
+{{end}}
+
+{{with $data.Others}}
+<p class="footnote">
+  Beside it:
+  {{range $i, $b := .}}{{if $i}} · {{end}}<a href="/change/{{$data.Ref}}?with={{$b}}">{{$b}}</a>{{end}}
+</p>
+{{end}}
+
+{{template "foot" .}}
+
+{{define "onechange"}}
 <section class="change">
-  {{if .Name}}<h2>{{.Name}}</h2>{{end}}
+  {{if .Name}}<h3 class="change-repo">{{.Name}}</h3>{{end}}
 
   <p class="footnote inline">
-    Compared with <code>{{.Base}}</code>, where it parted company — not with the working tree,
-    so nothing that has happened since is reported as though this proposal undid it.
+    Compared with <code>{{.Base}}</code>, where it parted company — not with the working tree, so
+    nothing that has happened since is reported as though this proposal undid it.
     {{.Ahead}} commit(s) on the branch{{if .Behind}}, {{.Behind}} here it does not have{{end}}.
   </p>
 
@@ -44,28 +75,24 @@
   {{end}}
 
   {{if .Change.Arrived}}
-  <h3>Arrives <span class="count">{{len .Change.Arrived}}</span></h3>
+  <h4>Arrives <span class="count">{{len .Change.Arrived}}</span></h4>
   {{template "changed" .Change.Arrived}}
   {{end}}
 
   {{if .Change.Dropped}}
-  <h3>Dropped <span class="count">{{len .Change.Dropped}}</span></h3>
+  <h4>Dropped <span class="count">{{len .Change.Dropped}}</span></h4>
   {{template "changed" .Change.Dropped}}
   {{end}}
 
   {{if .Change.Changed}}
-  <h3>Changed <span class="count">{{len .Change.Changed}}</span></h3>
+  <h4>Changed <span class="count">{{len .Change.Changed}}</span></h4>
   {{template "changed" .Change.Changed}}
   {{end}}
 
-  <p class="footnote">
-    {{.Change.Untouched}} task(s) are left alone.
-  </p>
+  <p class="footnote">{{.Change.Untouched}} task(s) are left alone.</p>
   {{end}}
 </section>
 {{end}}
-
-{{template "foot" .}}
 
 {{define "changed"}}
 <ul class="plan">

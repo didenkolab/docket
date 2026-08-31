@@ -1767,3 +1767,72 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
 
 /* The second way to read a proposal, beside the board it would produce. */
 .branches .what-it-does { font-size: 0.85rem; }
+
+/* ---- who wrote each line ---- */
+
+/* Three columns: who, which line, and the line. The gutter is quiet where a
+ * block came from one commit, because repeating the same name and hash down
+ * twenty rows is noise pretending to be information. */
+.blame {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  margin-top: var(--s4);
+}
+
+.blame td { vertical-align: top; padding: 0; white-space: pre-wrap; }
+
+.blame .who {
+  width: 13rem;
+  padding-right: var(--s3);
+  border-right: 1px solid var(--rule);
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.blame .who-name { color: var(--ink-soft); }
+.blame .who-when { margin-left: var(--s2); }
+.blame .who-commit { margin-left: var(--s2); font-size: 0.9em; }
+
+.blame .lineno {
+  width: 3rem;
+  padding: 0 var(--s3);
+  text-align: right;
+  color: var(--ink-faint);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.blame .code { padding-left: var(--s1); }
+
+/* The frontmatter is the machine's half of the file. Present, because "who
+ * moved this to Done" is asked as often as "who wrote this criterion", and
+ * quieter, because it is not prose. */
+.blame tr.front .code { color: var(--ink-soft); }
+.blame tr:hover td { background: var(--sunken); }
+
+/* Who wrote how much, most first. */
+.shares { display: flex; flex-wrap: wrap; gap: var(--s3); font-size: 0.85rem; color: var(--ink-soft); }
+.shares .share strong { color: var(--ink); font-weight: 550; }
+
+@media (max-width: 62rem) {
+  .blame .who { width: 9rem; font-size: 0.72rem; }
+  .blame .who-commit { display: none; }
+}
+
+/* Two proposals on one screen. Below the width where two columns of sentences
+ * are readable, they stack — a comparison you have to scroll sideways is not
+ * a comparison. */
+.beside { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s5) var(--s6); }
+.beside-head { display: flex; align-items: baseline; gap: var(--s3); margin-bottom: var(--s2); }
+.beside-head code { font-size: 0.9rem; }
+.beside .change { max-width: none; }
+.change h4 { margin: var(--s4) 0 var(--s1); font-size: 0.9rem; }
+.change-repo { font-size: 0.85rem; color: var(--ink-soft); margin: 0; }
+
+@media (max-width: 72rem) {
+  .beside { grid-template-columns: minmax(0, 1fr); }
+}

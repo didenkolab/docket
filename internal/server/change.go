@@ -12,6 +12,16 @@ import (
 
 type changeView struct {
 	Ref string
+	// Beside is a second proposal, shown next to the first.
+	//
+	// A choice between two plans was two tabs, and comparing two things in two
+	// tabs is comparing one thing twice. Named in
+	// docs/design/git-as-the-database.md.
+	Beside string
+	// Others are the branches that could be put beside this one.
+	Others []string
+	// Besides is the second proposal's rows, one per repository.
+	Besides []repoChange
 	// Repos is one section per repository the branch exists in. A workspace may
 	// hold the proposal in one repository and not the others, and saying which
 	// is part of the answer.
@@ -30,6 +40,9 @@ type repoChange struct {
 	Change planChange
 	// Trouble is why this repository could not be read.
 	Trouble string
+	// Ref is which proposal this row is about, so a page showing two can label
+	// them.
+	Ref string
 }
 
 // handlePlanChange says what a branch would do to the plan.
@@ -54,11 +67,31 @@ func (s *Server) handlePlanChange(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			continue
 		}
+		row.Ref = ref
 		view.Missing = false
 		view.Repos = append(view.Repos, row)
 	}
 
-	s.render(w, r, "change.html", c, "What "+ref+" would do", view)
+	// A second proposal, side by side. Refused unless it is a real ref, for the
+	// same reason as the first: a ref becomes an argument to a git command.
+	if beside := strings.TrimSpace(r.FormValue("with")); beside != "" && beside != ref {
+		if s.known(beside) {
+			view.Beside = beside
+			for _, v := range s.sp().Vaults() {
+				if row, ok := s.changeIn(r, v, beside); ok {
+					row.Ref = beside
+					view.Besides = append(view.Besides, row)
+				}
+			}
+		}
+	}
+	view.Others = s.otherBranches(ref, view.Beside)
+
+	title := "What " + ref + " would do"
+	if view.Beside != "" {
+		title = ref + " beside " + view.Beside
+	}
+	s.render(w, r, "change.html", c, title, view)
 }
 
 // changeIn compares one repository at a ref with where the ref parted company
@@ -111,4 +144,23 @@ func (s *Server) changeIn(r *http.Request, v *space.Vault, ref string) (repoChan
 	st := standingIn(r)
 	row.Change = comparePlans(visible(st, before), visible(st, after), was, now)
 	return row, true
+}
+
+// otherBranches is what else could be put beside this proposal.
+func (s *Server) otherBranches(ref, beside string) []string {
+	vaults := s.sp().Vaults()
+	if len(vaults) == 0 || vaults[0].Repo == nil {
+		return nil
+	}
+	branches, err := vaults[0].Repo.Branches()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, b := range branches {
+		if b.Name != ref && b.Name != beside {
+			out = append(out, b.Name)
+		}
+	}
+	return out
 }

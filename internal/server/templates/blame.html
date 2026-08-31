@@ -1,0 +1,43 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/task/{{$data.Key}}">{{$data.Key}}</a>
+  <span aria-hidden="true">/</span>
+  <span>who wrote it</span>
+</nav>
+
+<h1>{{$data.Title}}</h1>
+
+<p class="lede">
+  Every line of <code>{{$data.Path}}</code> and the commit it came from. A tracker keeps a
+  description as one value and overwrites it, so the sentence that changed the scope of a task
+  has no author — here it does, because the task is a file and git was going to know anyway.
+  <a href="/task/{{$data.Key}}/history">What changed, in order</a>.
+</p>
+
+{{with $data.People}}
+<p class="shares">
+  {{range .}}<span class="share"><strong>{{.Author}}</strong> {{.Lines}}</span>{{end}}
+</p>
+{{end}}
+
+<table class="blame">
+  <tbody>
+    {{range $data.Lines}}
+    <tr{{if .Front}} class="front"{{end}}>
+      <td class="who">
+        {{if not .Same}}
+        <span class="who-name">{{.Author}}</span>
+        <span class="who-when">{{.When}}</span>
+        <code class="who-commit" title="{{.Summary}}">{{.Short}}</code>
+        {{end}}
+      </td>
+      <td class="lineno">{{.Number}}</td>
+      <td class="code">{{.Text}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+
+{{template "foot" .}}
