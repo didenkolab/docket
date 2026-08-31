@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vadymdidenkolab/docket/internal/confluence"
 	"github.com/vadymdidenkolab/docket/internal/vault"
@@ -121,8 +122,25 @@ func fileSlug(title string) string {
 	if cleaned == "" {
 		return "untitled"
 	}
+	// A hundred and twenty bytes, cut at a character boundary.
+	//
+	// It was cut at the byte, which is the same thing in English and is not in
+	// anything else: a Cyrillic letter is two bytes, so the cut landed inside
+	// one and produced a name the file system refuses outright — "illegal byte
+	// sequence", on a real space whose pages are titled in Russian.
+	//
+	// Bytes rather than characters is the limit that matters, because that is
+	// what a file system counts, and 255 is the usual ceiling. A hundred and
+	// twenty leaves room for the folders a Confluence tree nests it in.
 	if len(cleaned) > 120 {
-		cleaned = strings.TrimSpace(cleaned[:120])
+		cut := 120
+		for cut > 0 && !utf8.RuneStart(cleaned[cut]) {
+			cut--
+		}
+		cleaned = strings.TrimSpace(cleaned[:cut])
+	}
+	if cleaned == "" {
+		return "untitled"
 	}
 	return cleaned
 }

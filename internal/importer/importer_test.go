@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vadymdidenkolab/docket/internal/check"
 	"github.com/vadymdidenkolab/docket/internal/snapshot"
@@ -609,5 +610,44 @@ func TestPlanKeepsANonLatinVocabularyAndItsLevels(t *testing.T) {
 	// And a priority in another script is no longer slugged away to nothing.
 	if got := maps.Priorities["Обычный"]; got == "" {
 		t.Error("a priority written in Cyrillic became the empty string")
+	}
+}
+
+// A page name is cut at a character, not at a byte.
+//
+// The limit was applied with a plain slice, which is the same thing in English
+// and is not in anything else: a Cyrillic letter is two bytes, so a long title
+// was cut inside one and the file system refused the name outright — "illegal
+// byte sequence", on a real Confluence space whose pages are titled in Russian.
+func TestAPageNameIsCutAtACharacter(t *testing.T) {
+	// One ASCII character first, so the hundred-and-twentieth byte lands inside
+	// a letter rather than between two. Without the offset every cut is on a
+	// boundary by luck and a byte-wise slice looks correct — which is how the
+	// first version of this test passed against the bug it was written for.
+	long := "x" + strings.Repeat("я", 200)
+	got := fileSlug(long)
+
+	if !utf8.ValidString(got) {
+		t.Errorf("the name is not valid UTF-8: %q", got)
+	}
+	if len(got) > 120 {
+		t.Errorf("the name is %d bytes, and a file system counts bytes", len(got))
+	}
+	if got == "" {
+		t.Error("the name is empty, so every long title would collide")
+	}
+
+	// The characters that a path cannot hold are replaced rather than dropped,
+	// and a title that is nothing but those still gets a name.
+	for _, c := range []struct{ what, title, want string }{
+		{"a slash would make a folder", "one/two", "one-two"},
+		{"a colon is refused by one file system or another", "a: b", "a - b"},
+		{"wikilink syntax cannot be linked to", "a [b] #c", "a (b) c"},
+		{"nothing usable at all", "###", "untitled"},
+		{"nothing at all", "   ", "untitled"},
+	} {
+		if got := fileSlug(c.title); got != c.want {
+			t.Errorf("%s: %q became %q, want %q", c.what, c.title, got, c.want)
+		}
 	}
 }

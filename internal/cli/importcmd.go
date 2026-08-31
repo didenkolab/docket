@@ -162,7 +162,8 @@ func runApply(args []string, stdout, stderr io.Writer) int {
 	dir := flags.String("snapshot", "", "the snapshot to read")
 	mapsDir := flags.String("maps", "", "where maps.yaml is (default: the snapshot)")
 	projectKey := flags.String("project", "", "which project in the snapshot to write")
-	spaces := flags.String("spaces", "", "comma-separated spaces to write as pages")
+	spaces := flags.String("spaces", "",
+		"comma-separated spaces to write as pages; every space in the snapshot by default")
 	vaultDir := flags.String("vault", "", "the vault to create")
 	author := flags.String("author", "", `who the import commit is by, as "Name <email>"`)
 
@@ -199,11 +200,22 @@ func runApply(args []string, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
+	// The snapshot knows which spaces it holds — it says so in its manifest —
+	// so the flag narrows rather than supplies. Requiring it was a second place
+	// to say a fact the snapshot already had, and the failure was silent: an
+	// import ran, reported "0 pages", and looked like it had worked.
+	wanted := splitList(*spaces)
+	if len(wanted) == 0 {
+		if m, err := snap.Manifest(); err == nil {
+			wanted = m.Spaces
+		}
+	}
+
 	log := func(format string, args ...any) { fmt.Fprintf(stdout, format+"\n", args...) }
 	report, err := importer.Apply(snap, loaded, importer.ApplyOptions{
 		Root:    *vaultDir,
 		Project: *projectKey,
-		Spaces:  splitList(*spaces),
+		Spaces:  wanted,
 		Now:     time.Now(),
 	}, log)
 	if err != nil {
