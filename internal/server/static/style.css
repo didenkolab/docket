@@ -1627,3 +1627,92 @@ details.callout[open] > summary.callout-title::before { content: "▾ "; }
   .board .column { max-width: none; margin-bottom: var(--s4); }
   .cards { overflow-y: visible; }
 }
+
+/* ---- an acceptance list ---- */
+
+/* A Markdown task list, which GFM renders as a disabled native checkbox inside
+ * an ordinary list item — so it arrived with two markers, a bullet and a
+ * checkbox, and the checkbox was the operating system's own grey square. It
+ * read as broken rather than as a list of criteria.
+ *
+ * The box is drawn here instead. It stays disabled: the record is the file, and
+ * a criterion is ticked by editing the task, not by clicking a page that would
+ * have to guess which line you meant. */
+.body li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.25rem;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.body input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  top: 0.15rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border: 1px solid var(--ink-faint);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+}
+
+.body input[type="checkbox"]:checked {
+  background: var(--done);
+  border-color: var(--done);
+}
+
+/* The tick, drawn rather than typed, so it sits where the box is whatever the
+ * type size does. */
+.body input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 0.28rem;
+  top: 0.12rem;
+  width: 0.22rem;
+  height: 0.45rem;
+  border: solid var(--on-accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* Done is done: a criterion that is met is not the thing to read. */
+.body li:has(> input[type="checkbox"]:checked) { color: var(--ink-soft); }
+
+/* ---- the task page's side column ---- */
+
+/* Decreasing weight down the column: the task's properties in a panel, the
+ * file's facts as quiet type, and the two things that change it folded away. */
+.side-file { margin-top: var(--s4); font-size: 0.85rem; color: var(--ink-soft); }
+.side-file .properties { margin: 0 0 var(--s2); }
+.side-file .properties dt { color: var(--ink-faint); }
+.side-file code { word-break: break-all; }
+.side-file p { margin: var(--s2) 0 0; }
+
+.side-do { margin-top: var(--s4); border-top: 1px solid var(--rule); padding-top: var(--s3); }
+.side-do > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 550;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.side-do > summary::-webkit-details-marker { display: none; }
+.side-do > summary::before { content: "＋ "; color: var(--ink-faint); }
+.side-do[open] > summary::before { content: "－ "; }
+.side-do > summary:hover { color: var(--ink); }
+.side-do form { margin-top: var(--s3); }
+
+.danger-zone > summary { color: var(--warn); }
+.danger-zone > summary:hover { color: var(--warn); }
+
+/* Places to go, beside the one thing to press. */
+.statusbar-links { display: flex; gap: var(--s3); margin-left: auto; font-size: 0.875rem; }
+.statusbar-links a { color: var(--ink-soft); text-decoration: none; }
+.statusbar-links a:hover { color: var(--accent); text-decoration: underline; }
+
+@media (max-width: 46rem) {
+  .statusbar-links { margin-left: 0; width: 100%; }
+}

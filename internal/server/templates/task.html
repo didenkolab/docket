@@ -22,12 +22,17 @@
     {{end}}
   </select>
   <button type="submit">Move</button>
-  <a class="button-link" href="/task/{{$t.Key}}/edit">Edit</a>
-  <a class="button-link" href="/new?parent={{$t.Key}}">Add child</a>
-  <a class="button-link" href="/task/{{$t.Key}}/history">History</a>
   {{if lt (len $data.Reachable) (len .Config.Statuses)}}
   <span class="footnote inline">The workflow limits where this can go.</span>
   {{end}}
+  {{/* Places to go, not things to do: the same weight as four buttons made the
+       row read as four decisions of equal size, when only one of them changes
+       anything. */}}
+  <span class="statusbar-links">
+    <a href="/task/{{$t.Key}}/edit">Edit</a>
+    <a href="/new?parent={{$t.Key}}">Add child</a>
+    <a href="/task/{{$t.Key}}/history">History</a>
+  </span>
 </form>
 {{else}}
 <p class="statusbar">
@@ -135,6 +140,11 @@
 
   <aside class="issue-side">
 
+    {{/* One panel of properties, then everything else in decreasing weight:
+         what the task is, then what the file is, then the two things that
+         change it. Attaching and deleting had the same weight as the task's own
+         properties, which made the column a pile of boxes rather than an
+         order. */}}
     <section class="panel">
       <h2>Details</h2>
       <dl class="properties">
@@ -145,9 +155,10 @@
         {{if $t.Parent}}<dt>Parent</dt><dd><a href="/task/{{$t.Parent}}">{{$t.Parent}}</a></dd>{{end}}
         <dt>Labels</dt>
         <dd>{{if $t.Labels}}{{range $t.Labels}}<a class="label" href="/search?label={{.}}">{{.}}</a>{{end}}{{else}}<span class="empty">None</span>{{end}}</dd>
-
+        {{if $t.Tags}}
         <dt>Tags</dt>
-        <dd>{{if $t.Tags}}{{range $t.Tags}}<a class="tag" href="/search?tag={{.}}">#{{.}}</a>{{end}}{{else}}<span class="empty">None</span>{{end}}</dd>
+        <dd>{{range $t.Tags}}<a class="tag" href="/search?tag={{.}}">#{{.}}</a>{{end}}</dd>
+        {{end}}
         {{if $t.Aliases}}
         <dt>Also known as</dt>
         <dd>{{range $t.Aliases}}<span class="label">{{.}}</span>{{end}}</dd>
@@ -155,44 +166,52 @@
       </dl>
     </section>
 
+    {{/* The file this page is. Quiet, because it is true rather than
+         interesting — until the moment a write is refused, and then it is the
+         only thing that matters. */}}
+    <section class="side-file">
+      <dl class="properties">
+        <dt>Created</dt><dd>{{$t.Created}}</dd>
+        <dt>Updated</dt><dd>{{$t.Updated}}</dd>
+        <dt>File</dt><dd><code>{{$data.Path}}</code></dd>
+      </dl>
+      <p>
+        <a href="/task/{{$t.Key}}/history">Every change to this task</a> ·
+        <span class="fingerprint" title="the bytes this page was rendered from">{{$data.Version}}</span>
+      </p>
+      <p class="footnote inline">
+        Every change here is written to that file and committed. If it changes underneath you —
+        in Obsidian, or by an agent — the write is refused rather than applied on top of what
+        you never saw.
+      </p>
+    </section>
+
     {{if $may}}
-    <section class="panel">
-      <h2>Attach a file</h2>
+    {{/* Folded, because attaching a file is rare and a file input is large. */}}
+    <details class="side-do">
+      <summary>Attach a file</summary>
       <form method="post" action="/task/{{$t.Key}}/attach" enctype="multipart/form-data"
             class="attach">
-  {{template "csrf" $}}
-        <input type="file" name="file" required aria-label="File to attach">
-        <button type="submit">Attach</button>
-      </form>
-      <p class="footnote">Saved into <code>attachments/</code> and committed with the line that
-      points at it. Images embed; anything else becomes a link.</p>
-    </section>
-    {{end}}
-    <p class="stamps">
-      Created {{$t.Created}}<br>
-      Updated {{$t.Updated}}<br>
-      <a href="/task/{{$t.Key}}/history">Every change to this task</a>
-    </p>
-
-    <p class="stamps">
-      <code>{{$data.Path}}</code>
-      <span class="fingerprint" title="the bytes this page was rendered from">{{$data.Version}}</span>
-    </p>
-
-    <p class="footnote">
-      Every change here is written to that file and committed. If it changes underneath you —
-      in Obsidian, or by an agent — the write is refused rather than applied on top of what you
-      never saw.
-    </p>
-
-    {{if $may}}
-    <form class="danger" method="post" action="/task/{{$t.Key}}/delete"
-          onsubmit="return confirm('Delete {{$t.Key}}? Git keeps it; the vault will not have it.')">
       {{template "csrf" $}}
-      <button type="submit" class="destructive">Delete this task</button>
-      <span class="footnote inline">Git keeps every version, so this removes the file and not
-      the record. A task with children is refused.</span>
-    </form>
+        <input type="file" name="file" required aria-label="File to attach">
+        <button type="submit" class="quiet">Attach</button>
+      </form>
+      <p class="footnote inline">Saved into <code>attachments/</code> and committed with the line
+      that points at it. Images embed; anything else becomes a link.</p>
+    </details>
+
+    {{/* Last, and folded: a destructive action should take a decision to reach,
+         not sit where a mis-aimed click lands. */}}
+    <details class="side-do danger-zone">
+      <summary>Delete this task</summary>
+      <p class="footnote inline">Git keeps every version, so this removes the file and not the
+      record. A task with children is refused.</p>
+      <form method="post" action="/task/{{$t.Key}}/delete"
+            onsubmit="return confirm('Delete {{$t.Key}}? Git keeps it; the vault will not have it.')">
+        {{template "csrf" $}}
+        <button type="submit" class="danger">Delete {{$t.Key}}</button>
+      </form>
+    </details>
     {{end}}
   </aside>
 </div>
