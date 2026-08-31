@@ -330,6 +330,7 @@ func (s *Server) watchRemote(every time.Duration) {
 	if every <= 0 {
 		return
 	}
+	every = watchEvery(every)
 	look := func() {
 		for _, v := range s.sp().Vaults() {
 			if v.Repo == nil || !v.Repo.HasRemote() {
@@ -355,6 +356,26 @@ func (s *Server) watchRemote(every time.Duration) {
 			look()
 		}
 	}()
+}
+
+// watchEvery is how often to look, never faster than makes sense.
+//
+// The watcher was given the same interval as the access re-check, which a test
+// sets to a nanosecond so a revoked token is noticed immediately. That is the
+// right value for asking a host about a person and a ruinous one here: every
+// tick runs `git fetch` over every vault, so the suite spawned git as fast as
+// the scheduler allowed. It finished on this laptop and hung a release build
+// for twenty minutes on two cores.
+//
+// A remote that moved a second ago and one that moved half a minute ago are the
+// same news to somebody reading a board. There is nothing to gain by asking
+// more often, and a process to spawn every time.
+func watchEvery(asked time.Duration) time.Duration {
+	const floor = 30 * time.Second
+	if asked < floor {
+		return floor
+	}
+	return asked
 }
 
 // handleTake brings in what the remote has.

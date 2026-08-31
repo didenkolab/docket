@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A vault with no remote commits every change and publishes none of them, and
@@ -106,6 +107,36 @@ func TestTheTaskPageRendersToTheEnd(t *testing.T) {
 	} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page has no %s — it ends before that", want)
+		}
+	}
+}
+
+// The remote watcher is never asked to run faster than it should.
+//
+// It was given the same interval as the access re-check, which a test sets to a
+// nanosecond so a revoked token is noticed at once. That is right for asking a
+// host about a person and ruinous here: every tick runs `git fetch` over every
+// vault, so the suite spawned git as fast as the scheduler allowed. It passed on
+// a laptop and hung a release build for twenty minutes.
+//
+// The first version of this test slept and measured, and passed with the floor
+// removed — a tight loop of subprocesses does not slow the goroutine watching
+// for it. So it tests the decision instead of the symptom, which is the only
+// part that was ever wrong.
+func TestTheRemoteIsNotWatchedFasterThanItMoves(t *testing.T) {
+	for _, c := range []struct {
+		what  string
+		asked time.Duration
+		want  time.Duration
+	}{
+		{"the nanosecond a test uses for access", time.Nanosecond, 30 * time.Second},
+		{"a second", time.Second, 30 * time.Second},
+		{"exactly the floor", 30 * time.Second, 30 * time.Second},
+		{"the five minutes a server defaults to", 5 * time.Minute, 5 * time.Minute},
+		{"an hour, because somebody asked for an hour", time.Hour, time.Hour},
+	} {
+		if got := watchEvery(c.asked); got != c.want {
+			t.Errorf("%s: asked %v, watches every %v, want %v", c.what, c.asked, got, c.want)
 		}
 	}
 }
