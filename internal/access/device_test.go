@@ -106,8 +106,24 @@ func TestGitLabIssuesAndRedeemsACode(t *testing.T) {
 	if device.UserCode != "ABCD-EFGH" {
 		t.Errorf("user code = %q", device.UserCode)
 	}
-	if got := e.forms["/oauth/authorize_device"].Get("scope"); got != "read_api" {
-		t.Errorf("scope = %q, want the narrow one GitLab actually needs", got)
+	// Reading the API answers who somebody is; writing the repository is what
+	// lets the board push what it commits. Still narrower than GitHub's `repo`:
+	// no issues, no members, no settings, no CI.
+	if got := e.forms["/oauth/authorize_device"].Get("scope"); got != host.DeviceScope() {
+		t.Errorf("scope = %q, want %q", got, host.DeviceScope())
+	}
+	for _, want := range []string{"read_api", "write_repository"} {
+		if !strings.Contains(host.DeviceScope(), want) {
+			t.Errorf("the scope does not ask for %s, so the board could not %s", want,
+				map[string]string{"read_api": "say who you are", "write_repository": "push"}[want])
+		}
+	}
+	// And not GitLab's widest. Checked as a whole word: "read_api" contains
+	// "api", which is how the first version of this check failed.
+	for _, granted := range strings.Fields(host.DeviceScope()) {
+		if granted == "api" {
+			t.Error("the scope is GitLab's widest, which is more than this needs")
+		}
 	}
 
 	token, err := host.PollDevice(context.Background(), "gitlab-client", device.DeviceCode)
