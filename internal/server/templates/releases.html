@@ -1,0 +1,57 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Releases</h1>
+
+{{if $data.None}}
+<p class="empty">
+  No tags in this repository yet. A release is a git tag — <code>git tag -a v1.0.0</code> — and
+  what went into it is the work whose files changed since the tag before it. Nothing to
+  configure and nothing to keep in step: the tag is the release.
+</p>
+{{else}}
+
+{{range $data.Repos}}
+{{if $.Data.Repos}}{{if gt (len $.Data.Repos) 1}}<h2 class="repo">{{.Project}}</h2>{{end}}{{end}}
+
+{{range .Releases}}
+<section class="release">
+  <header>
+    <h2>{{.Name}}</h2>
+    <time>{{.When}}</time>
+    <code class="hash">{{.Short}}</code>
+    {{if .Since}}<span class="since">since {{.Since}}</span>{{end}}
+  </header>
+
+  {{if .Annotation}}<p class="annotation">{{.Annotation}}</p>{{end}}
+
+  <ul class="shipped">
+    {{range .Tasks}}
+    <li>
+      <a class="hit-link" href="/task/{{.Key}}">
+        <span class="key">{{.Key}}</span>
+        <span class="hit-title">{{.Title}}</span>
+      </a>
+      <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+      {{if .Added}}<span class="new">new</span>{{end}}
+    </li>
+    {{else}}
+    <li class="empty">No task changed in this release.</li>
+    {{end}}
+  </ul>
+
+  {{if .Other}}
+  <p class="footnote">And {{.Other}} other file(s) — pages, boards, configuration.</p>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+
+<p class="footnote">
+  Read from the repository's tags each time this page is opened, so it cannot be out of date.
+  There is no release object to maintain and no <code>fixVersion</code> to set: what went into a
+  release is the work whose files changed between two tags, which is a question git answers.
+</p>
+{{end}}
+
+{{template "foot" .}}

@@ -2,6 +2,8 @@ package gitvcs
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -157,3 +159,128 @@ func (r *Repo) Blob(hash, path string) ([]byte, error) {
 	}
 	return []byte(out), nil
 }
+
+/* ---------- releases ---------- */
+
+// Release is a tag: a name, when it was made, and what it points at.
+//
+// A release is not a thing to model — it is a thing git already has. Jira keeps
+// a version object with a name, dates and a released flag, and a `fixVersion`
+// on every issue pointing at it, and then generates release notes by asking
+// which issues carry that value. All of that is a second record of what a tag
+// already says.
+//
+// Here the tag is the release. It exists or it does not; its date is its date;
+// and what shipped in it is `git log v1.1.0..v1.2.0`, which is a question git
+// answers without anybody maintaining an answer.
+type Release struct {
+	Name string
+	When time.Time
+	// Annotation is the tag message, when the tag has one. A lightweight tag
+	// has none, and that is fine — it is still a release.
+	Annotation string
+	Hash       string
+	// depth is how much history the tagged commit contains, used only to break
+	// a tie between two commits made in the same second. A release that
+	// contains another is later than it, whatever the clock says.
+	depth int
+}
+
+// Releases are the repository's tags, newest first.
+//
+// Ordered and dated by the commit each tag points at, not by when somebody
+// typed the tag command. Tagging is often retroactive — three releases labelled
+// in one afternoon are three releases whose tag dates are minutes apart and
+// whose order is meaningless. The commit is when the work existed, and that is
+// what a release is.
+//
+// Not by name either: a version number sorts wrongly as a string, and every
+// scheme for sorting one properly is a scheme somebody's version numbers break.
+func (r *Repo) Releases() ([]Release, error) {
+	// One field per line rather than a separator: for-each-ref has its own
+	// format language and does not expand the %x1f that git log does, so a
+	// separator asked for that way arrives as the literal text. None of these
+	// four fields can contain a newline — a tag subject is its first line — so
+	// lines are unambiguous.
+	// Five fields, one per line. `*committerdate` dereferences an annotated tag
+	// to the commit it points at and is empty for a lightweight one, which has
+	// no tag object and whose `committerdate` is already the commit's.
+	const fields = 5
+	out, err := r.output("for-each-ref",
+		"--format=%(refname:short)%0a%(*committerdate:iso-strict)%0a"+
+			"%(committerdate:iso-strict)%0a%(objectname)%0a%(contents:subject)",
+		"refs/tags")
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	var releases []Release
+	for i := 0; i+fields <= len(lines); i += fields {
+		if lines[i] == "" {
+			continue
+		}
+		stamp := lines[i+1]
+		if stamp == "" {
+			stamp = lines[i+2]
+		}
+		when, _ := time.Parse(time.RFC3339, stamp)
+		releases = append(releases, Release{
+			Name: lines[i], When: when, Hash: lines[i+3], Annotation: lines[i+4],
+			depth: r.depthOf(lines[i]),
+		})
+	}
+
+	sort.SliceStable(releases, func(a, b int) bool {
+		if !releases[a].When.Equal(releases[b].When) {
+			return releases[a].When.After(releases[b].When)
+		}
+		// Two commits in the same second. The one containing more history is
+		// the later one, which is what a chain of releases always is.
+		return releases[a].depth > releases[b].depth
+	})
+	return releases, nil
+}
+
+// depthOf is how many commits a ref contains. Zero when git cannot say, which
+// leaves the order to the dates.
+func (r *Repo) depthOf(ref string) int {
+	out, err := r.output("rev-list", "--count", ref)
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// Shipped is every file that changed between two points, which for two tags is
+// what went into a release.
+//
+// An empty `from` means everything up to `to` — the first release, which
+// contains the whole history before it.
+func (r *Repo) Shipped(from, to string) ([]string, error) {
+	span := to
+	if from != "" {
+		span = from + ".." + to
+	}
+	out, err := r.output("-c", "core.quotePath=false",
+		"diff", "--name-only", "--diff-filter=ACMR", span)
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line != "" {
+			paths = append(paths, line)
+		}
+	}
+	return paths, nil
+}
+
+// At is a file's content at a point in history — a tag, a branch, a commit.
+// Empty with no error means the file was not there.
+func (r *Repo) At(ref, path string) ([]byte, error) { return r.Blob(ref, path) }

@@ -268,6 +268,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /new", s.handleNewForm)
 	mux.HandleFunc("POST /new", s.handleNew)
 	mux.HandleFunc("GET /pages", s.handlePages)
+	mux.HandleFunc("GET /releases", s.handleReleases)
 	mux.HandleFunc("GET /pages/new", s.handlePageNewForm)
 	mux.HandleFunc("POST /pages/save", s.handlePageSave)
 	mux.HandleFunc("POST /preview", s.handlePreview)

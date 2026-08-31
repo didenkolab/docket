@@ -719,6 +719,31 @@ table.settings .count { color: var(--ink-faint); font-variant-numeric: tabular-n
 .opening h1 { margin-bottom: var(--s2); }
 .opening p { margin: 0 0 var(--s2); color: var(--ink-soft); }
 
+/* ---- releases ---- */
+
+.release { margin: 0 0 var(--s6); max-width: 60rem; }
+.release header { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding-bottom: var(--s2); }
+.release h2 { margin: 0; font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; text-transform: none; color: var(--ink); }
+.release time { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.release .hash, .release .since { color: var(--ink-faint); font-size: 0.78rem; }
+.release .annotation { margin: var(--s2) 0 0; color: var(--ink-soft); }
+
+.shipped { list-style: none; margin: var(--s3) 0 0; padding: 0; }
+.shipped li { display: flex; align-items: baseline; gap: var(--s2); padding: var(--s1) 0; flex-wrap: wrap; }
+
+.new {
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--done);
+  background: color-mix(in srgb, var(--done) 12%, transparent);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+h2.repo { margin-top: var(--s6); }
+
 /* ---- linked work ---- */
 
 .relations { list-style: none; margin: 0; padding: 0; }

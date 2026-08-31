@@ -137,6 +137,24 @@ reads. The exception is the one that changes what you pick up next — a task wa
 unfinished work is marked **blocked** on the board, and blocked by something already done is not
 blocked.
 
+### A release is a tag
+
+There is no version object, no `fixVersion` to set and no release notes to generate. A release
+is a git tag, and what went into it is the work whose files changed since the tag before it:
+
+```bash
+git tag -a v1.2.0 -m "What this release is"
+```
+
+The **Releases** page reads that out of the repository every time it is opened, so it cannot be
+out of date. Jira keeps a version object, a field on every issue pointing at it, and a generator
+that turns the two into notes — three records of one fact, kept in step by hand. Here there is
+one, and git maintains it.
+
+Ordered by the commit each tag points at rather than by when somebody typed the tag command,
+because tagging is often retroactive and three releases labelled in one afternoon have tag
+dates minutes apart.
+
 ### What happened to this task
 
 Every change is a commit, so the history of a task is the history of its file — and the
