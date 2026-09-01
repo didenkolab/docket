@@ -77,8 +77,15 @@ func TestInstallingAnAppAddsItsVocabularyAndFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(changed) != 4 {
-		t.Errorf("changed %v", changed)
+	// Its three files, docket.yaml, and the generated boards — which name the
+	// vault's types and have just gone stale.
+	for _, want := range []string{
+		"templates/test.md", "boards/cover.base", "docs/testing.md",
+		"docket.yaml", "boards/board.base",
+	} {
+		if !contains(changed, want) {
+			t.Errorf("%s is not among what changed: %v", want, changed)
+		}
 	}
 
 	after, err := project.Load(root)
@@ -206,6 +213,15 @@ func reasons(conflicts []Conflict) []string {
 		out = append(out, c.Error())
 	}
 	return out
+}
+
+func contains(values []string, want string) bool {
+	for _, got := range values {
+		if got == want {
+			return true
+		}
+	}
+	return false
 }
 
 func hasType(c *project.Config, name string) bool {

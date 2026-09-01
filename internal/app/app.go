@@ -25,10 +25,12 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/vadymdidenkolab/docket/internal/vault"
 	"gopkg.in/yaml.v3"
 )
 
@@ -138,16 +140,31 @@ func Read(dir, source string) (*Pack, error) {
 
 // Fetch reads a pack from a path or clones it from a git remote.
 //
+// A `#folder` on the end names a pack inside the repository, because a library
+// of them is one repository: six apps in six repositories is six things to
+// clone, six histories to follow and six places for the same fix.
+//
 // The caller removes the returned directory when it is done with it; for a
 // local path it is the path itself and removing it would be removing somebody's
 // work, so the cleanup is returned rather than assumed.
 func Fetch(source string) (*Pack, func(), error) {
 	nothing := func() {}
 
-	if info, err := os.Stat(source); err == nil && info.IsDir() {
-		pack, err := Read(source, source)
+	remote, inside := source, ""
+	if at := strings.LastIndex(source, "#"); at >= 0 {
+		remote, inside = source[:at], strings.Trim(source[at+1:], "/")
+		if strings.HasPrefix(filepath.ToSlash(filepath.Clean(inside)), "../") ||
+			filepath.IsAbs(inside) {
+			return nil, nothing, fmt.Errorf("%q leads outside the repository", inside)
+		}
+	}
+
+	if info, err := os.Stat(remote); err == nil && info.IsDir() {
+		at := filepath.Join(remote, filepath.FromSlash(inside))
+		pack, err := Read(at, source)
 		return pack, nothing, err
 	}
+	source = remote
 
 	staging, err := os.MkdirTemp("", "docket-app-")
 	if err != nil {
@@ -167,7 +184,7 @@ func Fetch(source string) (*Pack, func(), error) {
 			source, strings.TrimSpace(string(out)))
 	}
 
-	pack, err := Read(at, source)
+	pack, err := Read(filepath.Join(at, filepath.FromSlash(inside)), source)
 	if err != nil {
 		cleanup()
 		return nil, nothing, err
@@ -301,6 +318,23 @@ func Install(root string, c *project.Config, p *Pack) ([]string, error) {
 	}
 	if wrote {
 		changed = append(changed, project.FileName)
+	}
+
+	// The generated boards name the vault's types, so a pack that brought a
+	// type has just made them stale — and `docket check` would say so on the
+	// next run. Regenerating is deterministic and only touches the files that
+	// say they are generated, so it belongs here rather than in a note telling
+	// somebody to go and do it.
+	if wrote {
+		boards, err := vault.WriteBoards(root, c)
+		if err != nil {
+			return changed, err
+		}
+		for _, board := range boards {
+			if !slices.Contains(changed, board) {
+				changed = append(changed, board)
+			}
+		}
 	}
 	sort.Strings(changed)
 	return changed, nil

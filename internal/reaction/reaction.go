@@ -172,42 +172,57 @@ func run(ctx context.Context, root string, d Declared, e Event) Result {
 		result.Err = err
 		return result
 	}
-
-	program := filepath.Join(root, filepath.FromSlash(d.Run))
-	info, err := os.Stat(program)
-	if err != nil {
-		result.Err = fmt.Errorf("%s: %w", d.Run, err)
-		return result
-	}
-	if info.IsDir() || info.Mode()&0o111 == 0 {
-		result.Err = fmt.Errorf("%s is not an executable file — chmod +x it", d.Run)
-		return result
-	}
-
-	body, err := json.Marshal(e)
-	if err != nil {
-		result.Err = err
-		return result
-	}
-
-	ctx, stop := context.WithTimeout(ctx, Timeout)
-	defer stop()
-
-	// No shell, and one argument: the program itself. Everything about the
-	// event arrives on stdin as JSON, so nothing a person typed into a title
-	// can become part of a command line.
-	cmd := exec.CommandContext(ctx, program)
-	cmd.Dir = root
-	cmd.Stdin = bytes.NewReader(body)
-	cmd.Env = append(os.Environ(), "DOCKET_ROOT="+root, "DOCKET_EVENT="+e.Event)
-
-	var said bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &said, &said
-	err = cmd.Run()
-
-	result.Output = strings.TrimSpace(said.String())
+	said, err := Output(ctx, root, d.Run, e, Timeout)
+	result.Output = said
 	if err != nil {
 		result.Err = fmt.Errorf("%s: %w", d.Called(), err)
 	}
 	return result
+}
+
+// Output runs a program in the repository and returns what it printed.
+//
+// The one place a vault's own program is executed, so the rules live here and
+// nothing else has to remember them: a path inside the repository, an
+// executable file, no shell, and everything the program is told arrives on
+// stdin as JSON. A page that renders a program's output and a reaction that
+// writes a file are the same act with different consequences, and they must not
+// be able to disagree about what is safe.
+func Output(ctx context.Context, root, run string, told any, limit time.Duration) (string, error) {
+	if err := (Declared{On: OnMoved, Run: run}).Validate(); err != nil {
+		return "", err
+	}
+
+	program := filepath.Join(root, filepath.FromSlash(run))
+	info, err := os.Stat(program)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", run, err)
+	}
+	if info.IsDir() || info.Mode()&0o111 == 0 {
+		return "", fmt.Errorf("%s is not an executable file — chmod +x it", run)
+	}
+
+	body, err := json.Marshal(told)
+	if err != nil {
+		return "", err
+	}
+
+	ctx, stop := context.WithTimeout(ctx, limit)
+	defer stop()
+
+	// No shell, and one argument: the program itself. Everything it is told
+	// arrives on stdin as JSON, so nothing a person typed into a title can
+	// become part of a command line.
+	cmd := exec.CommandContext(ctx, program)
+	cmd.Dir = root
+	cmd.Stdin = bytes.NewReader(body)
+	cmd.Env = append(os.Environ(), "DOCKET_ROOT="+root)
+	if e, ok := told.(Event); ok {
+		cmd.Env = append(cmd.Env, "DOCKET_EVENT="+e.Event)
+	}
+
+	var said bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &said, &said
+	err = cmd.Run()
+	return strings.TrimSpace(said.String()), err
 }
