@@ -168,9 +168,17 @@
                    placeholder="nobody" aria-label="Assignee">
             <button type="submit" class="quiet">Set</button>
           </form>
+          {{if and $data.Me (ne $data.Me $t.Assignee)}}
+          <form class="inline-set" method="post" action="/task/{{$t.Key}}/assignee">
+            {{template "csrf" $}}
+            <input type="hidden" name="version" value="{{$data.Version}}">
+            <input type="hidden" name="me" value="1">
+            <button type="submit" class="quiet">Take it</button>
+          </form>
+          {{end}}
           {{if $data.People}}
           <datalist id="handles">
-            {{range $data.People}}<option value="{{.}}">{{end}}
+            {{range $data.People}}<option value="{{.Handle}}"{{if ne .Called .Handle}} label="{{.Called}}"{{end}}>{{end}}
           </datalist>
           {{end}}
           {{else}}

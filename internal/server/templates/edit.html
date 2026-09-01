@@ -53,7 +53,7 @@
              list="handles" autocomplete="off">
       {{if $data.People}}
       <datalist id="handles">
-        {{range $data.People}}<option value="{{.}}">{{end}}
+        {{range $data.People}}<option value="{{.Handle}}"{{if ne .Called .Handle}} label="{{.Called}}"{{end}}>{{end}}
       </datalist>
       <p class="footnote inline">Whoever is already at work here, busiest first — or type
       somebody new. Empty unassigns.</p>

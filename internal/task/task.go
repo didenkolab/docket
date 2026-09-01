@@ -38,7 +38,6 @@ type Task struct {
 	Status         string   `yaml:"status"`
 	StatusCategory string   `yaml:"status_category"`
 	Priority       string   `yaml:"priority"`
-	Assignee       string   `yaml:"assignee"`
 	Created        string   `yaml:"created"`
 	Updated        string   `yaml:"updated"`
 	Aliases        []string `yaml:"aliases"`
@@ -60,6 +59,16 @@ type Task struct {
 	Parent string   `yaml:"-"`
 	Labels []string `yaml:"-"`
 
+	// Assignee is who the work is on, by handle — the note a person's page is
+	// called.
+	//
+	// A link for the same reason a label is one: "what is Marina on" is a
+	// question asked standing at the person, and a link is what Obsidian
+	// answers it with — a backlinks pane and an edge in the graph. Written as
+	// `assignee: "[[marina]]"`; a vault that has always written a bare handle
+	// still reads, because a bare string reads as itself.
+	Assignee string `yaml:"-"`
+
 	// Sprint is the sprint page this task is in, by note name, or empty.
 	//
 	// A link, not a field, and for the opposite reason to Estimate: standing at
@@ -73,9 +82,10 @@ type Task struct {
 	// and belongs in prose.
 	Sprint string `yaml:"-"`
 
-	rawParent string
-	rawLabels []string
-	rawSprint string
+	rawParent   string
+	rawLabels   []string
+	rawSprint   string
+	rawAssignee string
 	// Order is where the task sits among the others in its column, when
 	// somebody has said. Absent — the usual case — the task sorts after every
 	// task that has one. See SetOrder.
@@ -132,15 +142,18 @@ func Parse(data []byte) (*Task, error) {
 // written.
 func (t *Task) resolve() {
 	var raw struct {
-		Parent string   `yaml:"parent"`
-		Labels []string `yaml:"labels"`
-		Sprint string   `yaml:"sprint"`
+		Parent   string   `yaml:"parent"`
+		Labels   []string `yaml:"labels"`
+		Sprint   string   `yaml:"sprint"`
+		Assignee string   `yaml:"assignee"`
 	}
 	_ = t.front.Decode(&raw)
 
 	t.rawParent, t.rawLabels, t.rawSprint = raw.Parent, raw.Labels, raw.Sprint
+	t.rawAssignee = raw.Assignee
 	t.Parent = KeyOf(NoteOf(raw.Parent))
 	t.Sprint = labelName(raw.Sprint)
+	t.Assignee = personName(raw.Assignee)
 	t.Labels = t.Labels[:0]
 	for _, l := range raw.Labels {
 		if name := labelName(l); name != "" {
@@ -165,6 +178,10 @@ func labelName(value string) string {
 func (t *Task) RawParent() string   { return t.rawParent }
 func (t *Task) RawLabels() []string { return t.rawLabels }
 func (t *Task) RawSprint() string   { return t.rawSprint }
+
+// RawAssignee is the assignee exactly as the file has it, so `docket check` can
+// say which vaults still write a bare handle rather than a link.
+func (t *Task) RawAssignee() string { return t.rawAssignee }
 
 // split separates the frontmatter block from the body.
 func split(data []byte) (front []byte, body string, err error) {

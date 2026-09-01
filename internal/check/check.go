@@ -37,6 +37,7 @@ const (
 	RuleSprints     = 13 // a sprint is a page, said as a link, and owns its days
 	RuleDocuments   = 14 // a document says what kind it is, and a decision has its shape
 	RuleFields      = 15 // a value means what the vault said the field would hold
+	RulePeople      = 16 // an assignee is somebody the vault has a page for
 )
 
 // Finding is one problem, located.
@@ -204,6 +205,11 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 	// state a new project starts in.
 	if pages, err := vault.Pages(root); err == nil {
 		findings = append(findings, checkDocuments(pages)...)
+	}
+	// A vault that keeps no people is not in breach: a bare handle reads
+	// perfectly well as a name. The rule starts asking once there are pages.
+	if people, err := vault.People(root); err == nil {
+		findings = append(findings, checkPeople(entries, people)...)
 	}
 
 	sort.Slice(findings, func(i, j int) bool {

@@ -315,3 +315,36 @@ func TagTree(tag string) []string {
 	}
 	return out
 }
+
+// SetAssignee puts the work on somebody, by handle — `marina`, which is what
+// their page is called.
+//
+// An empty handle takes it off everybody, which is a real state and the one a
+// backlog is full of. `assignee:` with no value is how Obsidian writes an empty
+// text property, so it is left as that rather than removed: a board reads it as
+// nobody either way, and removing the property would make the file differ from
+// every other one for no gain.
+func (t *Task) SetAssignee(handle string) {
+	if handle = strings.TrimSpace(handle); handle == "" {
+		t.Set("assignee", "")
+		t.Assignee, t.rawAssignee = "", ""
+		return
+	}
+	link := Link(handle)
+	t.setNode("assignee", quoted(link))
+	t.Assignee, t.rawAssignee = personName(handle), link
+}
+
+// PeopleFolder is where a person's page lives. Named here because a handle is
+// read here: it is the one folder that may appear in front of one.
+const PeopleFolder = "people/"
+
+// personName is the handle a value points at.
+//
+// Not labelName: a handle may have a slash in it. `agent/claude` is one name,
+// and stripping everything before the last slash — which is right for a label
+// filed under docs/labels/ — turned every agent in the vault into "claude".
+// Only the people folder comes off, and only from the front.
+func personName(value string) string {
+	return strings.TrimPrefix(strings.TrimSpace(NoteOf(value)), PeopleFolder)
+}

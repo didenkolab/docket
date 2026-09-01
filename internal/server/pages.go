@@ -674,7 +674,8 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	view.Fields = shownFields(c, t)
-	view.People = s.handlesIn(r)
+	view.People = s.candidates(r)
+	view.Me = s.meAs(r)
 	s.render(w, r, "task.html", c, t.Key+" "+t.Title, view)
 }
 
@@ -716,14 +717,21 @@ type taskView struct {
 	// Rollup is what its children add up to, for a container. When it is set it
 	// is the answer, because a container has no estimate of its own.
 	Rollup string
-	// People are the handles already at work here, offered beside the assignee.
+	// People is everybody the work can be given to: whoever already carries
+	// some, whoever the vault has written a page for, and whoever the host says
+	// has access to the repository. The last is the one that matters for
+	// somebody new — rights on the repository are how a person becomes
+	// somebody work can be put on, before they have touched a task.
 	//
 	// This was referenced by the template before it existed on this view, and a
 	// missing field stops template execution where it stands — so the page was
 	// rendered as far as the properties panel and simply ended. Everything
 	// below it, the comments, the history and the delete button, was gone, and
 	// nothing said so.
-	People []string
+	People []candidate
+	// Me is the handle of whoever is reading, when the host knows them, so the
+	// work can be taken in one click.
+	Me string
 	// Fields are the vault's own properties for this type of task, with what
 	// this one holds. Shown in the order declared, and shown even when empty:
 	// a field a type has and this task does not is a fact, and hiding it is how
@@ -1334,6 +1342,11 @@ func plain(fragment string) string { return marks.Replace(fragment) }
 func (s *Server) handleAssign(w http.ResponseWriter, r *http.Request) {
 	key := keyOf(r)
 	who := strings.TrimSpace(r.FormValue("assignee"))
+	// "Take it" is the same write with the handle filled in from the session,
+	// rather than a second endpoint that could disagree with this one.
+	if r.FormValue("me") == "1" {
+		who = s.meAs(r)
+	}
 
 	author := s.authorFor(r)
 	err := s.editTask(r, key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
@@ -1341,15 +1354,41 @@ func (s *Server) handleAssign(w http.ResponseWriter, r *http.Request) {
 			return "", nil, nil
 		}
 		was := t.Assignee
-		t.Set("assignee", who)
+
+		// Somebody the host vouches for and the vault has never written down
+		// gets a page, in this commit. The alternative is a link to a note that
+		// does not exist — a ghost in the graph, and a backlinks pane with
+		// nowhere to show the work.
+		var also []string
+		if who != "" {
+			if member, ok := memberNamed(s.membersFor(r), who); ok {
+				written, err := s.writePersonPage(who, member, s.hostKeyFor(r, who))
+				if err != nil {
+					return "", nil, err
+				}
+				if written != "" {
+					also = append(also, written)
+				}
+			}
+		}
+
+		// A link when there is a page to link to, a plain handle when there is
+		// not. A vault that keeps no people reads exactly as it did before any
+		// of this, and no link is ever written to a note nobody wrote.
+		if _, known := vault.PersonOf(s.peopleIn(), who); known {
+			t.SetAssignee(who)
+		} else {
+			t.Set("assignee", who)
+			t.Assignee = who
+		}
 
 		switch {
 		case was == "":
-			return key + ": assigned to " + who, nil, nil
+			return key + ": assigned to " + who, also, nil
 		case who == "":
-			return key + ": unassigned, was " + was, nil, nil
+			return key + ": unassigned, was " + was, also, nil
 		}
-		return key + ": " + was + " → " + who, nil, nil
+		return key + ": " + was + " → " + who, also, nil
 	})
 	s.afterEdit(w, r, key, err)
 }

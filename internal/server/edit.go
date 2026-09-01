@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -55,8 +54,10 @@ type editView struct {
 	//
 	// A list rather than a closed set, because the handles are whatever the
 	// vault says — an import maps them, an agent has one, and somebody arriving
-	// tomorrow is not in it yet.
-	People []string
+	// tomorrow is not in it yet. Whoever has rights on the repository is in it
+	// from the moment they are given them, which is what somebody means by
+	// "put it on them".
+	People []candidate
 }
 
 // fieldControl is one declared property, ready to edit. The kind decides the
@@ -179,7 +180,7 @@ func (s *Server) editView(r *http.Request, c *project.Config, t *task.Task, vers
 		view.Scale = append(view.Scale, sizeChoice{Value: value, Selected: value == view.Size})
 	}
 
-	view.People = s.handlesIn(r)
+	view.People = s.candidates(r)
 
 	for _, f := range c.FieldsFor(t.Type) {
 		control := fieldControl{
@@ -571,32 +572,3 @@ func applyFields(r *http.Request, c *project.Config, t *task.Task) []string {
 // Read from the tasks rather than from the host: the host knows who may push,
 // and the vault knows who the work is actually on — an agent, or somebody an
 // import mapped, is in the second list and not the first. Ordered by how much
-// they carry, so the people a board is about are at the top of the list.
-func (s *Server) handlesIn(r *http.Request) []string {
-	entries, err := s.entries(r)
-	if err != nil {
-		return nil
-	}
-
-	carries := map[string]int{}
-	for _, e := range entries {
-		if e.Task == nil {
-			continue
-		}
-		if who := strings.TrimSpace(e.Task.Assignee); who != "" {
-			carries[who]++
-		}
-	}
-
-	out := make([]string, 0, len(carries))
-	for who := range carries {
-		out = append(out, who)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if carries[out[i]] != carries[out[j]] {
-			return carries[out[i]] > carries[out[j]]
-		}
-		return out[i] < out[j]
-	})
-	return out
-}

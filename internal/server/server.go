@@ -119,6 +119,10 @@ type Server struct {
 	// when nothing here has a remote to send to.
 	pushes *pushing
 
+	// members is who each host says has access, remembered for a while so that
+	// offering an assignee is not a request to github.com per page.
+	members members
+
 	// now is injectable so tests can assert on timestamps.
 	now func() time.Time
 }
