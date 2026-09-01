@@ -55,6 +55,10 @@ type exported struct {
 	// default: a thousand tasks is a megabyte of prose, and most apps want the
 	// properties.
 	Body string `json:"body,omitempty"`
+	// Fields are the properties this vault declared for itself, as written.
+	// An app's own fields are the columns its own report is made of, and
+	// leaving them out would send it back to reading the files.
+	Fields map[string]string `json:"fields,omitempty"`
 }
 
 func runExport(args []string, stdout, stderr io.Writer) int {
@@ -115,6 +119,14 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 		}
 		row.Checked, row.Boxes = boxes(e.Task.Body())
 		row.Relations = e.Task.AllRelations(relationNames(c))
+		for _, f := range c.Fields {
+			if value := strings.TrimSpace(e.Task.Property(f.Name)); value != "" {
+				if row.Fields == nil {
+					row.Fields = map[string]string{}
+				}
+				row.Fields[f.Name] = value
+			}
+		}
 		if *withBody {
 			row.Body = e.Task.Body()
 		}
@@ -144,6 +156,13 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 						return strings.Join(r.Relations[verb], " ")
 					}
 				}
+				// And a field the vault declared: an app reports on its own
+				// properties, and it should not have to read the files for
+				// them.
+				if _, ok := column[name]; !ok && declaresField(c, name) {
+					field := name
+					column[field] = func(r exported) string { return r.Fields[field] }
+				}
 				if _, ok := column[name]; !ok {
 					fmt.Fprintf(stderr, "docket export: %q is not a column: %s\n",
 						name, strings.Join(everyColumn, ", "))
@@ -172,6 +191,16 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	return exitOK
+}
+
+// declaresField reports whether the vault declared a property by that name.
+func declaresField(c *project.Config, name string) bool {
+	for _, f := range c.Fields {
+		if f.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // relationNames is every verb the vault understands.

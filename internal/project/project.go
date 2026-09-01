@@ -107,6 +107,51 @@ type App struct {
 	Name    string `yaml:"name"`
 	Source  string `yaml:"source"`
 	Version string `yaml:"version,omitempty"`
+	// Brought is what this app added, by name.
+	//
+	// Kept so an app can be upgraded. A new version that changes its own type
+	// or its own field is not in conflict with the vault — it is in conflict
+	// with its own last version, which is what an upgrade is. Without this the
+	// installer could only refuse, and the only way forward would be editing
+	// docket.yaml by hand.
+	Brought Brought `yaml:"brought,omitempty"`
+}
+
+// Brought is the names one app contributed.
+type Brought struct {
+	Types     []string `yaml:"types,omitempty"`
+	Fields    []string `yaml:"fields,omitempty"`
+	Relations []string `yaml:"relations,omitempty"`
+	Pages     []string `yaml:"pages,omitempty"`
+	Panels    []string `yaml:"panels,omitempty"`
+}
+
+// Empty says nothing was recorded — an app installed before the vault kept
+// track of what each one brought.
+func (b Brought) Empty() bool {
+	return len(b.Types) == 0 && len(b.Fields) == 0 && len(b.Relations) == 0 &&
+		len(b.Pages) == 0 && len(b.Panels) == 0
+}
+
+// Owns reports whether this app contributed that name.
+func (b Brought) Owns(kind, name string) bool {
+	var in []string
+	switch kind {
+	case "type":
+		in = b.Types
+	case "field":
+		in = b.Fields
+	case "relation":
+		in = b.Relations
+	case "page":
+		in = append(append([]string{}, b.Pages...), b.Panels...)
+	}
+	for _, got := range in {
+		if strings.EqualFold(got, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // Status is a name people use paired with a category machines act on.

@@ -243,13 +243,35 @@ func (c Conflict) Error() string { return c.What + " " + c.Name + ": " + c.Why }
 func Check(root string, c *project.Config, p *Pack) []Conflict {
 	var out []Conflict
 
+	// What this app itself brought last time is not a conflict: a new version
+	// changing its own type is what an upgrade is.
+	var mine project.Brought
+	installedBefore := false
+	for _, installed := range c.Apps {
+		if strings.EqualFold(installed.Name, p.Name) {
+			mine, installedBefore = installed.Brought, true
+		}
+	}
+	// An app installed before the vault recorded what each one brought has an
+	// empty list, and every one of its own names would read as somebody else's.
+	// The vault does say the app is installed, and a name this same pack
+	// declares is its own far more often than it is a coincidence.
+	blind := installedBefore && mine.Empty()
+
+	add := func(c Conflict) {
+		if mine.Owns(c.What, c.Name) || blind {
+			return
+		}
+		out = append(out, c)
+	}
+
 	known := map[string]project.Type{}
 	for _, t := range c.Types {
 		known[t.Name] = t
 	}
 	for _, t := range p.Vocabulary.Types {
 		if existing, ok := known[t.Name]; ok && existing.Level != t.Level {
-			out = append(out, Conflict{"type", t.Name, fmt.Sprintf(
+			add(Conflict{"type", t.Name, fmt.Sprintf(
 				"this vault already has it at level %d and the app wants level %d",
 				existing.Level, t.Level)})
 		}
@@ -261,28 +283,27 @@ func Check(root string, c *project.Config, p *Pack) []Conflict {
 	}
 	for _, f := range p.Vocabulary.Fields {
 		if existing, ok := fields[f.Name]; ok && existing.Kind != f.Kind {
-			out = append(out, Conflict{"field", f.Name, fmt.Sprintf(
+			add(Conflict{"field", f.Name, fmt.Sprintf(
 				"this vault already has it as %s and the app wants %s",
 				existing.Kind, f.Kind)})
 		}
 		if project.OwnedProperties[f.Name] {
-			out = append(out, Conflict{"field", f.Name,
-				"that is a property the format owns"})
+			add(Conflict{"field", f.Name, "that is a property the format owns"})
 		}
-		if c.IsRelation(f.Name) {
-			out = append(out, Conflict{"field", f.Name,
+		if c.IsRelation(f.Name) && !ownsRelation(p, f.Name) {
+			add(Conflict{"field", f.Name,
 				"that is already a relation here, and one property cannot be both"})
 		}
 	}
 
 	for _, r := range p.Vocabulary.Relations {
 		if existing, ok := c.RelationOf(r.Name); ok && existing.Inverse != r.Inverse {
-			out = append(out, Conflict{"relation", r.Name, fmt.Sprintf(
+			add(Conflict{"relation", r.Name, fmt.Sprintf(
 				"this vault already has it with inverse %q and the app wants %q",
 				existing.Inverse, r.Inverse)})
 		}
 		if _, ok := fields[r.Name]; ok {
-			out = append(out, Conflict{"relation", r.Name,
+			add(Conflict{"relation", r.Name,
 				"that is already a field here, and one property cannot be both"})
 		}
 	}
@@ -290,7 +311,7 @@ func Check(root string, c *project.Config, p *Pack) []Conflict {
 	for _, page := range append(append([]project.Surface{}, p.Surfaces.Pages...), p.Surfaces.Panels...) {
 		for _, existing := range append(append([]project.Surface{}, c.Pages...), c.Panels...) {
 			if strings.EqualFold(existing.Name, page.Name) && existing.Run != page.Run {
-				out = append(out, Conflict{"page", page.Name, fmt.Sprintf(
+				add(Conflict{"page", page.Name, fmt.Sprintf(
 					"this vault already draws it with %s and the app wants %s",
 					existing.Run, page.Run)})
 			}
@@ -311,6 +332,10 @@ func Check(root string, c *project.Config, p *Pack) []Conflict {
 			continue
 		}
 		if string(theirs) != string(ours) {
+			// A file this app wrote last time is its own to replace.
+			if blind || mine.Owns("file", rel) || carriedBy(mine, rel) {
+				continue
+			}
 			out = append(out, Conflict{"file", rel,
 				"already here and different — the app would write over it"})
 		}
@@ -390,66 +415,103 @@ func Install(root string, c *project.Config, p *Pack) ([]string, error) {
 
 // merge adds the pack's vocabulary to docket.yaml and records the app.
 func merge(root string, c *project.Config, p *Pack) (bool, error) {
-	before := len(c.Types) + len(c.Fields) + len(c.Declared) + len(c.Apps) +
-		len(c.Pages) + len(c.Panels)
-	known := func(name string, in []string) bool {
-		for _, got := range in {
-			if got == name {
-				return true
+	var mine project.Brought
+	for _, installed := range c.Apps {
+		if strings.EqualFold(installed.Name, p.Name) {
+			mine = installed.Brought
+			if mine.Empty() {
+				// Installed before the vault recorded ownership: everything
+				// this pack declares is treated as its own, which is the same
+				// reading Check made when it let the install through.
+				mine = declaredBy(p)
 			}
 		}
-		return false
 	}
 
-	var typeNames, fieldNames []string
-	for _, t := range c.Types {
-		typeNames = append(typeNames, t.Name)
+	// What the file says now, so that "nothing changed" is decided by comparing
+	// the configuration rather than by counting its entries: an upgrade that
+	// replaces a type in place leaves every count identical and every meaning
+	// different.
+	before, err := yaml.Marshal(c)
+	if err != nil {
+		return false, err
 	}
-	for _, f := range c.Fields {
-		fieldNames = append(fieldNames, f.Name)
-	}
-
+	// Replaced where it is this app's own, added where it is new. An upgrade
+	// that could only add would leave the old definition in place and the new
+	// one nowhere — which is how a type ends up at a level its own app no
+	// longer believes in.
 	for _, t := range p.Vocabulary.Types {
-		if !known(t.Name, typeNames) {
-			c.Types = append(c.Types, t)
+		if at := indexOfType(c.Types, t.Name); at >= 0 {
+			if mine.Owns("type", t.Name) {
+				c.Types[at] = t
+			}
+			continue
 		}
+		c.Types = append(c.Types, t)
 	}
 	for _, f := range p.Vocabulary.Fields {
-		if !known(f.Name, fieldNames) {
-			c.Fields = append(c.Fields, f)
+		if at := indexOfField(c.Fields, f.Name); at >= 0 {
+			if mine.Owns("field", f.Name) {
+				c.Fields[at] = f
+			}
+			continue
 		}
+		c.Fields = append(c.Fields, f)
 	}
 	for _, r := range p.Vocabulary.Relations {
+		if at := indexOfRelation(c.Declared, r.Name); at >= 0 {
+			if mine.Owns("relation", r.Name) {
+				c.Declared[at] = r
+			}
+			continue
+		}
 		if !c.IsRelation(r.Name) {
 			c.Declared = append(c.Declared, r)
 		}
 	}
-	for _, page := range p.Surfaces.Pages {
-		if !hasSurface(c.Pages, page.Name) {
-			c.Pages = append(c.Pages, page)
-		}
-	}
-	for _, shown := range p.Surfaces.Panels {
-		if !hasSurface(c.Panels, shown.Name) {
-			c.Panels = append(c.Panels, shown)
-		}
-	}
+	c.Pages = mergeSurfaces(c.Pages, p.Surfaces.Pages, mine)
+	c.Panels = mergeSurfaces(c.Panels, p.Surfaces.Panels, mine)
 
 	// Recorded so `docket app list` can say what is installed, and so a later
 	// version of the same app can tell what it is replacing.
-	replaced := false
-	for i, was := range c.Apps {
-		if was.Name == p.Name {
-			c.Apps[i] = project.App{Name: p.Name, Source: p.Source, Version: p.Version}
-			replaced = true
+	recorded := false
+	brought := project.Brought{}
+	for _, t := range p.Vocabulary.Types {
+		brought.Types = append(brought.Types, t.Name)
+	}
+	for _, f := range p.Vocabulary.Fields {
+		brought.Fields = append(brought.Fields, f.Name)
+	}
+	for _, r := range p.Vocabulary.Relations {
+		brought.Relations = append(brought.Relations, r.Name)
+		if r.Inverse != "" {
+			brought.Relations = append(brought.Relations, r.Inverse)
 		}
 	}
-	if !replaced {
-		c.Apps = append(c.Apps, project.App{Name: p.Name, Source: p.Source, Version: p.Version})
+	for _, page := range p.Surfaces.Pages {
+		brought.Pages = append(brought.Pages, page.Name)
+	}
+	for _, shown := range p.Surfaces.Panels {
+		brought.Panels = append(brought.Panels, shown.Name)
 	}
 
-	if before == len(c.Types)+len(c.Fields)+len(c.Declared)+len(c.Apps)+
-		len(c.Pages)+len(c.Panels) && replaced {
+	for i, was := range c.Apps {
+		if was.Name == p.Name {
+			c.Apps[i] = project.App{Name: p.Name, Source: p.Source,
+				Version: p.Version, Brought: brought}
+			recorded = true
+		}
+	}
+	if !recorded {
+		c.Apps = append(c.Apps, project.App{Name: p.Name, Source: p.Source,
+			Version: p.Version, Brought: brought})
+	}
+
+	after, err := yaml.Marshal(c)
+	if err != nil {
+		return false, err
+	}
+	if string(before) == string(after) {
 		// Nothing new: the same app at the same version, installed twice.
 		return false, nil
 	}
@@ -468,4 +530,102 @@ func hasSurface(surfaces []project.Surface, name string) bool {
 		}
 	}
 	return false
+}
+
+// ownsRelation reports whether this same pack declares that name as a relation,
+// which is how a field and a relation of the same name inside one app is caught
+// rather than mistaken for a clash with the vault.
+func ownsRelation(p *Pack, name string) bool {
+	for _, r := range p.Vocabulary.Relations {
+		if strings.EqualFold(r.Name, name) || strings.EqualFold(r.Inverse, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// carriedBy reports whether a path is one an app brings, which makes replacing
+// it an upgrade rather than writing over somebody's edit.
+//
+// Files are matched by folder rather than recorded one by one: an app's second
+// version renames its own scripts, and a list of names from the first version
+// would call the new ones somebody else's.
+func carriedBy(mine project.Brought, path string) bool {
+	if len(mine.Pages) == 0 && len(mine.Panels) == 0 && len(mine.Types) == 0 &&
+		len(mine.Fields) == 0 && len(mine.Relations) == 0 {
+		return false // nothing recorded: an app installed before this was kept
+	}
+	return strings.HasPrefix(path, "hooks/") || strings.HasPrefix(path, "templates/") ||
+		strings.HasPrefix(path, "boards/")
+}
+
+func indexOfType(types []project.Type, name string) int {
+	for i, t := range types {
+		if strings.EqualFold(t.Name, name) {
+			return i
+		}
+	}
+	return -1
+}
+
+func indexOfField(fields []project.Field, name string) int {
+	for i, f := range fields {
+		if strings.EqualFold(f.Name, name) {
+			return i
+		}
+	}
+	return -1
+}
+
+func indexOfRelation(relations []project.Relation, name string) int {
+	for i, r := range relations {
+		if strings.EqualFold(r.Name, name) {
+			return i
+		}
+	}
+	return -1
+}
+
+// mergeSurfaces replaces what this app drew before and adds what is new.
+func mergeSurfaces(have, wanted []project.Surface, mine project.Brought) []project.Surface {
+	for _, surface := range wanted {
+		if at := indexOfSurface(have, surface.Name); at >= 0 {
+			if mine.Owns("page", surface.Name) {
+				have[at] = surface
+			}
+			continue
+		}
+		have = append(have, surface)
+	}
+	return have
+}
+
+func indexOfSurface(surfaces []project.Surface, name string) int {
+	for i, s := range surfaces {
+		if strings.EqualFold(s.Name, name) {
+			return i
+		}
+	}
+	return -1
+}
+
+// declaredBy is everything a pack declares, as ownership.
+func declaredBy(p *Pack) project.Brought {
+	var out project.Brought
+	for _, t := range p.Vocabulary.Types {
+		out.Types = append(out.Types, t.Name)
+	}
+	for _, f := range p.Vocabulary.Fields {
+		out.Fields = append(out.Fields, f.Name)
+	}
+	for _, r := range p.Vocabulary.Relations {
+		out.Relations = append(out.Relations, r.Name, r.Inverse)
+	}
+	for _, page := range p.Surfaces.Pages {
+		out.Pages = append(out.Pages, page.Name)
+	}
+	for _, shown := range p.Surfaces.Panels {
+		out.Panels = append(out.Panels, shown.Name)
+	}
+	return out
 }
