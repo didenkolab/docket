@@ -2,6 +2,7 @@ package vault
 
 import (
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/vadymdidenkolab/docket/internal/gitvcs"
@@ -45,10 +46,19 @@ func ListAt(repo *gitvcs.Repo, ref string, c *project.Config) ([]Entry, error) {
 	var entries []Entry
 
 	for _, key := range c.ProjectKeys() {
-		paths, err := repo.Tree(ref, key)
+		// The whole folder in one call. A file at a time is a git process at a
+		// time, and on a real board that was thirty six seconds to step back
+		// one commit — slow enough that walking the history reads as broken.
+		files, err := repo.Files(ref, key)
 		if err != nil {
 			return nil, err
 		}
+		paths := make([]string, 0, len(files))
+		for p := range files {
+			paths = append(paths, p)
+		}
+		sort.Strings(paths)
+
 		for _, p := range paths {
 			name := path.Base(p)
 			if !strings.HasSuffix(name, ".md") {
@@ -64,17 +74,13 @@ func ListAt(repo *gitvcs.Repo, ref string, c *project.Config) ([]Entry, error) {
 			}
 
 			entry := Entry{Key: taskKey, Project: key, Number: number, Path: p}
-			raw, err := repo.At(ref, p)
-			switch {
-			case err != nil:
-				entry.Err = err
-			case len(raw) == 0:
+			raw := files[p]
+			if len(raw) == 0 {
 				continue
-			default:
-				entry.Raw = raw
-				if entry.Task, err = task.Parse(raw); err != nil {
-					entry.Err = err
-				}
+			}
+			entry.Raw = raw
+			if entry.Task, err = task.Parse(raw); err != nil {
+				entry.Err = err
 			}
 			entries = append(entries, entry)
 		}

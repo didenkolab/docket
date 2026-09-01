@@ -1,7 +1,11 @@
 package gitvcs
 
 import (
+	"archive/tar"
+	"bytes"
 	"fmt"
+	"io"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -482,4 +486,65 @@ func (r *Repo) PropertyHistory(path, name string) ([]string, error) {
 		values = append(values, newestFirst[i])
 	}
 	return values, nil
+}
+
+// Files is every file under a directory at one commit, with its content, in
+// one call.
+//
+// Tree and Blob together are the obvious way to do this and are the wrong one:
+// they spawn a git process per file, and on a real board — four thousand files
+// — that is thirty six seconds to change one commit, against a third of a
+// second to draw the same board from disk. Nobody walks a history at that
+// speed; they conclude the feature is broken, which is what happened.
+//
+// `git archive` writes the whole tree as a tar on one pipe, so the cost is one
+// process and one read no matter how many files there are.
+func (r *Repo) Files(ref, dir string) (map[string][]byte, error) {
+	args := []string{"-c", "core.quotePath=false", "archive", "--format=tar", ref}
+	if dir != "" {
+		args = append(args, "--", dir)
+	}
+	cmd := exec.Command("git", args...)
+	cmd.Dir = r.Root
+	var trouble bytes.Buffer
+	cmd.Stderr = &trouble
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	files := map[string][]byte{}
+	reader := tar.NewReader(out)
+	for {
+		head, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			cmd.Wait()
+			return nil, err
+		}
+		if head.Typeflag != tar.TypeReg {
+			continue
+		}
+		body, err := io.ReadAll(reader)
+		if err != nil {
+			cmd.Wait()
+			return nil, err
+		}
+		files[head.Name] = body
+	}
+	if err := cmd.Wait(); err != nil {
+		// A directory that does not exist at this commit is not an error: an
+		// empty tree is the honest answer, and it is what a project added on a
+		// later commit looks like from before it existed.
+		if strings.Contains(trouble.String(), "did not match any files") {
+			return map[string][]byte{}, nil
+		}
+		return nil, fmt.Errorf("git archive %s: %s", ref, strings.TrimSpace(trouble.String()))
+	}
+	return files, nil
 }
