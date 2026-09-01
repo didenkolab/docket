@@ -445,6 +445,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /apps", s.handleApps)
 	mux.HandleFunc("POST /apps/install", s.handleAppInstall)
 	mux.HandleFunc("GET /app/{name}", s.handleSurface)
+	mux.HandleFunc("POST /app/do/{name}", s.handleAction)
+	mux.HandleFunc("POST /in/{name}", s.handleInbox)
 	mux.HandleFunc("GET /people", s.handlePeople)
 	mux.HandleFunc("GET /person/{handle}", s.handlePerson)
 	mux.HandleFunc("GET /views", s.handleViews)

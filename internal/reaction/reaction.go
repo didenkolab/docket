@@ -180,6 +180,15 @@ func run(ctx context.Context, root string, d Declared, e Event) Result {
 	return result
 }
 
+// Posted runs a program with bytes on stdin rather than an event.
+//
+// The same rules and the same one place: what arrives from outside is a body
+// somebody else wrote, and handing it to a shell would be handing a stranger a
+// command line.
+func Posted(ctx context.Context, root, run string, body []byte, limit time.Duration) (string, error) {
+	return output(ctx, root, run, body, nil, limit)
+}
+
 // Output runs a program in the repository and returns what it printed.
 //
 // The one place a vault's own program is executed, so the rules live here and
@@ -192,9 +201,7 @@ func Output(ctx context.Context, root, run string, told any, limit time.Duration
 	if err := (Declared{On: OnMoved, Run: run}).Validate(); err != nil {
 		return "", err
 	}
-
-	program := filepath.Join(root, filepath.FromSlash(run))
-	info, err := os.Stat(program)
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(run)))
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", run, err)
 	}
@@ -206,6 +213,12 @@ func Output(ctx context.Context, root, run string, told any, limit time.Duration
 	if err != nil {
 		return "", err
 	}
+	return output(ctx, root, run, body, told, limit)
+}
+
+// output is the one place a vault's own program is executed.
+func output(ctx context.Context, root, run string, body []byte, told any, limit time.Duration) (string, error) {
+	program := filepath.Join(root, filepath.FromSlash(run))
 
 	ctx, stop := context.WithTimeout(ctx, limit)
 	defer stop()
@@ -230,6 +243,6 @@ func Output(ctx context.Context, root, run string, told any, limit time.Duration
 
 	var said bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &said, &said
-	err = cmd.Run()
+	err := cmd.Run()
 	return strings.TrimSpace(said.String()), err
 }

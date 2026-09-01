@@ -77,6 +77,15 @@ func (s *Server) acceptBody(w http.ResponseWriter, r *http.Request) bool {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 
+	// An inbox is posted to by a machine, and its body is the payload rather
+	// than a form. Parsing it here would consume it — curl sends
+	// x-www-form-urlencoded unless told otherwise, so the JUnit somebody posted
+	// would arrive as an empty file and the answer would be "nothing was
+	// posted". The cap above still applies.
+	if strings.HasPrefix(r.URL.Path, "/in/") {
+		return true
+	}
+
 	if !upload && strings.HasPrefix(r.Header.Get("Content-Type"),
 		"application/x-www-form-urlencoded") {
 		if err := r.ParseForm(); err != nil {

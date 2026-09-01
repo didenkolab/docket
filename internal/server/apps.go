@@ -112,6 +112,12 @@ func (s *Server) lookAt(r *http.Request, source string, c *project.Config) *appO
 	for _, panel := range pack.Surfaces.Panels {
 		offer.Draws = append(offer.Draws, panel.Called()+" (panel)")
 	}
+	for _, action := range pack.Surfaces.Actions {
+		offer.Draws = append(offer.Draws, action.Called()+" (a button that runs a program)")
+	}
+	for _, in := range pack.Surfaces.Inbox {
+		offer.Draws = append(offer.Draws, "/in/"+in.Name+" (an address the outside can post to)")
+	}
 	for _, conflict := range app.Check(home.Root, c, pack) {
 		offer.Conflicts = append(offer.Conflicts, conflict.Error())
 	}

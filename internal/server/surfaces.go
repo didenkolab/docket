@@ -3,7 +3,9 @@ package server
 import (
 	"html/template"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -36,6 +38,13 @@ type surfacePage struct {
 	Title string
 	Name  string
 	Body  template.HTML
+	// Buttons are what this page can be asked to do.
+	Buttons []actionButton
+	// Did is what the last action printed, when one has just run.
+	Did     string
+	DidName string
+	Wrote   []string
+	Failed  bool
 	// Ran is the program, so a page that says something surprising can be
 	// traced to what produced it.
 	Ran string
@@ -61,7 +70,12 @@ func (s *Server) handleSurface(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	view := surfacePage{Title: surface.Called(), Name: surface.Name, Ran: surface.Run}
+	view := surfacePage{
+		Title: surface.Called(), Name: surface.Name, Ran: surface.Run,
+		Buttons: s.buttonsOn(surface.Name),
+		Did:     r.URL.Query().Get("said"), DidName: r.URL.Query().Get("did"),
+		Failed: r.URL.Query().Get("failed") == "1",
+	}
 	if !s.programs {
 		view.Refused = true
 		s.render(w, r, "surface.html", c, view.Title, view)
@@ -158,3 +172,114 @@ func (s *Server) panelsFor(r *http.Request, key string) []panel {
 	}
 	return out
 }
+
+// ---- doing something ----
+
+type actionButton struct {
+	Name    string
+	Title   string
+	Confirm string
+}
+
+// buttonsOn is what this page can be asked to do.
+func (s *Server) buttonsOn(page string) []actionButton {
+	var out []actionButton
+	for _, v := range s.sp().Vaults() {
+		c, err := project.Load(v.Root)
+		if err != nil {
+			continue
+		}
+		for _, a := range c.Actions {
+			if a.On != "" && !strings.EqualFold(a.On, page) {
+				continue
+			}
+			out = append(out, actionButton{Name: a.Name, Title: a.Called(), Confirm: a.Confirm})
+		}
+	}
+	return out
+}
+
+// actionNamed finds a declared action and the repository that declared it.
+func (s *Server) actionNamed(name string) (*space.Vault, project.Action, bool) {
+	for _, v := range s.sp().Vaults() {
+		c, err := project.Load(v.Root)
+		if err != nil {
+			continue
+		}
+		for _, a := range c.Actions {
+			if strings.EqualFold(a.Name, name) {
+				return v, a, true
+			}
+		}
+	}
+	return nil, project.Action{}, false
+}
+
+// handleAction runs one, and commits what it wrote.
+//
+// The one thing an app can do rather than draw, so it is held to everything a
+// reaction is held to and one thing more: a person asked for it, at a moment,
+// and the page says what came back. A button that runs something and then shows
+// the page it was on, unchanged, is a button nobody trusts twice.
+func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimSpace(r.PathValue("name"))
+	page := strings.TrimSpace(r.FormValue("page"))
+	back := func(said string, failed bool) {
+		where := "/app/" + url.PathEscape(page) + "?did=" + url.QueryEscape(name) +
+			"&said=" + url.QueryEscape(said)
+		if failed {
+			where += "&failed=1"
+		}
+		http.Redirect(w, r, where, http.StatusSeeOther)
+	}
+
+	v, action, ok := s.actionNamed(name)
+	if !ok {
+		s.fail(w, r, http.StatusNotFound, "No such action",
+			"No project in this space declares an action called "+name+".")
+		return
+	}
+	if !s.programs {
+		back("This server was not started with --programs, so nothing ran.", true)
+		return
+	}
+	if !s.mayWriteTo(r, v) {
+		s.refuse(w, r, "Running an app's action can change the vault, so it needs write access.")
+		return
+	}
+
+	s.writes.Lock()
+	defer s.writes.Unlock()
+
+	before := dirtyIn(v.Root)
+	said, err := reaction.Output(r.Context(), v.Root, action.Run,
+		map[string]string{"action": action.Name, "root": v.Root}, actionLife)
+	after := dirtyIn(v.Root)
+
+	var wrote []string
+	for path := range after {
+		if _, was := before[path]; !was {
+			wrote = append(wrote, path)
+		}
+	}
+	sort.Strings(wrote)
+
+	if len(wrote) > 0 {
+		if commitErr := v.Repo.Commit(wrote, action.Called()+": "+
+			plural(len(wrote), "file", "files")+" written", s.authorFor(r)); commitErr != nil {
+			said += "\n\nWritten but not committed: " + commitErr.Error()
+		} else {
+			s.after(r, v)
+		}
+	}
+	if err != nil {
+		back(strings.TrimSpace(said+"\n\n"+err.Error()), true)
+		return
+	}
+	back(said, false)
+}
+
+// actionLife is how long a person will wait with a page open. Longer than a
+// page that only draws, because this one is doing something they asked for —
+// and still bounded, because a browser gives up on its own.
+const actionLife = 3 * time.Minute

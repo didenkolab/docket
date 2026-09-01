@@ -65,12 +65,21 @@ type Manifest struct {
 type Surfaces struct {
 	Pages  []project.Surface `yaml:"pages,omitempty"`
 	Panels []project.Surface `yaml:"panels,omitempty"`
+	// Actions are the buttons it puts on its own pages. The one kind of
+	// surface that does something rather than drawing, so an app declaring one
+	// is unmistakably an app that brings code.
+	Actions []project.Action `yaml:"actions,omitempty"`
+	// Inbox is what it accepts from outside — an address a CI job posts to.
+	Inbox []project.Inbound `yaml:"inbox,omitempty"`
 }
 
 // BringsPrograms reports whether installing this would put a program in the
 // repository — the fact that decides whether anybody has to think before
 // installing it.
 func (p *Pack) BringsPrograms() bool {
+	if len(p.Surfaces.Actions) > 0 || len(p.Surfaces.Inbox) > 0 {
+		return true
+	}
 	if len(p.Surfaces.Pages) > 0 || len(p.Surfaces.Panels) > 0 {
 		return true
 	}
@@ -472,6 +481,25 @@ func merge(root string, c *project.Config, p *Pack) (bool, error) {
 	c.Pages = mergeSurfaces(c.Pages, p.Surfaces.Pages, mine)
 	c.Panels = mergeSurfaces(c.Panels, p.Surfaces.Panels, mine)
 
+	for _, action := range p.Surfaces.Actions {
+		if at := indexOfAction(c.Actions, action.Name); at >= 0 {
+			if mine.Owns("action", action.Name) {
+				c.Actions[at] = action
+			}
+			continue
+		}
+		c.Actions = append(c.Actions, action)
+	}
+	for _, in := range p.Surfaces.Inbox {
+		if at := indexOfInbound(c.Inbox, in.Name); at >= 0 {
+			if mine.Owns("action", in.Name) {
+				c.Inbox[at] = in
+			}
+			continue
+		}
+		c.Inbox = append(c.Inbox, in)
+	}
+
 	// Recorded so `docket app list` can say what is installed, and so a later
 	// version of the same app can tell what it is replacing.
 	recorded := false
@@ -493,6 +521,12 @@ func merge(root string, c *project.Config, p *Pack) (bool, error) {
 	}
 	for _, shown := range p.Surfaces.Panels {
 		brought.Panels = append(brought.Panels, shown.Name)
+	}
+	for _, action := range p.Surfaces.Actions {
+		brought.Actions = append(brought.Actions, action.Name)
+	}
+	for _, in := range p.Surfaces.Inbox {
+		brought.Actions = append(brought.Actions, in.Name)
 	}
 
 	for i, was := range c.Apps {
@@ -627,5 +661,29 @@ func declaredBy(p *Pack) project.Brought {
 	for _, shown := range p.Surfaces.Panels {
 		out.Panels = append(out.Panels, shown.Name)
 	}
+	for _, action := range p.Surfaces.Actions {
+		out.Actions = append(out.Actions, action.Name)
+	}
+	for _, in := range p.Surfaces.Inbox {
+		out.Actions = append(out.Actions, in.Name)
+	}
 	return out
+}
+
+func indexOfAction(actions []project.Action, name string) int {
+	for i, a := range actions {
+		if strings.EqualFold(a.Name, name) {
+			return i
+		}
+	}
+	return -1
+}
+
+func indexOfInbound(inbox []project.Inbound, name string) int {
+	for i, in := range inbox {
+		if strings.EqualFold(in.Name, name) {
+			return i
+		}
+	}
+	return -1
 }

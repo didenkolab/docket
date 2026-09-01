@@ -3,6 +3,27 @@
 
 <h1>{{$data.Title}}</h1>
 
+{{if $data.Buttons}}
+<div class="does">
+  {{range $data.Buttons}}
+  <form method="post" action="/app/do/{{.Name}}"
+        {{if .Confirm}}onsubmit="return confirm('{{.Confirm}}')"{{end}}>
+    {{template "csrf" $}}
+    <input type="hidden" name="page" value="{{$data.Name}}">
+    <button type="submit">{{.Title}}</button>
+  </form>
+  {{end}}
+  <span class="hint">Runs a program in this repository. What it writes is committed.</span>
+</div>
+{{end}}
+
+{{if $data.Did}}
+<section class="block">
+  <h2>{{$data.DidName}}</h2>
+  <pre class="said{{if $data.Failed}} bad{{end}}">{{$data.Did}}</pre>
+</section>
+{{end}}
+
 {{if $data.Refused}}
 <div class="notice warn">
   This page is drawn by <code>{{$data.Ran}}</code>, a program in this repository, and this server

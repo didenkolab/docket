@@ -250,8 +250,14 @@ func (s *Server) guard(next http.Handler) http.Handler {
 // open lists what is reachable without signing in: the sign-in page itself,
 // the stylesheet it needs, and the health check.
 func open(path string) bool {
+	// /in/ is open to the guard and closed by its own secret. A CI job has no
+	// session and never will: it is a machine, and what says it may post is a
+	// secret held where the server runs rather than a person's sign-in. See
+	// internal/server/inbox.go, which refuses an inbox that names no secret on
+	// a server that signs people in.
 	return path == "/sign-in" || strings.HasPrefix(path, "/sign-in/") ||
-		path == "/healthz" || strings.HasPrefix(path, "/static/")
+		path == "/healthz" || strings.HasPrefix(path, "/static/") ||
+		strings.HasPrefix(path, "/in/")
 }
 
 // allowed says why a request is refused, or "" when it is not.

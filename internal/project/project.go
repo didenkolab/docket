@@ -102,6 +102,45 @@ func (s Surface) Called() string {
 	return s.Name
 }
 
+// Inbound is one address the outside can post to.
+type Inbound struct {
+	Name string `yaml:"name"`
+	Run  string `yaml:"run"`
+	// SecretEnv names an environment variable holding the shared secret a
+	// caller must send as X-Docket-Secret.
+	//
+	// The name is in the repository and the secret is not: a secret in a file
+	// everybody clones is not a secret, and one in the server's environment is
+	// held by whoever runs the server, which is who decides what may be posted
+	// to it. An inbox with no secret named is refused unless the server has no
+	// sign-in at all.
+	SecretEnv string `yaml:"secret_env,omitempty"`
+}
+
+// Called is what to show for an inbox.
+func (i Inbound) Called() string { return i.Name }
+
+// Action is a program a page can run, on request.
+type Action struct {
+	Name  string `yaml:"name"`
+	Title string `yaml:"title,omitempty"`
+	Run   string `yaml:"run"`
+	// On is the page it belongs to, so a page shows its own buttons and not
+	// everybody else's.
+	On string `yaml:"on,omitempty"`
+	// Confirm is what to ask before running it. Empty asks nothing, which is
+	// right for reading something and wrong for anything that writes.
+	Confirm string `yaml:"confirm,omitempty"`
+}
+
+// Called is what the button says.
+func (a Action) Called() string {
+	if strings.TrimSpace(a.Title) != "" {
+		return a.Title
+	}
+	return a.Name
+}
+
 // App is a pack this vault has installed.
 type App struct {
 	Name    string `yaml:"name"`
@@ -124,13 +163,14 @@ type Brought struct {
 	Relations []string `yaml:"relations,omitempty"`
 	Pages     []string `yaml:"pages,omitempty"`
 	Panels    []string `yaml:"panels,omitempty"`
+	Actions   []string `yaml:"actions,omitempty"`
 }
 
 // Empty says nothing was recorded — an app installed before the vault kept
 // track of what each one brought.
 func (b Brought) Empty() bool {
 	return len(b.Types) == 0 && len(b.Fields) == 0 && len(b.Relations) == 0 &&
-		len(b.Pages) == 0 && len(b.Panels) == 0
+		len(b.Pages) == 0 && len(b.Panels) == 0 && len(b.Actions) == 0
 }
 
 // Owns reports whether this app contributed that name.
@@ -145,6 +185,8 @@ func (b Brought) Owns(kind, name string) bool {
 		in = b.Relations
 	case "page":
 		in = append(append([]string{}, b.Pages...), b.Panels...)
+	case "action":
+		in = b.Actions
 	}
 	for _, got := range in {
 		if strings.EqualFold(got, name) {
@@ -334,6 +376,21 @@ type Config struct {
 	// --programs runs any of them.
 	Pages  []Surface `yaml:"pages,omitempty"`
 	Panels []Surface `yaml:"panels,omitempty"`
+
+	// Inbox is what this vault accepts from outside: a program per address, run
+	// with whatever was posted to it on stdin.
+	//
+	// The way results arrive without anybody opening a browser — a CI job posts
+	// its JUnit and the board has an execution before the pipeline finishes.
+	// The fourth thing an app can be: reactions listen to the vault, pages draw
+	// it, actions change it on request, and this lets the outside speak.
+	Inbox []Inbound `yaml:"inbox,omitempty"`
+
+	// Actions are programs a page can be asked to run — the button an app puts
+	// on its own page. Everything else a vault declares is read; this is the
+	// one that does something, so it is the one that asks first and says what
+	// happened afterwards.
+	Actions []Action `yaml:"actions,omitempty"`
 
 	// Apps are the packs this vault has taken on: what they added is in the
 	// vocabulary above like anything else, and this is the record of where it

@@ -2268,3 +2268,7 @@ body > header nav .apps-menu .menu-list { z-index: 30; }
 
 /* The way in to installing one, under whatever is already installed. */
 .menu-list .add-app { border-top: 1px solid var(--rule); margin-top: var(--s1); padding-top: var(--s2); color: var(--ink-soft); }
+
+/* The buttons an app puts on its own page. */
+.does { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
+.said.bad { color: var(--warn); }
