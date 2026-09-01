@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
 	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/space"
 	"github.com/vadymdidenkolab/docket/internal/task"
@@ -122,6 +121,24 @@ func (s *Server) releasesIn(v *space.Vault) ([]releaseView, error) {
 		return nil, err
 	}
 
+	// One read per tag, not one per file. A release that ships two and a half
+	// thousand files was five thousand git processes — forty five seconds for a
+	// page whose whole promise is that it cannot drift, which nobody waits for.
+	// Memoised because each tag is read twice: once as itself, once as the
+	// thing the release before it is measured against.
+	trees := map[string]map[string][]byte{}
+	treeAt := func(ref string) map[string][]byte {
+		if known, ok := trees[ref]; ok {
+			return known
+		}
+		files, err := v.Repo.Files(ref, "")
+		if err != nil {
+			files = nil
+		}
+		trees[ref] = files
+		return files
+	}
+
 	views := make([]releaseView, 0, len(tags))
 	for i, tag := range tags {
 		// The tags are newest first, so the one this release follows is the
@@ -141,8 +158,13 @@ func (s *Server) releasesIn(v *space.Vault) ([]releaseView, error) {
 		if err != nil {
 			return nil, err
 		}
+		shipped := treeAt(tag.Name)
+		var before map[string][]byte
+		if since != "" {
+			before = treeAt(since)
+		}
 		for _, path := range paths {
-			t := versionOf(v.Repo, tag.Name, path)
+			t := versionOf(shipped[path], path)
 			if t == nil {
 				view.Other++
 				continue
@@ -150,7 +172,7 @@ func (s *Server) releasesIn(v *space.Vault) ([]releaseView, error) {
 			view.Tasks = append(view.Tasks, releaseTask{
 				Key: t.Key, Title: t.Title,
 				Status: t.Status, Category: t.StatusCategory,
-				Added: since != "" && !exists(v.Repo, since, path),
+				Added: since != "" && len(before[path]) == 0,
 			})
 		}
 		view.Says = describeRelease(view)
@@ -202,14 +224,10 @@ func describeRelease(v releaseView) []string {
 	return says
 }
 
-// versionOf parses a file as a task at one point in history, or nil when it is
+// versionOf reads a file as it stood at one point in history, or nil when it is
 // not a task at all — a page, a board, the configuration.
-func versionOf(repo *gitvcs.Repo, ref, path string) *task.Task {
-	if !strings.HasSuffix(path, ".md") {
-		return nil
-	}
-	raw, err := repo.At(ref, path)
-	if err != nil || len(raw) == 0 {
+func versionOf(raw []byte, path string) *task.Task {
+	if !strings.HasSuffix(path, ".md") || len(raw) == 0 {
 		return nil
 	}
 	t, err := task.Parse(raw)
@@ -217,9 +235,4 @@ func versionOf(repo *gitvcs.Repo, ref, path string) *task.Task {
 		return nil
 	}
 	return t
-}
-
-func exists(repo *gitvcs.Repo, ref, path string) bool {
-	raw, err := repo.At(ref, path)
-	return err == nil && len(raw) > 0
 }
