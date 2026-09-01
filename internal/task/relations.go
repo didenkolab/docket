@@ -15,49 +15,6 @@ import "strings"
 // type called "Parent-Child" that is not the parent field. The line is kept
 // sharp here: one field is structure, these are not.
 
-// Relation is one kind of connection, and the words for each direction.
-type Relation struct {
-	// Field is the property name, which is also the verb: `blocks`.
-	Field string
-	// Inverse is the property on the other task, when there is one. A relation
-	// with no inverse is symmetric.
-	Inverse string
-	// Says is how it reads on the task that carries it.
-	Says string
-	// Said is how it reads on the task at the other end.
-	Said string
-}
-
-// Relations are the ones a vault understands. Deliberately few: Jira's own set
-// minus `clones`, which describes how a task came into existence rather than
-// how it relates to the work, and which git records anyway.
-var Relations = []Relation{
-	{Field: "blocks", Inverse: "blocked_by", Says: "blocks", Said: "is blocked by"},
-	{Field: "blocked_by", Inverse: "blocks", Says: "is blocked by", Said: "blocks"},
-	{Field: "duplicates", Inverse: "duplicated_by", Says: "duplicates", Said: "is duplicated by"},
-	{Field: "duplicated_by", Inverse: "duplicates", Says: "is duplicated by", Said: "duplicates"},
-	{Field: "causes", Inverse: "caused_by", Says: "causes", Said: "is caused by"},
-	{Field: "caused_by", Inverse: "causes", Says: "is caused by", Said: "causes"},
-	{Field: "relates", Says: "relates to", Said: "relates to"},
-}
-
-// RelationOf finds a relation by its property name.
-func RelationOf(field string) (Relation, bool) {
-	for _, r := range Relations {
-		if r.Field == field {
-			return r, true
-		}
-	}
-	return Relation{}, false
-}
-
-// IsRelation says whether a property name is one of these, so that `docket
-// check` can tell a relation written as a string from somebody's own field.
-func IsRelation(field string) bool {
-	_, ok := RelationOf(field)
-	return ok
-}
-
 // Related is the keys a task names under one relation.
 //
 // Both forms are read, as everywhere: a link gives its note name, from which
@@ -114,13 +71,17 @@ func (t *Task) SetRelated(field string, notes []string) {
 	t.setLinkList(field, links)
 }
 
-// AllRelations is every relation a task carries, in the order Relations lists
-// them, so a task page reads the same way every time.
-func (t *Task) AllRelations() map[string][]string {
+// AllRelations is every relation a task carries, out of the ones the vault
+// understands, so a task page reads the same way every time.
+//
+// The list is passed in rather than known here: which verbs exist is the
+// vault's vocabulary, like its statuses, and this package holds the mechanics
+// of a property whose value is a link. See project.Relations.
+func (t *Task) AllRelations(names []string) map[string][]string {
 	out := map[string][]string{}
-	for _, r := range Relations {
-		if keys := t.Related(r.Field); len(keys) > 0 {
-			out[r.Field] = keys
+	for _, name := range names {
+		if keys := t.Related(name); len(keys) > 0 {
+			out[name] = keys
 		}
 	}
 	return out

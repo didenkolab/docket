@@ -174,7 +174,7 @@ func RunIn(root string, alsoKnown map[string]bool) ([]Finding, error) {
 			}
 		}
 
-		checkRelations(add, e, byKey)
+		checkRelations(add, e, byKey, c.Relations())
 
 		for _, name := range t.NestedProperties() {
 			add(Finding{e.Path, t.PropertyLine(name), RuleFlat,
@@ -598,24 +598,24 @@ func entryFor(entries []vault.Entry, key string) vault.Entry {
 //
 // `docket check --fix` rewrites them, because unlike every other finding this
 // one has a right answer.
-func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string) {
+func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string, relations []project.Relation) {
 	t := e.Task
 
-	for _, r := range task.Relations {
-		for _, raw := range t.RawRelated(r.Field) {
+	for _, r := range relations {
+		for _, raw := range t.RawRelated(r.Name) {
 			if !task.IsLink(raw) {
-				add(Finding{e.Path, t.PropertyLine(r.Field), RuleRelations,
+				add(Finding{e.Path, t.PropertyLine(r.Name), RuleRelations,
 					fmt.Sprintf("%s %q is a string, not a link: it connects nothing in Obsidian. "+
-						"Write it as %q", r.Field, raw, task.Link(noteFor(raw, byKey)))})
+						"Write it as %q", r.Name, raw, task.Link(noteFor(raw, byKey)))})
 			}
 		}
 		// A relation pointing at nothing is a relation about a task that was
 		// renamed away or never existed, and is worth the same attention as a
 		// parent that does not exist.
-		for _, key := range t.Related(r.Field) {
+		for _, key := range t.Related(r.Name) {
 			if _, ok := byKey[key]; !ok {
-				add(Finding{e.Path, t.PropertyLine(r.Field), RuleParent,
-					fmt.Sprintf("%s %q, which is not in this vault", r.Field, key)})
+				add(Finding{e.Path, t.PropertyLine(r.Name), RuleParent,
+					fmt.Sprintf("%s %q, which is not in this vault", r.Name, key)})
 			}
 		}
 	}

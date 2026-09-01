@@ -208,6 +208,24 @@ func (s *Space) Config() (*project.Config, error) {
 			}
 		}
 		merged.Priorities = union(merged.Priorities, c.Priorities, seenText, "priority:")
+
+		// A project's own properties and its own verbs, which the merge used to
+		// drop on the floor. A workspace then showed neither: a field declared
+		// by one repository was invisible on its own tasks, because the page
+		// asks the space rather than the project. First declaration wins, the
+		// same rule as a type's level.
+		for _, f := range c.Fields {
+			if !seenText["field:"+f.Name] {
+				seenText["field:"+f.Name] = true
+				merged.Fields = append(merged.Fields, f)
+			}
+		}
+		for _, r := range c.Declared {
+			if !seenText["relation:"+r.Name] {
+				seenText["relation:"+r.Name] = true
+				merged.Declared = append(merged.Declared, r)
+			}
+		}
 	}
 	return merged, nil
 }

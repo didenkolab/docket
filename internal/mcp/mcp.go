@@ -310,12 +310,12 @@ type taskView struct {
 	Note      string              `json:"note"` // what a wikilink to this task says
 }
 
-func view(e vault.Entry) taskView {
+func view(e vault.Entry, relations []string) taskView {
 	return taskView{
 		Key: e.Key, Title: e.Task.Title, Type: e.Task.Type,
 		Status: e.Task.Status, Category: e.Task.StatusCategory,
 		Priority: e.Task.Priority, Assignee: e.Task.Assignee, Parent: e.Task.Parent,
-		Labels: e.Task.Labels, Tags: e.Task.Tags, Relations: e.Task.AllRelations(),
+		Labels: e.Task.Labels, Tags: e.Task.Tags, Relations: e.Task.AllRelations(relations),
 		Path: e.Path, Note: e.Note(),
 	}
 }
@@ -330,6 +330,10 @@ func (s *Server) listTasks(raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Which verbs a task can carry is the vault's vocabulary. A space whose
+	// configuration cannot be read still lists its tasks: the relations then
+	// fall back to the ones the format ships.
+	c, _ := s.Space.Config()
 
 	out := []taskView{}
 	for _, e := range entries {
@@ -348,7 +352,7 @@ func (s *Server) listTasks(raw json.RawMessage) (any, error) {
 		if args.Assignee != "" && e.Task.Assignee != args.Assignee {
 			continue
 		}
-		out = append(out, view(e))
+		out = append(out, view(e, relationFields(c)))
 	}
 	return jsonText(out)
 }
@@ -382,7 +386,7 @@ func (s *Server) getTask(raw json.RawMessage) (any, error) {
 			Comments    []task.Comment `json:"comments,omitempty"`
 			Reachable   []string       `json:"reachable_statuses"`
 		}{
-			taskView:    view(e),
+			taskView:    view(e, relationFields(c)),
 			Version:     fingerprint(e.Raw),
 			Description: e.Task.Description(),
 			Comments:    e.Task.Comments(),
@@ -469,4 +473,18 @@ func relBase(rel string) string {
 		return rel[slash+1:]
 	}
 	return rel
+}
+
+// relationFields is the vault's relations, as property names. Which verbs exist
+// is vocabulary, so it comes from the configuration rather than from a list in
+// the code — see project.Relations.
+func relationFields(c *project.Config) []string {
+	if c == nil {
+		c = &project.Config{}
+	}
+	var names []string
+	for _, r := range c.Relations() {
+		names = append(names, r.Name)
+	}
+	return names
 }

@@ -160,10 +160,11 @@ func (s *Server) updateTask(raw json.RawMessage) (any, error) {
 		t.SetTags(*args.Tags)
 		changed = append(changed, "tags")
 	}
+	relations := relationFields(c)
 	for field, keys := range args.Relations {
-		if !task.IsRelation(field) {
+		if !named(relations, field) {
 			return nil, fmt.Errorf("%s is not a relation: it is one of %s",
-				field, relationNames())
+				field, strings.Join(relations, ", "))
 		}
 		notes, err := s.notesFor(keys)
 		if err != nil {
@@ -393,12 +394,14 @@ func (s *Server) notesFor(keys []string) ([]string, error) {
 	return notes, nil
 }
 
-func relationNames() string {
-	var names []string
-	for _, r := range task.Relations {
-		names = append(names, r.Field)
+// named reports whether a list holds that name.
+func named(names []string, want string) bool {
+	for _, name := range names {
+		if name == want {
+			return true
+		}
 	}
-	return strings.Join(names, ", ")
+	return false
 }
 
 // taskAt reads one task, or nil when it cannot be read. Used where a missing

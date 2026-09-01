@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
@@ -37,6 +38,11 @@ type relatedTask struct {
 // another shows it under "is blocked by" if it says so, and under "Referenced
 // by" either way.
 func (s *Server) relationsOf(r *http.Request, t *task.Task) []relationGroup {
+	relations := project.DefaultRelations()
+	if c, err := s.config(); err == nil {
+		relations = c.Relations()
+	}
+
 	entries, err := s.entries(r)
 	if err != nil {
 		return nil
@@ -49,8 +55,8 @@ func (s *Server) relationsOf(r *http.Request, t *task.Task) []relationGroup {
 	}
 
 	var groups []relationGroup
-	for _, r := range task.Relations {
-		keys := t.Related(r.Field)
+	for _, r := range relations {
+		keys := t.Related(r.Name)
 		if len(keys) == 0 {
 			continue
 		}
@@ -114,10 +120,10 @@ func (s *Server) notesFor(keys []string) ([]string, error) {
 
 // relationNames is the list to offer when somebody names one that does not
 // exist.
-func relationNames() string {
+func relationNames(relations []project.Relation) string {
 	var names []string
-	for _, r := range task.Relations {
-		names = append(names, r.Field)
+	for _, r := range relations {
+		names = append(names, r.Name)
 	}
 	return "one of " + strings.Join(names, ", ")
 }

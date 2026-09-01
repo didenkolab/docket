@@ -51,8 +51,10 @@ func toJSON(c *project.Config, t *task.Task, version string, withBody bool) task
 	if c != nil {
 		out.Reachable = names(c.Reachable(t.Status))
 	}
-	if related := t.AllRelations(); len(related) > 0 {
-		out.Relations = related
+	if c != nil {
+		if related := t.AllRelations(relationFields(c)); len(related) > 0 {
+			out.Relations = related
+		}
 	}
 	if withBody {
 		out.Body = t.Body()
@@ -241,9 +243,13 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 			t.SetTags(*req.Tags)
 			changed = append(changed, "tags")
 		}
+		relations := project.DefaultRelations()
+		if c, err := s.config(); err == nil {
+			relations = c.Relations()
+		}
 		for field, keys := range req.Relations {
-			if !task.IsRelation(field) {
-				return "", nil, errors.New(field + " is not a relation: " + relationNames())
+			if !isRelation(relations, field) {
+				return "", nil, errors.New(field + " is not a relation: " + relationNames(relations))
 			}
 			notes, err := s.notesFor(keys)
 			if err != nil {
@@ -296,4 +302,23 @@ func (s *Server) apiPatchTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toJSON(c, t, version, true))
+}
+
+// relationFields is the vault's relations, as property names.
+func relationFields(c *project.Config) []string {
+	var names []string
+	for _, r := range c.Relations() {
+		names = append(names, r.Name)
+	}
+	return names
+}
+
+// isRelation reports whether that property is one of the vault's relations.
+func isRelation(relations []project.Relation, name string) bool {
+	for _, r := range relations {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
 }

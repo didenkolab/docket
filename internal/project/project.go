@@ -231,6 +231,11 @@ type Config struct {
 	// the format defines.
 	Fields []Field `yaml:"fields,omitempty"`
 
+	// Declared are the relations this vault added — a verb between two tasks
+	// that the format does not ship. Read through Relations(), which puts the
+	// built-in ones first and expands each declared pair into both directions.
+	Declared []Relation `yaml:"relations,omitempty"`
+
 	// Estimates is the unit work is sized in, and the scale if there is one.
 	// Omitted when the vault does not size work — a vault that never asked for
 	// estimates should not grow a field it has to leave empty.
@@ -322,6 +327,9 @@ func FindRoot(start string) (string, error) {
 func (c *Config) validate() error {
 	if strings.TrimSpace(c.Name) == "" {
 		return errors.New("the vault has no name")
+	}
+	if err := c.validateRelations(); err != nil {
+		return err
 	}
 	if len(c.Projects) == 0 {
 		return errors.New("no projects: a vault with no projects can hold no tasks")

@@ -99,7 +99,7 @@ func comparePlans(before, after []vault.Entry, was, now *project.Config) planCha
 				Says:     []string{"was " + old.Status},
 			})
 		default:
-			if says := whatChanged(old, fresh); len(says) > 0 {
+			if says := whatChanged(old, fresh, relationFields(now)); len(says) > 0 {
 				change.Changed = append(change.Changed, taskChange{
 					Key: key, Title: fresh.Title, Status: fresh.Status,
 					Category: fresh.StatusCategory, Says: says,
@@ -117,7 +117,7 @@ func comparePlans(before, after []vault.Entry, was, now *project.Config) planCha
 // whatChanged is every difference between two versions of one task, said once
 // each. Order matters: a move is what somebody is looking for, and a body
 // rewrite is what they will miss.
-func whatChanged(old, fresh *task.Task) []string {
+func whatChanged(old, fresh *task.Task, relations []string) []string {
 	var says []string
 
 	if old.Status != fresh.Status {
@@ -144,9 +144,8 @@ func whatChanged(old, fresh *task.Task) []string {
 	if said := setChange("tag", old.Tags, fresh.Tags); said != "" {
 		says = append(says, said)
 	}
-	for _, relation := range task.Relations {
-		if said := setChange(relation.Field, old.Related(relation.Field),
-			fresh.Related(relation.Field)); said != "" {
+	for _, name := range relations {
+		if said := setChange(name, old.Related(name), fresh.Related(name)); said != "" {
 			says = append(says, said)
 		}
 	}
