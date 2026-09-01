@@ -76,7 +76,7 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	defer s.writes.Unlock()
 
 	before := dirtyIn(v.Root)
-	said, runErr := reaction.Posted(r.Context(), v.Root, inbound.Run, posted, actionLife)
+	said, runErr := reaction.Posted(r.Context(), v.Root, inbound.Run, posted, actionLife, s.whereEnv(v))
 	after := dirtyIn(v.Root)
 
 	var wrote []string

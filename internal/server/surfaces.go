@@ -83,7 +83,8 @@ func (s *Server) handleSurface(w http.ResponseWriter, r *http.Request) {
 	}
 
 	said, err := reaction.Output(r.Context(), v.Root, surface.Run,
-		map[string]string{"surface": surface.Name, "root": v.Root}, surfaceLife)
+		map[string]string{"surface": surface.Name, "root": v.Root}, surfaceLife,
+		s.whereEnv(v))
 	if err != nil {
 		view.Trouble = err.Error()
 		if said != "" {
@@ -155,7 +156,7 @@ func (s *Server) panelsFor(r *http.Request, key string) []panel {
 			map[string]string{
 				"panel": declared.Name, "key": key,
 				"path": filepath.ToSlash(at), "root": owner.Root,
-			}, surfaceLife)
+			}, surfaceLife, s.whereEnv(owner))
 		switch {
 		case err != nil:
 			shown.Trouble = err.Error()
@@ -253,7 +254,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	before := dirtyIn(v.Root)
 	said, err := reaction.Output(r.Context(), v.Root, action.Run,
-		map[string]string{"action": action.Name, "root": v.Root}, actionLife)
+		map[string]string{"action": action.Name, "root": v.Root}, actionLife, s.whereEnv(v))
 	after := dirtyIn(v.Root)
 
 	var wrote []string
@@ -283,3 +284,16 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 // page that only draws, because this one is doing something they asked for —
 // and still bounded, because a browser gives up on its own.
 const actionLife = 3 * time.Minute
+
+// whereEnv tells a program where its vault sits in the space.
+//
+// An app writing a picture into its own attachments folder has to link to it,
+// and in a workspace that link carries the project in front of the path. The
+// alternative is every app guessing, and every app guessing differently.
+func (s *Server) whereEnv(v *space.Vault) string {
+	prefix := ""
+	if v != nil && v.Prefix != "" {
+		prefix = v.Prefix + "/"
+	}
+	return "DOCKET_PREFIX=" + prefix
+}

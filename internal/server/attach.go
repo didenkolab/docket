@@ -161,7 +161,15 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 // is a repository, and the rest of it is not the web server's to hand out.
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	rel := path.Clean("/" + r.PathValue("path"))[1:]
-	if !strings.HasPrefix(rel, vault.Attachments+"/") || strings.Contains(rel, "..") {
+	// Inside its own repository the folder is attachments/; in a workspace the
+	// path carries the project in front of it. Checking only the bare prefix
+	// meant an attachment in a workspace was a 404 — and an app drawing a chart
+	// into its own vault had nowhere to point at.
+	inVault := rel
+	if v, at, err := s.sp().Resolve(rel); err == nil && v != nil {
+		inVault = at
+	}
+	if !strings.HasPrefix(inVault, vault.Attachments+"/") || strings.Contains(rel, "..") {
 		http.NotFound(w, r)
 		return
 	}

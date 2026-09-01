@@ -185,8 +185,8 @@ func run(ctx context.Context, root string, d Declared, e Event) Result {
 // The same rules and the same one place: what arrives from outside is a body
 // somebody else wrote, and handing it to a shell would be handing a stranger a
 // command line.
-func Posted(ctx context.Context, root, run string, body []byte, limit time.Duration) (string, error) {
-	return output(ctx, root, run, body, nil, limit)
+func Posted(ctx context.Context, root, run string, body []byte, limit time.Duration, env ...string) (string, error) {
+	return output(ctx, root, run, body, nil, limit, env...)
 }
 
 // Output runs a program in the repository and returns what it printed.
@@ -197,7 +197,7 @@ func Posted(ctx context.Context, root, run string, body []byte, limit time.Durat
 // stdin as JSON. A page that renders a program's output and a reaction that
 // writes a file are the same act with different consequences, and they must not
 // be able to disagree about what is safe.
-func Output(ctx context.Context, root, run string, told any, limit time.Duration) (string, error) {
+func Output(ctx context.Context, root, run string, told any, limit time.Duration, env ...string) (string, error) {
 	if err := (Declared{On: OnMoved, Run: run}).Validate(); err != nil {
 		return "", err
 	}
@@ -213,11 +213,11 @@ func Output(ctx context.Context, root, run string, told any, limit time.Duration
 	if err != nil {
 		return "", err
 	}
-	return output(ctx, root, run, body, told, limit)
+	return output(ctx, root, run, body, told, limit, env...)
 }
 
 // output is the one place a vault's own program is executed.
-func output(ctx context.Context, root, run string, body []byte, told any, limit time.Duration) (string, error) {
+func output(ctx context.Context, root, run string, body []byte, told any, limit time.Duration, env ...string) (string, error) {
 	program := filepath.Join(root, filepath.FromSlash(run))
 
 	ctx, stop := context.WithTimeout(ctx, limit)
@@ -240,6 +240,7 @@ func output(ctx context.Context, root, run string, body []byte, told any, limit 
 	if e, ok := told.(Event); ok {
 		cmd.Env = append(cmd.Env, "DOCKET_EVENT="+e.Event)
 	}
+	cmd.Env = append(cmd.Env, env...)
 
 	var said bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &said, &said
