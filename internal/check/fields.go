@@ -59,14 +59,19 @@ func checkFields(add func(Finding), e vault.Entry, c *project.Config) {
 			}
 			continue
 		}
-		if wrong := wrongFor(f, value); wrong != "" {
+		if wrong := WrongFor(f, value); wrong != "" {
 			add(Finding{e.Path, line, RuleFields, wrong})
 		}
 	}
 }
 
 // wrongFor is what is wrong with a value, or empty.
-func wrongFor(f project.Field, value string) string {
+// WrongFor is why a value does not fit the field, or "" when it does.
+//
+// Exported because a script writing through `docket set` has to be held to the
+// same rule as a person: a validator that only runs at check time is a
+// validator that finds out after the fact.
+func WrongFor(f project.Field, value string) string {
 	switch f.Kind {
 	case project.FieldNumber:
 		if _, err := strconv.ParseFloat(value, 64); err != nil {
