@@ -60,8 +60,8 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	template := flags.String("template", "",
 		"the repository a new project is scaffolded from\n"+
 			"    \t(default "+vault.DefaultTemplate+")")
-	reactions := flags.Bool("reactions", false,
-		"run the programs this vault declares under reactions: in docket.yaml\n"+
+	programs := flags.Bool("programs", false,
+		"run the programs this vault declares — its reactions, pages and panels\n"+
 			"    \t(off unless said here: a repository can declare a program, and only\n"+
 			"    \twhoever starts the server can agree to execute it on this machine)")
 	clientID := flags.String("device-client-id", "",
@@ -128,7 +128,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 
 		DeviceClientID: deviceClientID(*clientID),
 		Template:       *template,
-		Reactions:      *reactions,
+		Programs:       *programs,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "docket serve: %v\n", err)

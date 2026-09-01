@@ -51,6 +51,8 @@ type pageData struct {
 	// worth a place in the navigation. A vault that keeps no people does not
 	// get a menu item for an empty list.
 	People bool
+	// Surfaces are the pages this vault's apps declare, for the navigation.
+	Surfaces []project.Surface
 	// Views says the vault has saved views — boards/*.base — to offer. Every
 	// scaffolded vault has some, so this is all but always true; it is asked
 	// rather than assumed so that a vault whose boards folder was deleted does
@@ -94,6 +96,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		Sprints:   len(s.sp().Sprints()) > 0,
 		Views:     len(s.sp().Views()) > 0,
 		People:    len(s.peopleIn()) > 0,
+		Surfaces:  s.surfaces(),
 		Theme:     themeAttribute(themeOf(r)),
 		Themes:    themeChoices(themeOf(r)),
 		Here:      r.URL.RequestURI(),
@@ -679,6 +682,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	view.Fields = shownFields(c, t)
+	view.Panels = s.panelsFor(r, t.Key)
 	view.People = s.candidates(r)
 	view.Me = s.meAs(r)
 	s.render(w, r, "task.html", c, t.Key+" "+t.Title, view)
@@ -734,6 +738,9 @@ type taskView struct {
 	// below it, the comments, the history and the delete button, was gone, and
 	// nothing said so.
 	People []candidate
+	// Panels are blocks drawn by this vault's apps, each from a program's
+	// output. Empty on a server that does not run programs.
+	Panels []panel
 	// Me is the handle of whoever is reading, when the host knows them, so the
 	// work can be taken in one click.
 	Me string

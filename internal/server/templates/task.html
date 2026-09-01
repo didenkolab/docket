@@ -115,6 +115,13 @@
     </section>
     {{end}}
 
+    {{range $data.Panels}}
+    <section class="block">
+      <h2>{{.Title}}</h2>
+      {{if .Trouble}}<pre class="said">{{.Trouble}}</pre>{{else}}<div class="body">{{.Body}}</div>{{end}}
+    </section>
+    {{end}}
+
     <section class="block" id="activity">
       <h2>Activity <span class="count">{{len $data.Comments}}</span></h2>
 

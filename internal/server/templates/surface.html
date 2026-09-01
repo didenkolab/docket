@@ -1,0 +1,19 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>{{$data.Title}}</h1>
+
+{{if $data.Refused}}
+<div class="notice warn">
+  This page is drawn by <code>{{$data.Ran}}</code>, a program in this repository, and this server
+  was not started with <code>--programs</code>. A repository can declare a program; only whoever
+  starts the server can agree to run it on this machine — the same reason git does not put hooks
+  in the repository.
+</div>
+{{else if $data.Trouble}}
+<div class="notice warn"><pre class="said">{{$data.Trouble}}</pre></div>
+{{else}}
+<div class="body">{{$data.Body}}</div>
+<p class="footnote">Drawn by <code>{{$data.Ran}}</code>, each time this page is opened.</p>
+{{end}}
+{{template "foot" .}}

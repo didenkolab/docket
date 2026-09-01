@@ -134,8 +134,23 @@ func describe(p *app.Pack) string {
 	if n := len(p.Vocabulary.Relations); n > 0 {
 		fmt.Fprintf(&b, "  relations  %s\n", names(relationPairs(p)))
 	}
+	if n := len(p.Surfaces.Pages) + len(p.Surfaces.Panels); n > 0 {
+		var shown []string
+		for _, page := range p.Surfaces.Pages {
+			shown = append(shown, page.Called()+" (page)")
+		}
+		for _, panel := range p.Surfaces.Panels {
+			shown = append(shown, panel.Called()+" (panel)")
+		}
+		fmt.Fprintf(&b, "  draws      %s\n", names(shown))
+	}
 	if n := len(p.Files); n > 0 {
 		fmt.Fprintf(&b, "  files      %s\n", names(p.Files))
+	}
+	if p.BringsPrograms() {
+		fmt.Fprint(&b, "\n  This app brings a program. Installing it writes the file; nothing\n"+
+			"  runs it unless a server is started with --programs, which is a\n"+
+			"  decision made on the machine that would run it. Read the program.\n")
 	}
 	return b.String()
 }

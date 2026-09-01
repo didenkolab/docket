@@ -39,9 +39,14 @@ const FileName = "docket-app.yaml"
 
 // Copyable are the folders a pack may put files in.
 //
-// Deliberately three. A pack that could write anywhere could write docket.yaml,
+// Deliberately four. A pack that could write anywhere could write docket.yaml,
 // a task, or a .git hook, and then installing one would be running one.
-var Copyable = []string{"templates", "boards", "docs"}
+//
+// hooks/ is where a program lives, and a file there arrives executable if it
+// was executable in the pack. That is not consent to run it: nothing in a
+// repository runs unless the server was started with --programs. Installing
+// writes the file; running it is a separate decision made on the machine.
+var Copyable = []string{"templates", "boards", "docs", "hooks"}
 
 // Manifest is what a pack says it is.
 type Manifest struct {
@@ -50,6 +55,31 @@ type Manifest struct {
 	Version     string `yaml:"version,omitempty"`
 	// Vocabulary is what it adds to docket.yaml.
 	Vocabulary Vocabulary `yaml:"vocabulary,omitempty"`
+	// Surfaces are the pages and panels it draws, each from a program it
+	// carries. An app declaring one is an app that brings code, and installing
+	// it says so out loud.
+	Surfaces Surfaces `yaml:"surfaces,omitempty"`
+}
+
+// Surfaces are the pages and panels a pack declares.
+type Surfaces struct {
+	Pages  []project.Surface `yaml:"pages,omitempty"`
+	Panels []project.Surface `yaml:"panels,omitempty"`
+}
+
+// BringsPrograms reports whether installing this would put a program in the
+// repository — the fact that decides whether anybody has to think before
+// installing it.
+func (p *Pack) BringsPrograms() bool {
+	if len(p.Surfaces.Pages) > 0 || len(p.Surfaces.Panels) > 0 {
+		return true
+	}
+	for _, file := range p.Files {
+		if strings.HasPrefix(file, "hooks/") {
+			return true
+		}
+	}
+	return false
 }
 
 // Vocabulary is the part of a configuration a pack may contribute.
@@ -253,6 +283,16 @@ func Check(root string, c *project.Config, p *Pack) []Conflict {
 		}
 	}
 
+	for _, page := range append(append([]project.Surface{}, p.Surfaces.Pages...), p.Surfaces.Panels...) {
+		for _, existing := range append(append([]project.Surface{}, c.Pages...), c.Panels...) {
+			if strings.EqualFold(existing.Name, page.Name) && existing.Run != page.Run {
+				out = append(out, Conflict{"page", page.Name, fmt.Sprintf(
+					"this vault already draws it with %s and the app wants %s",
+					existing.Run, page.Run)})
+			}
+		}
+	}
+
 	// A file that is already there and differs is somebody's edit. Identical is
 	// fine — installing the same app twice should be quiet.
 	for _, rel := range p.Files {
@@ -306,7 +346,11 @@ func Install(root string, c *project.Config, p *Pack) ([]string, error) {
 		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 			return changed, err
 		}
-		if err := os.WriteFile(to, body, 0o644); err != nil {
+		mode := os.FileMode(0o644)
+		if info, err := os.Stat(from); err == nil && info.Mode()&0o111 != 0 {
+			mode = 0o755
+		}
+		if err := os.WriteFile(to, body, mode); err != nil {
 			return changed, err
 		}
 		changed = append(changed, rel)
@@ -342,7 +386,8 @@ func Install(root string, c *project.Config, p *Pack) ([]string, error) {
 
 // merge adds the pack's vocabulary to docket.yaml and records the app.
 func merge(root string, c *project.Config, p *Pack) (bool, error) {
-	before := len(c.Types) + len(c.Fields) + len(c.Declared) + len(c.Apps)
+	before := len(c.Types) + len(c.Fields) + len(c.Declared) + len(c.Apps) +
+		len(c.Pages) + len(c.Panels)
 	known := func(name string, in []string) bool {
 		for _, got := range in {
 			if got == name {
@@ -375,6 +420,16 @@ func merge(root string, c *project.Config, p *Pack) (bool, error) {
 			c.Declared = append(c.Declared, r)
 		}
 	}
+	for _, page := range p.Surfaces.Pages {
+		if !hasSurface(c.Pages, page.Name) {
+			c.Pages = append(c.Pages, page)
+		}
+	}
+	for _, shown := range p.Surfaces.Panels {
+		if !hasSurface(c.Panels, shown.Name) {
+			c.Panels = append(c.Panels, shown)
+		}
+	}
 
 	// Recorded so `docket app list` can say what is installed, and so a later
 	// version of the same app can tell what it is replacing.
@@ -389,7 +444,8 @@ func merge(root string, c *project.Config, p *Pack) (bool, error) {
 		c.Apps = append(c.Apps, project.App{Name: p.Name, Source: p.Source, Version: p.Version})
 	}
 
-	if before == len(c.Types)+len(c.Fields)+len(c.Declared)+len(c.Apps) && replaced {
+	if before == len(c.Types)+len(c.Fields)+len(c.Declared)+len(c.Apps)+
+		len(c.Pages)+len(c.Panels) && replaced {
 		// Nothing new: the same app at the same version, installed twice.
 		return false, nil
 	}
@@ -399,3 +455,13 @@ func merge(root string, c *project.Config, p *Pack) (bool, error) {
 // Named is the pack directory's own name, used when a manifest is being written
 // rather than read.
 func Named(dir string) string { return path.Base(filepath.ToSlash(dir)) }
+
+// hasSurface reports whether a list already declares that name.
+func hasSurface(surfaces []project.Surface, name string) bool {
+	for _, s := range surfaces {
+		if strings.EqualFold(s.Name, name) {
+			return true
+		}
+	}
+	return false
+}

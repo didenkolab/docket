@@ -70,12 +70,13 @@ type Options struct {
 	// Template is the repository a new project is scaffolded from. Empty means
 	// vault.DefaultTemplate, which is the public one.
 	Template string
-	// Reactions lets this server run what the vault declares under `reactions:`.
+	// Programs lets this server run what the vault declares: its reactions, and
+	// the pages and panels drawn from a program's output.
 	//
 	// Off unless said, and said on the machine that would run them. A
 	// repository can declare a program; only whoever starts the server can
 	// agree to execute it. See internal/reaction.
-	Reactions bool
+	Programs bool
 	// Unauthenticated runs the server with nobody signed in, whatever the
 	// repositories say about their hosts.
 	//
@@ -125,8 +126,8 @@ type Server struct {
 	// when nothing here has a remote to send to.
 	pushes *pushing
 
-	// reactions says this server may run what the vault declares.
-	reactions bool
+	// programs says this server may run what the vault declares.
+	programs bool
 
 	// members is who each host says has access, remembered for a while so that
 	// offering an assignee is not a request to github.com per page.
@@ -191,7 +192,7 @@ func New(root string, opts Options) (*Server, error) {
 		deviceClientID: strings.TrimSpace(opts.DeviceClientID),
 		onLoopback:     opts.OnLoopback && !opts.BehindProxy,
 		pushes:         newPushing(),
-		reactions:      opts.Reactions,
+		programs:       opts.Programs,
 		template:       orTemplate(opts.Template),
 		namedHost:      opts.Host,
 	}
@@ -441,7 +442,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /releases", s.handleReleases)
 	mux.HandleFunc("GET /sprints", s.handleSprints)
 	mux.HandleFunc("GET /sprint/{note}", s.handleSprint)
-	mux.HandleFunc("GET /reports/time-in-status", s.handleTimeInStatus)
+	mux.HandleFunc("GET /app/{name}", s.handleSurface)
 	mux.HandleFunc("GET /people", s.handlePeople)
 	mux.HandleFunc("GET /person/{handle}", s.handlePerson)
 	mux.HandleFunc("GET /views", s.handleViews)

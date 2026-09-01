@@ -44,8 +44,8 @@ cat > "$DOCKET_ROOT/docs/last-done.json"
 	git(t, root, "-c", "user.email=t@example.com", "-c", "user.name=T", "commit", "-q", "-m", "a reaction")
 
 	s, err := New(root, Options{
-		Author:    gitvcs.Author{Name: "Server", Email: "server@example.com"},
-		Reactions: allowed,
+		Author:   gitvcs.Author{Name: "Server", Email: "server@example.com"},
+		Programs: allowed,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -46,11 +46,11 @@ func (s *Server) react(r *http.Request, v *space.Vault, e reaction.Event) {
 		declared = append(declared, reaction.Declared(d))
 	}
 
-	if !s.reactions {
+	if !s.programs {
 		// Said once per event rather than silently: a vault whose automation is
 		// not running should be able to find out why without reading the source.
 		log.Printf("docket: %s declares %d reactions and this server was not started "+
-			"with --reactions, so none ran", v.Prefix, len(declared))
+			"with --programs, so none ran", v.Prefix, len(declared))
 		return
 	}
 

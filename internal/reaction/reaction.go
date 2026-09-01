@@ -217,6 +217,13 @@ func Output(ctx context.Context, root, run string, told any, limit time.Duration
 	cmd.Dir = root
 	cmd.Stdin = bytes.NewReader(body)
 	cmd.Env = append(os.Environ(), "DOCKET_ROOT="+root)
+	// The tool itself, so a program can ask it for data rather than parsing the
+	// vault again. This is what keeps a report an app: the hard reading —
+	// history, renames, the vault's vocabulary — stays in one tested place, and
+	// the app formats what it prints.
+	if self, err := os.Executable(); err == nil {
+		cmd.Env = append(cmd.Env, "DOCKET_BIN="+self)
+	}
 	if e, ok := told.(Event); ok {
 		cmd.Env = append(cmd.Env, "DOCKET_EVENT="+e.Event)
 	}

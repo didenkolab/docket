@@ -79,6 +79,29 @@ type Reaction struct {
 	Project string `yaml:"project,omitempty"`
 }
 
+// Surface is a page or a panel drawn from what a program prints.
+//
+// The output is Markdown, rendered the way every other page in the vault is:
+// an app that could return HTML would be an app that could put anything on a
+// page somebody trusts, and Markdown is the format the vault is written in
+// anyway.
+type Surface struct {
+	// Name is what it is called in an address: /app/<name>.
+	Name string `yaml:"name"`
+	// Title is what the navigation says. Defaults to the name.
+	Title string `yaml:"title,omitempty"`
+	// Run is the program, as a path inside the repository.
+	Run string `yaml:"run"`
+}
+
+// Called is what to show for a surface.
+func (s Surface) Called() string {
+	if strings.TrimSpace(s.Title) != "" {
+		return s.Title
+	}
+	return s.Name
+}
+
 // App is a pack this vault has installed.
 type App struct {
 	Name    string `yaml:"name"`
@@ -256,6 +279,16 @@ type Config struct {
 	// permission to execute code on somebody's machine, which is the same
 	// reason git does not share .git/hooks. See internal/reaction.
 	Reactions []Reaction `yaml:"reactions,omitempty"`
+
+	// Pages and Panels are surfaces drawn from a program's output: a page of
+	// its own in the navigation, and a block on every task.
+	//
+	// The mechanism the reporting apps need — twenty two of the marketplace's
+	// top hundred are a query and a drawing, and the query is a command. Run
+	// under the same consent as a reaction: only a server started with
+	// --programs runs any of them.
+	Pages  []Surface `yaml:"pages,omitempty"`
+	Panels []Surface `yaml:"panels,omitempty"`
 
 	// Apps are the packs this vault has taken on: what they added is in the
 	// vocabulary above like anything else, and this is the record of where it
