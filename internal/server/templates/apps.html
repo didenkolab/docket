@@ -1,0 +1,82 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Apps</h1>
+<p class="lede">
+  An app is a git repository with an <code>docket-app.yaml</code> in it. Paste its URL and it is
+  cloned, read, and merged into this vault as a diff — types, fields, relations, templates, saved
+  views and documents. Nothing is registered anywhere and nobody has to be asked.
+</p>
+
+{{if $data.Saved}}<div class="notice ok">{{$data.Saved}}</div>{{end}}
+{{if $data.Trouble}}<div class="notice warn">{{$data.Trouble}}</div>{{end}}
+
+{{if $data.Installed}}
+<table class="settings">
+  <thead><tr><th>Installed</th><th>Version</th><th>From</th></tr></thead>
+  <tbody>
+    {{range $data.Installed}}
+    <tr><td><code>{{.Name}}</code></td><td>{{.Version}}</td><td class="remote"><code>{{.Source}}</code></td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+
+{{if $data.CanWrite}}
+<h2>Add one</h2>
+<form class="stacked" method="get" action="/apps">
+  <label for="source">Repository URL</label>
+  <input id="source" name="source" required autofocus class="field-wide"
+         value="{{with $data.Offered}}{{.Source}}{{end}}"
+         placeholder="https://github.com/vadymdidenkolab/docket-apps.git#risks">
+  <button type="submit">Look at it</button>
+</form>
+<p class="footnote">
+  Whatever you would give <code>git clone</code>. A <code>#folder</code> on the end names one app
+  inside a repository that holds several. Nothing is written until you say so on the next screen.
+</p>
+
+{{with $data.Offered}}
+<section class="block">
+  <h2>{{if .Name}}{{.Name}}{{if .Version}} {{.Version}}{{end}}{{else}}That URL{{end}}</h2>
+  {{if .Description}}<p class="lede">{{.Description}}</p>{{end}}
+
+  {{if .Conflicts}}
+  <div class="notice warn">
+    <strong>This cannot be installed as it is.</strong>
+    <ul>{{range .Conflicts}}<li>{{.}}</li>{{end}}</ul>
+    Nothing was written.
+  </div>
+  {{else}}
+  <table class="settings">
+    <tbody>
+      {{if .Types}}<tr><td>Types</td><td>{{range $i, $t := .Types}}{{if $i}}, {{end}}<code>{{$t}}</code>{{end}}</td></tr>{{end}}
+      {{if .Fields}}<tr><td>Fields</td><td>{{range $i, $f := .Fields}}{{if $i}}, {{end}}<code>{{$f}}</code>{{end}}</td></tr>{{end}}
+      {{if .Relations}}<tr><td>Relations</td><td>{{range $i, $r := .Relations}}{{if $i}}, {{end}}<code>{{$r}}</code>{{end}}</td></tr>{{end}}
+      {{if .Draws}}<tr><td>Draws</td><td>{{range $i, $d := .Draws}}{{if $i}}, {{end}}{{$d}}{{end}}</td></tr>{{end}}
+      {{if .Files}}<tr><td>Files</td><td>{{range $i, $f := .Files}}{{if $i}}, {{end}}<code>{{$f}}</code>{{end}}</td></tr>{{end}}
+    </tbody>
+  </table>
+
+  {{if .Brings}}
+  <div class="notice warn">
+    <strong>This app brings a program.</strong> Installing it writes the file into this
+    repository. Nothing runs it unless a server is started with <code>--programs</code>, which is
+    a decision made on the machine that would run it — the same reason git does not put hooks in
+    a repository. Read the program before you install it.
+    {{if not $.Data.Programs}}This server does not run programs, so its pages will say so rather
+    than draw.{{end}}
+  </div>
+  {{end}}
+
+  <form method="post" action="/apps/install">
+    {{template "csrf" $}}
+    <input type="hidden" name="source" value="{{.Source}}">
+    <button type="submit">Install it</button>
+    <span class="hint">Written into this repository and committed, so what it did is a diff.</span>
+  </form>
+  {{end}}
+</section>
+{{end}}
+{{end}}
+{{template "foot" .}}

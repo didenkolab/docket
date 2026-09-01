@@ -180,6 +180,10 @@ func Read(dir, source string) (*Pack, error) {
 func Fetch(source string) (*Pack, func(), error) {
 	nothing := func() {}
 
+	// The whole string is what gets recorded, so that installing again from the
+	// same place finds the same app: a source that lost its #folder points at a
+	// repository with no manifest at its root.
+	asked := source
 	remote, inside := source, ""
 	if at := strings.LastIndex(source, "#"); at >= 0 {
 		remote, inside = source[:at], strings.Trim(source[at+1:], "/")
@@ -191,7 +195,7 @@ func Fetch(source string) (*Pack, func(), error) {
 
 	if info, err := os.Stat(remote); err == nil && info.IsDir() {
 		at := filepath.Join(remote, filepath.FromSlash(inside))
-		pack, err := Read(at, source)
+		pack, err := Read(at, asked)
 		return pack, nothing, err
 	}
 	source = remote
@@ -214,7 +218,7 @@ func Fetch(source string) (*Pack, func(), error) {
 			source, strings.TrimSpace(string(out)))
 	}
 
-	pack, err := Read(filepath.Join(at, filepath.FromSlash(inside)), source)
+	pack, err := Read(filepath.Join(at, filepath.FromSlash(inside)), asked)
 	if err != nil {
 		cleanup()
 		return nil, nothing, err

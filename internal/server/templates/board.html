@@ -1,7 +1,7 @@
 {{template "head" .}}
 {{$data := .Data}}
 
-{{if $data.Ref}}
+{{if and $data.Ref (not $data.Walk.At)}}
 <div class="proposal">
   <strong>{{$data.Ref}}</strong> — a board as it would be on that branch, read out of the
   repository rather than off the disk. Nothing here can be changed; a proposal is changed by
@@ -44,6 +44,27 @@
     other; there is one set of files.
   </p>
 </div>
+{{end}}
+
+{{with $data.Walk}}
+{{if .Trouble}}
+<div class="notice warn">{{.Trouble}} This is the board as it is now.</div>
+{{end}}
+{{if or .At .Earlier}}
+<div class="walk{{if .At}} back{{end}}">
+  {{if .Earlier}}<a href="{{.Earlier}}">← earlier</a>{{else}}<span class="left">← earlier</span>{{end}}
+  {{if .At}}
+  <span class="when">
+    <code>{{.Short}}</code> {{.Subject}} — {{.Who}}, {{.When}}
+  </span>
+  {{else}}
+  <span class="when">the board as it is now</span>
+  {{end}}
+  {{if .Later}}<a href="{{.Later}}">later →</a>{{else}}<span class="left">later →</span>{{end}}
+  {{if .At}}<a class="now" href="{{.Now}}">back to now</a>{{end}}
+  <span class="left">{{.Position}}</span>
+</div>
+{{end}}
 {{end}}
 
 {{if $data.Menus}}

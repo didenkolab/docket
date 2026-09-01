@@ -236,6 +236,9 @@ type boardView struct {
 	// nobody has agreed to.
 	Ref string
 
+	// Walk is where this board is in the repository's history, and where it can
+	// go from there. Empty on a workspace, which has no single past.
+	Walk travel
 	// Menus is the filter bar: who the cards are for, and which columns are
 	// drawn. The same menus the search page uses, because they are the same
 	// question asked in two places.
@@ -434,6 +437,16 @@ type projectTab struct {
 // Work crosses projects constantly, so the default is all of them and the
 // project is a chip on the card rather than a separate board to go and find.
 func (s *Server) handleBoard(w http.ResponseWriter, r *http.Request) {
+	// The board as it was, when asked for. Reading a ref is how a proposal is
+	// looked at already; a commit is the same read with a different name, and
+	// everything that writes refuses while one is set.
+	if walk := s.timeTravel(r); walk.At != "" {
+		// The commit is passed as the ref the board is drawn from, which is
+		// what stops it being dragged: a board of last Tuesday that accepted a
+		// drop would write today's file from a page showing the past.
+		s.board(w, r, s.sp().At(walk.At), walk.At)
+		return
+	}
 	s.board(w, r, s.sp(), "")
 }
 
@@ -485,7 +498,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 	atStatus := r.URL.Query().Get("status")
 
 	view := boardView{
-		Selected: selected, Ref: ref,
+		Selected: selected, Ref: ref, Walk: s.timeTravel(r),
 		Narrowed: forWhom != "" || atStatus != "",
 		Cleared:  without(r.URL, "assignee", "status"),
 	}
@@ -1086,6 +1099,9 @@ type searchView struct {
 	Assignees []string
 	Labels    []string
 	Tags      []string
+	// Walk is where this board is in the repository's history, and where it can
+	// go from there. Empty on a workspace, which has no single past.
+	Walk travel
 	// Menus is the filter bar: one per dimension, each option a link carrying
 	// the rest of the bar. See finder.go.
 	Menus []finderMenu

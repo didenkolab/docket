@@ -2247,3 +2247,24 @@ body > header nav .apps-menu > summary {
 }
 body > header nav .apps-menu > summary:hover { color: var(--ink); background: var(--sunken); }
 body > header nav .apps-menu .menu-list { z-index: 30; }
+
+/* Walking the board through the history. Quiet until it is being used, and
+ * unmistakable when it is: a board showing last Tuesday must not be mistaken
+ * for the board. */
+.walk {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  font-size: 0.8125rem; color: var(--ink-soft);
+  padding: var(--s2) 0; margin-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule);
+}
+.walk.back {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  padding: var(--s2) var(--s3);
+}
+.walk .when { color: var(--ink); }
+.walk .now { margin-left: auto; font-weight: 550; }
+
+/* The way in to installing one, under whatever is already installed. */
+.menu-list .add-app { border-top: 1px solid var(--rule); margin-top: var(--s1); padding-top: var(--s2); color: var(--ink-soft); }

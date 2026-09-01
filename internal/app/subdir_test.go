@@ -30,6 +30,11 @@ func TestAnAppCanLiveInAFolderOfARepository(t *testing.T) {
 	if p.Name != "risks" {
 		t.Errorf("read %q", p.Name)
 	}
+	// The whole string is what the vault records. Without the folder, installing
+	// again from the same place would look for a manifest that is not there.
+	if !strings.HasSuffix(p.Source, "#risks") {
+		t.Errorf("it recorded %q, which does not say which app it was", p.Source)
+	}
 	// The whole library is not a pack: its root has no manifest.
 	if _, cleanup, err := Fetch(library); err == nil {
 		cleanup()
