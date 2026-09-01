@@ -31,6 +31,10 @@
   <span class="statusbar-links">
     <a href="/task/{{$t.Key}}/edit">Edit</a>
     <a href="/new?parent={{$t.Key}}">Add child</a>
+    {{/* On a real task this sits eight screens down, under the description, the
+         criteria and six long comments — and a discussion nobody can find is a
+         discussion that happens somewhere else. */}}
+    <a href="#activity">Activity{{if $data.Comments}} {{len $data.Comments}}{{end}}</a>
     <a href="/task/{{$t.Key}}/history">History</a>
   </span>
 </form>
@@ -111,8 +115,22 @@
     </section>
     {{end}}
 
-    <section class="block">
+    <section class="block" id="activity">
       <h2>Activity <span class="count">{{len $data.Comments}}</span></h2>
+
+      {{/* The box before what has been said, not after it. Comments read
+           oldest first, because that is the order the file holds them in and
+           the order an argument happened in — but saying something new should
+           not mean scrolling past all of it first. */}}
+      {{if $may}}
+      <form class="comment-form" method="post" action="/task/{{$t.Key}}/comment">
+        {{template "csrf" $}}
+        <input type="hidden" name="version" value="{{$data.Version}}">
+        <label for="text">Add a comment</label>
+        <textarea id="text" name="text" rows="3" placeholder="What happened?"></textarea>
+        <button type="submit">Comment</button>
+      </form>
+      {{end}}
 
       {{range $data.Comments}}
       <article class="comment">
@@ -124,16 +142,6 @@
       </article>
       {{else}}
       <p class="empty">Nothing said yet.</p>
-      {{end}}
-
-      {{if $may}}
-      <form class="comment-form" method="post" action="/task/{{$t.Key}}/comment">
-  {{template "csrf" $}}
-        <input type="hidden" name="version" value="{{$data.Version}}">
-        <label for="text">Add a comment</label>
-        <textarea id="text" name="text" rows="3" placeholder="What happened?"></textarea>
-        <button type="submit">Comment</button>
-      </form>
       {{end}}
     </section>
   </div>

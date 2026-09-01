@@ -2212,3 +2212,7 @@ details.sprint > summary:hover .version { color: var(--accent); }
 .as-text { margin-top: var(--s6); border-top: 1px solid var(--rule); padding-top: var(--s4); }
 .as-text > summary { cursor: pointer; color: var(--ink-soft); font-size: 0.875rem; }
 .as-text > summary:hover { color: var(--ink); }
+
+/* Jumped to, the section has to arrive below the sticky header rather than
+ * under it — otherwise the heading you clicked is the one thing you cannot see. */
+#activity { scroll-margin-top: 4.5rem; }
