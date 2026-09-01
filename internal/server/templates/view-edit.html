@@ -14,6 +14,8 @@
   {{template "csrf" $}}
   <input type="hidden" name="path" value="{{$data.Path}}">
   <input type="hidden" name="version" value="{{$data.Version}}">
+  <input type="hidden" name="body" value="{{$data.Body}}">
+  <input type="hidden" name="from" value="conditions">
   {{if $data.New}}<input type="hidden" name="new" value="1">{{end}}
 
   {{if $data.New}}
@@ -30,11 +32,52 @@
   <code>boards/</code> folder.</p>
   {{end}}
 
-  <label for="body">The file</label>
-  <textarea id="body" name="body" rows="24" spellcheck="false">{{$data.Body}}</textarea>
+  {{if $data.Conditions}}
+  <label>In</label>
+  <div class="folders">
+    {{$chosen := $data.Conditions.Folders}}
+    {{range $data.Folders}}
+    <label class="tick">
+      <input type="checkbox" name="folder" value="{{.}}"{{if has $chosen .}} checked{{end}}>
+      {{.}}
+    </label>
+    {{end}}
+  </div>
+  <p class="footnote inline">The project folders this view is about. A task is a file in one of
+  them; a page is not, which is what keeps documents off a board.</p>
+
+  <label for="join">Where</label>
+  <select id="join" name="join">
+    <option value="and"{{if eq $data.Conditions.Join "and"}} selected{{end}}>all of these hold</option>
+    <option value="or"{{if eq $data.Conditions.Join "or"}} selected{{end}}>any of these holds</option>
+  </select>
+
+  <table class="conditions">
+    <tbody>
+      {{range $data.Rows}}
+      <tr>
+        <td>
+          <input name="property" value="{{.Property}}" list="known-properties" placeholder="property">
+        </td>
+        <td>
+          <select name="operator">
+            {{$op := .Op}}
+            {{range $data.Operators}}
+            <option value="{{.}}"{{if eq . $op}} selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </td>
+        <td><input name="value" value="{{.Value}}" placeholder="value"></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <datalist id="known-properties">
+    {{range $data.Suggestions}}<option value="{{.}}">{{end}}
+  </datalist>
   <p class="footnote inline">
-    <code>file.inFolder("KEY")</code>, <code>note.status_category != "done"</code>,
-    <code>note.labels.contains("server")</code>, joined under <code>and</code> or <code>or</code>.
+    An empty row is not a condition. Three spare ones are always here, so another condition needs
+    no button — fill one in and save.
   </p>
 
   <div class="edit-actions save-bar">
@@ -44,9 +87,45 @@
     {{else}}
     <a class="cancel" href="/view/{{$data.Path}}">Cancel</a>
     {{end}}
-    <span class="hint">
-      The filter is read before anything is written: a file that would not draw is refused here.
-    </span>
+    <span class="hint">Everything else in the file — its views, formulas and labels — is left
+    exactly as it is.</span>
   </div>
+  {{end}}
 </form>
+
+<details class="as-text"{{if not $data.Conditions}} open{{end}}>
+  <summary>{{if $data.Conditions}}As a file{{else}}This filter is beyond the form — edit it as a file{{end}}</summary>
+  {{if not $data.Conditions}}
+  <p class="footnote">
+    A filter with a nested <code>or</code>, or a <code>not</code> around a comparison, is not a
+    list of conditions. Flattening it into one would change what the view selects, so it is left
+    to the text.
+  </p>
+  {{end}}
+  <form class="edit" method="post" action="/views/save">
+    {{template "csrf" $}}
+    <input type="hidden" name="path" value="{{$data.Path}}">
+    <input type="hidden" name="version" value="{{$data.Version}}">
+    {{if $data.New}}
+    <input type="hidden" name="new" value="1">
+    <input type="hidden" name="in" value="{{index $data.Repositories 0}}">
+    <label for="name-text">Name</label>
+    <input id="name-text" name="name" placeholder="waiting-on-review">
+    {{end}}
+
+    <label for="body">The file</label>
+    <textarea id="body" name="body" rows="20" spellcheck="false">{{$data.Body}}</textarea>
+    <p class="footnote inline">
+      <code>file.inFolder("KEY")</code>, <code>note.status_category != "done"</code>,
+      <code>note.labels.contains("server")</code>, joined under <code>and</code> or <code>or</code>.
+    </p>
+
+    <div class="edit-actions save-bar">
+      <button type="submit">Save the file</button>
+      <span class="hint">
+        The filter is read before anything is written: a file that would not draw is refused here.
+      </span>
+    </div>
+  </form>
+</details>
 {{template "foot" .}}

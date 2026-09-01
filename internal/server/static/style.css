@@ -2193,3 +2193,22 @@ details.sprint > summary:hover .version { color: var(--accent); }
 .views-table .filter code { font-size: 0.75rem; color: var(--ink-soft); overflow-wrap: anywhere; }
 .views-table td { padding-top: var(--s1); padding-bottom: var(--s1); }
 .views-table td a.quiet { margin-left: var(--s2); }
+
+/* The filter as a form: three columns, because a condition is three things. */
+.conditions { border-collapse: collapse; width: 100%; max-width: 46rem; margin: var(--s2) 0; }
+.conditions td { padding: var(--s1) var(--s2) var(--s1) 0; vertical-align: middle; }
+.conditions td:first-child { width: 38%; }
+.conditions td:last-child { width: 34%; }
+.conditions input, .conditions select { width: 100%; }
+
+/* The projects a view is about. */
+.folders { display: flex; flex-wrap: wrap; gap: var(--s3); margin: var(--s2) 0; }
+.tick { display: inline-flex; align-items: center; gap: var(--s2); text-transform: none;
+        letter-spacing: normal; font-size: 0.875rem; font-weight: 450; color: var(--ink); }
+.tick input { width: auto; }
+
+/* The same filter as the file it is. Folded away, because the form is the
+ * ordinary way in and the text is the way in when the form cannot say it. */
+.as-text { margin-top: var(--s6); border-top: 1px solid var(--rule); padding-top: var(--s4); }
+.as-text > summary { cursor: pointer; color: var(--ink-soft); font-size: 0.875rem; }
+.as-text > summary:hover { color: var(--ink); }

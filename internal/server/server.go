@@ -145,6 +145,17 @@ func New(root string, opts Options) (*Server, error) {
 		// "1 commit(s)" is a sentence nobody wrote on purpose. The count is
 		// known when the page is rendered, so the word can be right.
 		"plural": plural,
+		// Whether a list holds something — a checkbox in a form has to know
+		// whether it is ticked, and the alternative is building a set per row
+		// in Go for the template's benefit.
+		"has": func(list []string, want string) bool {
+			for _, got := range list {
+				if got == want {
+					return true
+				}
+			}
+			return false
+		},
 	}).ParseFS(assets, "templates/*.html")
 	if err != nil {
 		return nil, err
