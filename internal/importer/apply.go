@@ -110,7 +110,7 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 	log("%d tasks, %d with imported history", report.Tasks, report.Histories)
 
 	for _, space := range opts.Spaces {
-		count, err := writePages(snap, opts.Root, space)
+		count, err := writePages(snap, opts.Root, space, notes)
 		if err != nil {
 			return nil, fmt.Errorf("space %s: %w", space, err)
 		}

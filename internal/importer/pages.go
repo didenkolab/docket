@@ -31,10 +31,13 @@ type sourcePage struct {
 
 // writePages turns a space into a tree of Markdown pages under docs/.
 //
+// notes is every imported task's note name, so a key a page mentions becomes a
+// link to the work rather than five characters of text.
+//
 // The tree follows the source's parent links, so a space that people navigated
 // by hierarchy still reads as one. Titles become file names because that is
 // what a wikilink to a page will say.
-func writePages(snap Reader, root, space string) (int, error) {
+func writePages(snap Reader, root, space string, notes map[string]string) (int, error) {
 	var pages []sourcePage
 	err := snap.Each("pages/"+space+".jsonl", func(raw json.RawMessage) error {
 		var page sourcePage
@@ -64,6 +67,11 @@ func writePages(snap Reader, root, space string) (int, error) {
 		if err != nil {
 			return written, fmt.Errorf("page %q: %w", page.Title, err)
 		}
+		// A page that names an issue links it, so the task shows the page in
+		// its backlinks and the graph draws the two together. Two systems that
+		// referred to each other by writing a key down become one vault where
+		// writing it down is the link.
+		body = linkMentions(body, notes)
 
 		rel := pagePath(page, byID, space, taken)
 		full := filepath.Join(root, filepath.FromSlash(rel))
