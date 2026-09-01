@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/space"
 )
 
@@ -45,6 +46,15 @@ type exported struct {
 	// would otherwise count them again.
 	Checked int `json:"checked"`
 	Boxes   int `json:"boxes"`
+	// Relations are what this task says about others, by verb. Present because
+	// an app that draws coverage — which is what a test-management product
+	// actually sells — needs the verb, and reading the files again to get it
+	// would be a second implementation of the vault.
+	Relations map[string][]string `json:"relations,omitempty"`
+	// Body is the Markdown under the frontmatter, when asked for. Off by
+	// default: a thousand tasks is a megabyte of prose, and most apps want the
+	// properties.
+	Body string `json:"body,omitempty"`
 }
 
 func runExport(args []string, stdout, stderr io.Writer) int {
@@ -56,6 +66,7 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 	}
 	format := flags.String("format", "json", "json or csv")
 	onlyOpen := flags.Bool("open", false, "leave out what is finished")
+	withBody := flags.Bool("body", false, "json only: include each task's Markdown")
 	fields := flags.String("fields", "",
 		"csv only: the columns to print, in order, comma separated\n"+
 			"    \t(a program reading this with awk should name them: a title may hold\n"+
@@ -80,6 +91,11 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docket export: %v\n", err)
 		return exitError
 	}
+	c, err := sp.Config()
+	if err != nil {
+		fmt.Fprintf(stderr, "docket export: %v\n", err)
+		return exitError
+	}
 
 	out := []exported{}
 	for _, e := range entries {
@@ -98,6 +114,10 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 			Estimate: e.Task.Estimate,
 		}
 		row.Checked, row.Boxes = boxes(e.Task.Body())
+		row.Relations = e.Task.AllRelations(relationNames(c))
+		if *withBody {
+			row.Body = e.Task.Body()
+		}
 		out = append(out, row)
 	}
 	sort.SliceStable(out, func(a, b int) bool { return out[a].Key < out[b].Key })
@@ -116,6 +136,14 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 			wanted = nil
 			for _, name := range strings.Split(*fields, ",") {
 				name = strings.TrimSpace(name)
+				// A verb is a column too: `--fields key,tested_by` is how an app
+				// asks what covers what.
+				if _, ok := column[name]; !ok && c.IsRelation(name) {
+					verb := name
+					column[verb] = func(r exported) string {
+						return strings.Join(r.Relations[verb], " ")
+					}
+				}
 				if _, ok := column[name]; !ok {
 					fmt.Fprintf(stderr, "docket export: %q is not a column: %s\n",
 						name, strings.Join(everyColumn, ", "))
@@ -144,6 +172,15 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 	return exitOK
+}
+
+// relationNames is every verb the vault understands.
+func relationNames(c *project.Config) []string {
+	var names []string
+	for _, r := range c.Relations() {
+		names = append(names, r.Name)
+	}
+	return names
 }
 
 // everyColumn is what a full export prints, in order.

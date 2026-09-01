@@ -188,6 +188,13 @@ func plural(n int, one, many string) string {
 func overlapping(sprints []vault.Sprint, now time.Time) []Finding {
 	var usable []vault.Sprint
 	for _, s := range sprints {
+		// A sprint whose dates were inferred cannot overlap wrongly: parallel
+		// sprints are what an import of several teams' boards actually holds,
+		// and the vault has already said the dates are a guess. See
+		// `docket adopt`.
+		if s.Inferred {
+			continue
+		}
 		if s.Trouble == "" && !s.Starts.IsZero() {
 			usable = append(usable, s)
 		}

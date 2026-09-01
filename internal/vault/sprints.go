@@ -50,6 +50,15 @@ type Sprint struct {
 	Ends   time.Time
 	// Body is the prose — the goal, what was cut, the retrospective.
 	Body string
+	// Inferred says the dates were guessed rather than agreed — written by
+	// `docket adopt`, which takes a sprint out of an imported property and has
+	// nothing to go on but the earliest task created and the last one changed.
+	//
+	// It matters to one rule: sprints that overlap are a fault when somebody
+	// planned them and a certainty when a machine inferred them from work that
+	// ran in parallel. The flag is removed by the person who puts the real
+	// dates in.
+	Inferred bool
 	// Trouble is why this page could not be read as a sprint, for a page that
 	// has to say so rather than pretend the sprint is not there.
 	Trouble string
@@ -158,10 +167,11 @@ func ParseSprint(raw []byte) (Sprint, bool) {
 	}
 
 	var page struct {
-		Title  string `yaml:"title"`
-		Type   string `yaml:"type"`
-		Starts string `yaml:"starts"`
-		Ends   string `yaml:"ends"`
+		Title    string `yaml:"title"`
+		Type     string `yaml:"type"`
+		Starts   string `yaml:"starts"`
+		Inferred bool   `yaml:"inferred"`
+		Ends     string `yaml:"ends"`
 	}
 	if err := yaml.Unmarshal(front, &page); err != nil {
 		return Sprint{}, false
@@ -172,6 +182,7 @@ func ParseSprint(raw []byte) (Sprint, bool) {
 
 	s := Sprint{Title: strings.TrimSpace(page.Title), Body: body}
 	s.Starts, s.Ends, s.Trouble = readSpan(page.Starts, page.Ends)
+	s.Inferred = page.Inferred
 	return s, true
 }
 
