@@ -41,6 +41,7 @@ Commands:
   people      Who the work is on, and who has no page yet
   app         Install a pack of vocabulary and files
   report      What the board cannot say by looking at today
+  anomalies   What is odd about how the work is connected
   serve       A board and an API over a vault
   import      Bring in an existing Jira and Confluence instance
   mcp         Serve the vault to an agent over MCP
@@ -99,6 +100,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runApp(args[1:], stdout, stderr)
 	case "report":
 		return runReport(args[1:], stdout, stderr)
+	case "anomalies":
+		return runAnomalies(args[1:], stdout, stderr)
 	case "project":
 		return runProject(args[1:], stdout, stderr)
 	case "workspace":

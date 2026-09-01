@@ -24,7 +24,16 @@
     {{if .Sprints}}<a href="/sprints">Sprints</a>{{end}}
     {{if .Views}}<a href="/views">Views</a>{{end}}
     {{if .People}}<a href="/people">People</a>{{end}}
-    {{range .Surfaces}}<a href="/app/{{.Name}}">{{.Called}}</a>{{end}}
+    {{/* One item, not one per app. A header that grows a link every time
+         somebody installs something is a header that stops being navigation. */}}
+    {{if .Surfaces}}
+    <details class="menu apps-menu">
+      <summary>Apps</summary>
+      <div class="menu-list" role="menu">
+        {{range .Surfaces}}<a href="/app/{{.Name}}" role="menuitem">{{.Called}}</a>{{end}}
+      </div>
+    </details>
+    {{end}}
     <a href="/branches">Branches</a>
     {{if .You.CanWrite}}<a href="/new">New task</a>{{end}}
     {{if .You.CanConfigure}}<a href="/settings">Settings</a>{{end}}

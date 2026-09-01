@@ -2235,3 +2235,15 @@ details.sprint > summary:hover .version { color: var(--accent); }
 
 /* What a program printed when it went wrong: its own words, unwrapped. */
 .said { font-family: var(--mono); font-size: 0.8125rem; white-space: pre-wrap; margin: 0; }
+
+/* The apps menu sits in the header, where the summary has to look like the
+ * links beside it rather than like a control in a filter bar. */
+body > header nav .apps-menu > summary {
+  background: transparent;
+  border-color: transparent;
+  padding: var(--s1) var(--s2);
+  padding-right: calc(var(--s2) + 0.9rem);
+  height: auto;
+}
+body > header nav .apps-menu > summary:hover { color: var(--ink); background: var(--sunken); }
+body > header nav .apps-menu .menu-list { z-index: 30; }
