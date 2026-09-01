@@ -69,6 +69,13 @@ type SignIn struct {
 	DeviceClientID string `yaml:"device_client_id,omitempty"`
 }
 
+// App is a pack this vault has installed.
+type App struct {
+	Name    string `yaml:"name"`
+	Source  string `yaml:"source"`
+	Version string `yaml:"version,omitempty"`
+}
+
 // Status is a name people use paired with a category machines act on.
 type Status struct {
 	Name     string `yaml:"name"`
@@ -230,6 +237,12 @@ type Config struct {
 	// Fields are the properties this vault added for itself, beyond the ones
 	// the format defines.
 	Fields []Field `yaml:"fields,omitempty"`
+
+	// Apps are the packs this vault has taken on: what they added is in the
+	// vocabulary above like anything else, and this is the record of where it
+	// came from, so `docket app list` can say and a later version can tell what
+	// it is replacing.
+	Apps []App `yaml:"apps,omitempty"`
 
 	// Declared are the relations this vault added — a verb between two tasks
 	// that the format does not ship. Read through Relations(), which puts the
