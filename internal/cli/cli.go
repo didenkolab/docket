@@ -42,6 +42,7 @@ Commands:
   app         Install a pack of vocabulary and files
   report      What the board cannot say by looking at today
   anomalies   What is odd about how the work is connected
+  export      The tasks, as JSON or CSV — and what an app computes from
   serve       A board and an API over a vault
   import      Bring in an existing Jira and Confluence instance
   mcp         Serve the vault to an agent over MCP
@@ -102,6 +103,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runReport(args[1:], stdout, stderr)
 	case "anomalies":
 		return runAnomalies(args[1:], stdout, stderr)
+	case "export":
+		return runExport(args[1:], stdout, stderr)
 	case "project":
 		return runProject(args[1:], stdout, stderr)
 	case "workspace":
