@@ -546,6 +546,13 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 			view.Broken = append(view.Broken, e)
 			continue
 		}
+		// A type the vault keeps off the board is a record, not work: a test run
+		// happened, nobody moves it, and seven hundred of them in the first
+		// column is a board about the importer rather than about the project.
+		// Out before the counts, so the project tabs count work too.
+		if !configOf(e.Project).OnBoard(e.Task.Type) {
+			continue
+		}
 		counts[e.Project]++
 		if selected != "" && e.Project != selected {
 			continue

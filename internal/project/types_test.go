@@ -117,3 +117,36 @@ func TestAStandardTypeWritesBackAsAWord(t *testing.T) {
 		t.Errorf("a level was lost:\n%s", out)
 	}
 }
+
+func TestOffBoardTypes(t *testing.T) {
+	var c Config
+	if err := yaml.Unmarshal([]byte(`
+name: v
+projects: [{key: ACME}]
+statuses: [{name: Backlog, category: todo}]
+types:
+  - task
+  - name: test_run
+    level: -1
+    board: false
+`), &c); err != nil {
+		t.Fatal(err)
+	}
+	if !c.OnBoard("task") {
+		t.Error("a type that says nothing about the board belongs on it")
+	}
+	if c.OnBoard("test_run") {
+		t.Error("board: false should keep it off")
+	}
+	if !c.OnBoard("Эпик") {
+		t.Error("a type the vault never declared must stay visible, not vanish")
+	}
+	if got := c.OffBoard(); len(got) != 1 || got[0] != "test_run" {
+		t.Errorf("OffBoard() = %v", got)
+	}
+	// A vault that never mentioned the board keeps the short form it wrote.
+	out, err := yaml.Marshal(Type{Name: "task"})
+	if err != nil || strings.TrimSpace(string(out)) != "task" {
+		t.Errorf("round trip = %q, %v", out, err)
+	}
+}

@@ -45,7 +45,21 @@ const (
 type Type struct {
 	Name  string `yaml:"name"`
 	Level int    `yaml:"level"`
+	// Board says whether one of these belongs on the board. Nil means yes,
+	// because that is what a type is for; `board: false` is for the types that
+	// are records of something rather than work somebody does.
+	//
+	// A test run is the case that forced this. Importing one real suite wrote
+	// seven hundred of them, and every one arrived in the first column of the
+	// workflow: a board of a thousand cards where nine hundred were machine
+	// written and none of them were anybody's work. They are not in a column
+	// because nobody moves them — a run happened, and the page that means
+	// something is the execution's, not a card in Backlog.
+	Board *bool `yaml:"board,omitempty"`
 }
+
+// OnBoard reports whether tasks of this type belong in a column.
+func (t Type) OnBoard() bool { return t.Board == nil || *t.Board }
 
 // UnmarshalYAML accepts a plain name or a mapping. A plain name is a standard
 // type, which is what almost every type is.
@@ -69,7 +83,7 @@ func (t *Type) UnmarshalYAML(node *yaml.Node) error {
 // MarshalYAML writes back the short form for a standard type, so a vault that
 // declared no levels keeps a configuration file it recognises.
 func (t Type) MarshalYAML() (any, error) {
-	if t.Level == LevelStandard {
+	if t.Level == LevelStandard && t.Board == nil {
 		return t.Name, nil
 	}
 	type plain Type
@@ -88,6 +102,31 @@ func (c *Config) TypeNames() []string {
 
 // HasType reports whether the vault defines a type.
 func (c *Config) HasType(name string) bool { return contains(c.TypeNames(), name) }
+
+// OnBoard reports whether a task of this type belongs in a column.
+//
+// An unknown type does: a task carrying a word the vault never declared is a
+// vocabulary problem `docket check` reports, and hiding it from the board would
+// answer that problem by making the task impossible to find.
+func (c *Config) OnBoard(name string) bool {
+	for _, t := range c.Types {
+		if t.Name == name {
+			return t.OnBoard()
+		}
+	}
+	return true
+}
+
+// OffBoard is every type the vault keeps out of its columns, in order.
+func (c *Config) OffBoard() []string {
+	var out []string
+	for _, t := range c.Types {
+		if !t.OnBoard() {
+			out = append(out, t.Name)
+		}
+	}
+	return out
+}
 
 // LevelOf is where a type sits. An unknown type is standard: a task carrying a
 // type the vault does not define is reported by `docket check` as a vocabulary
