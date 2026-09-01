@@ -2227,3 +2227,8 @@ details.sprint > summary:hover .version { color: var(--accent); }
 /* Taking a project out: two buttons, and the second one has to look like what
  * it does. */
 .take-out { display: flex; gap: var(--s2); align-items: center; }
+
+/* A report is read across, so its rows are quiet and its numbers line up. */
+.report-table { max-width: none; }
+.report-table .count { font-variant-numeric: tabular-nums; text-align: right; padding-right: var(--s4); }
+.report-table td { padding-top: var(--s1); padding-bottom: var(--s1); }

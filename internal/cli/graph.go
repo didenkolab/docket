@@ -88,13 +88,13 @@ func runGraph(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "docket: %v\n", err)
 		return exitError
 	}
-	report(stdout, shape)
+	describeShape(stdout, shape)
 	return exitOK
 }
 
-// report writes the shape in sentences, because a table of numbers is a thing
-// somebody has to already know how to read.
-func report(w io.Writer, s vault.Shape) {
+// describeShape writes the shape in sentences, because a table of numbers is a
+// thing somebody has to already know how to read.
+func describeShape(w io.Writer, s vault.Shape) {
 	if s.Notes == 0 {
 		fmt.Fprintln(w, "No notes.")
 		return

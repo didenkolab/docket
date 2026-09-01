@@ -1,0 +1,67 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>Time in status</h1>
+<p class="lede">
+  Read out of this repository's own history: every move was a commit, so how long work sits in
+  each column is arithmetic rather than a thing to buy. {{$data.Tasks}} tasks,
+  {{$data.Moves}} moves.
+</p>
+
+{{if $data.Trouble}}<div class="notice warn">{{$data.Trouble}}</div>{{end}}
+
+{{if $data.Columns}}
+<table class="settings report-table">
+  <thead>
+    <tr>
+      <th>Status</th><th>Entered</th><th>Here now</th>
+      <th>Median stay</th><th>Longest stay</th><th>Waiting longest</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range $data.Columns}}
+    <tr>
+      <td><b>{{.Status}}</b></td>
+      <td class="count">{{.Entered}}</td>
+      <td class="count">{{if .Open}}{{.Open}}{{else}}—{{end}}</td>
+      <td>{{.Median}}</td>
+      <td>{{.Longest}}{{if .LongestIn}} <span class="left">{{.LongestIn}}</span>{{end}}</td>
+      <td>{{.Waiting}}{{if .WaitingFor}} <span class="left">{{.WaitingFor}}</span>{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+<p class="footnote">
+  The median rather than the average: one task somebody abandoned for a year moves an average and
+  says nothing true about the column. “Entered” counts arrivals, not tasks — work comes back.
+</p>
+{{else}}
+<p class="empty">
+  Nothing to read yet. A status change becomes a commit, so this fills in as work moves — a vault
+  that arrived in one import has one moment in its history and nothing to measure between.
+</p>
+{{end}}
+
+{{if $data.Stuck}}
+<section class="block">
+  <h2>Waiting longest <span class="count">{{len $data.Stuck}}</span></h2>
+  <table class="settings report-table">
+    <thead><tr><th>Task</th><th>Status</th><th>Waiting</th><th>Age</th></tr></thead>
+    <tbody>
+      {{range $data.Stuck}}
+      <tr>
+        <td><a href="{{.Href}}"><span class="key">{{.Key}}</span></a> {{.Title}}</td>
+        <td><span class="pill">{{.Status}}</span></td>
+        <td>{{.Waiting}}</td>
+        <td>{{.Age}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <p class="footnote">
+    The list a standing meeting is actually about, and the reason a median per column is not
+    enough: the column is fine and one card in it is three weeks old.
+  </p>
+</section>
+{{end}}
+{{template "foot" .}}
