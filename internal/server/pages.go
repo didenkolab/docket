@@ -47,6 +47,10 @@ type pageData struct {
 	// sprint is offered to teams that work in sprints, and the way a vault says
 	// it works in sprints is by having written one down.
 	Sprints bool
+	// People says somebody in this space has a page, so there is a People page
+	// worth a place in the navigation. A vault that keeps no people does not
+	// get a menu item for an empty list.
+	People bool
 	// Views says the vault has saved views — boards/*.base — to offer. Every
 	// scaffolded vault has some, so this is all but always true; it is asked
 	// rather than assumed so that a vault whose boards folder was deleted does
@@ -89,6 +93,7 @@ func (s *Server) renderEvery(seconds int, w http.ResponseWriter, r *http.Request
 		Workspace: s.sp().Workspace,
 		Sprints:   len(s.sp().Sprints()) > 0,
 		Views:     len(s.sp().Views()) > 0,
+		People:    len(s.peopleIn()) > 0,
 		Theme:     themeAttribute(themeOf(r)),
 		Themes:    themeChoices(themeOf(r)),
 		Here:      r.URL.RequestURI(),

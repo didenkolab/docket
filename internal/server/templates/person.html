@@ -1,0 +1,59 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<div class="page-head">
+  <h1>{{if $data.Name}}{{$data.Name}}{{else}}{{$data.Handle}}{{end}}</h1>
+  <a class="button-link" href="{{$data.Board}}">Their board</a>
+</div>
+
+<p class="path">
+  <code>{{$data.Handle}}</code>
+  {{if $data.GitHub}}· github <code>{{$data.GitHub}}</code>{{end}}
+  {{if $data.GitLab}}· gitlab <code>{{$data.GitLab}}</code>{{end}}
+  {{if $data.Path}}· <a href="/page/{{$data.Path}}">their page</a>{{end}}
+  {{if not $data.Path}}· <span class="left">no page in people/ yet</span>{{end}}
+</p>
+
+{{if $data.Body}}<div class="body">{{$data.Body}}</div>{{end}}
+
+<section class="block">
+  <h2>Carrying <span class="count">{{len $data.Open}}</span></h2>
+  {{if $data.Open}}
+  <ul class="children">
+    {{range $data.Open}}
+    <li>
+      <a class="key" href="{{.Href}}">{{.Key}}</a>
+      <span class="child-title">{{.Title}}</span>
+      <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+    </li>
+    {{end}}
+  </ul>
+  {{else}}
+  <p class="empty">Nothing open.</p>
+  {{end}}
+</section>
+
+{{if $data.Done}}
+<section class="block">
+  <h2>Finished <span class="count">{{len $data.Done}}</span></h2>
+  <ul class="children">
+    {{range $data.Done}}
+    <li>
+      <a class="key" href="{{.Href}}">{{.Key}}</a>
+      <span class="child-title">{{.Title}}</span>
+      <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+    </li>
+    {{end}}
+  </ul>
+  <p class="footnote">The most recent. Everything they have ever finished is on
+  <a href="{{$data.Board}}">their board</a>.</p>
+</section>
+{{end}}
+
+{{if not $data.Member}}
+<p class="footnote">
+  The host does not list them on this repository. That is not a fault — a person page outlives
+  access, and history should keep who did what — but new work should probably not go to them.
+</p>
+{{end}}
+{{template "foot" .}}

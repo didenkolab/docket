@@ -431,6 +431,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /releases", s.handleReleases)
 	mux.HandleFunc("GET /sprints", s.handleSprints)
 	mux.HandleFunc("GET /sprint/{note}", s.handleSprint)
+	mux.HandleFunc("GET /people", s.handlePeople)
+	mux.HandleFunc("GET /person/{handle}", s.handlePerson)
 	mux.HandleFunc("GET /views", s.handleViews)
 	mux.HandleFunc("GET /views/new", s.handleViewEditForm)
 	mux.HandleFunc("GET /views/edit/{path...}", s.handleViewEditForm)

@@ -1,0 +1,35 @@
+{{template "head" .}}
+{{$data := .Data}}
+
+<h1>People</h1>
+<p class="lede">
+  Who work can be given to: whoever is already carrying some, whoever the vault has written a page
+  for, and whoever the host says has access to the repository. Rights on the repository are how
+  somebody becomes a person work can be put on.
+</p>
+
+{{if $data}}
+<table class="settings people-table">
+  <thead>
+    <tr><th>Handle</th><th>Tasks</th><th>Written down</th><th>Has access</th></tr>
+  </thead>
+  <tbody>
+    {{range $data}}
+    <tr>
+      <td><a href="/person/{{.Handle}}">{{.Called}}</a></td>
+      <td class="count">{{if .Carries}}{{.Carries}}{{else}}—{{end}}</td>
+      <td>{{if .Page}}yes{{else}}<span class="left">no page</span>{{end}}</td>
+      <td>{{if .Member}}yes{{else}}—{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+<p class="footnote">
+  A handle with no page is either somebody nobody wrote down or a typo — and until it has one,
+  Obsidian draws no edge from their work to them. <code>docket people --write</code> writes the
+  pages; assigning to somebody the host names writes theirs by itself.
+</p>
+{{else}}
+<p class="empty">Nothing is assigned to anybody, and nobody is written down.</p>
+{{end}}
+{{template "foot" .}}

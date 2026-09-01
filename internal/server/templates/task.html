@@ -182,7 +182,10 @@
           </datalist>
           {{end}}
           {{else}}
-          {{if $t.Assignee}}{{$t.Assignee}}{{else}}<span class="empty">Unassigned</span>{{end}}
+          {{if $t.Assignee}}<a href="/person/{{$t.Assignee}}">{{$t.Assignee}}</a>{{else}}<span class="empty">Unassigned</span>{{end}}
+          {{end}}
+          {{if and .You.CanWrite $t.Assignee}}
+          <a class="who-link" href="/person/{{$t.Assignee}}">what else is on them</a>
           {{end}}
         </dd>
         {{if $data.Unit}}

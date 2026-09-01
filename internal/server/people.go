@@ -1,7 +1,9 @@
 package server
 
 import (
+	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/access"
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/vault"
 )
 
@@ -287,4 +290,110 @@ func (s *Server) meAs(r *http.Request) string {
 		return login
 	}
 	return ""
+}
+
+// ---- their page ----
+
+type personView struct {
+	Handle string
+	Name   string
+	// Path is the file, so the page can say where it is and link to editing it.
+	Path   string
+	GitHub string
+	GitLab string
+	Body   template.HTML
+	// Open is what they are carrying, and Done is what they have finished,
+	// most recently changed first.
+	Open  []personTask
+	Done  []personTask
+	Board string
+	// Member says the host still lists them on the repository. A person page
+	// outlives access, which is right — history keeps who did what — but a
+	// board offering somebody who left is a board that misassigns work.
+	Member bool
+}
+
+type personTask struct {
+	Key      string
+	Title    string
+	Status   string
+	Category string
+	Href     string
+	Project  string
+}
+
+// handlePerson shows one person: who they are, and what is on them.
+func (s *Server) handlePerson(w http.ResponseWriter, r *http.Request) {
+	c, err := s.config()
+	if err != nil {
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		return
+	}
+	handle := strings.TrimSpace(r.PathValue("handle"))
+	if handle == "" {
+		http.Redirect(w, r, "/people", http.StatusSeeOther)
+		return
+	}
+
+	entries, err := s.entries(r)
+	if err != nil {
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the tasks", err.Error())
+		return
+	}
+	carried := vault.AssignedTo(entries, handle)
+
+	person, hasPage := vault.PersonOf(s.peopleIn(), handle)
+	if !hasPage && len(carried) == 0 {
+		s.fail(w, r, http.StatusNotFound, "Nobody by that name",
+			"No page in "+vault.PeopleDir+"/ is "+handle+", and no task is on them.")
+		return
+	}
+
+	view := personView{
+		Handle: handle, Name: person.Name, Path: person.Path,
+		GitHub: person.GitHub, GitLab: person.GitLab,
+		Board: "/?assignee=" + url.QueryEscape(handle),
+	}
+	if _, ok := memberNamed(s.membersFor(r), handle); ok {
+		view.Member = true
+	}
+	if person.Body != "" {
+		if ix, err := s.index(); err == nil {
+			view.Body = renderMarkdown(person.Body, ix)
+		}
+	}
+
+	for _, e := range carried {
+		shown := personTask{
+			Key: e.Key, Title: e.Task.Title, Status: e.Task.Status,
+			Category: e.Task.StatusCategory, Href: "/task/" + e.Key, Project: e.Project,
+		}
+		if e.Task.StatusCategory == project.CategoryDone {
+			view.Done = append(view.Done, shown)
+			continue
+		}
+		view.Open = append(view.Open, shown)
+	}
+	// What is finished is an archive, and the same rule as a board's finished
+	// column applies: the recent part, or the page is a wall of history.
+	sort.SliceStable(view.Done, func(a, b int) bool { return view.Done[a].Key > view.Done[b].Key })
+	if len(view.Done) > recentlyDone {
+		view.Done = view.Done[:recentlyDone]
+	}
+
+	title := handle
+	if person.Name != "" {
+		title = person.Name
+	}
+	s.render(w, r, "person.html", c, title, view)
+}
+
+// handlePeople lists everybody.
+func (s *Server) handlePeople(w http.ResponseWriter, r *http.Request) {
+	c, err := s.config()
+	if err != nil {
+		s.fail(w, r, http.StatusInternalServerError, "Cannot read the vault", err.Error())
+		return
+	}
+	s.render(w, r, "people.html", c, "People", s.candidates(r))
 }

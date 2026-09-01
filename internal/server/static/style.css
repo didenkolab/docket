@@ -2216,3 +2216,10 @@ details.sprint > summary:hover .version { color: var(--accent); }
 /* Jumped to, the section has to arrive below the sticky header rather than
  * under it — otherwise the heading you clicked is the one thing you cannot see. */
 #activity { scroll-margin-top: 4.5rem; }
+
+/* ---- people ---- */
+
+.who-link { display: block; font-size: 0.75rem; color: var(--ink-faint); margin-top: var(--s1); }
+.who-link:hover { color: var(--ink); }
+.people-table { max-width: 46rem; }
+.people-table .count { font-variant-numeric: tabular-nums; }

@@ -38,6 +38,7 @@ Commands:
   check       Validate a vault against the specification
   workspace   Assemble several project repositories into one Obsidian vault
   graph       What shape the vault's links are in
+  people      Who the work is on, and who has no page yet
   serve       A board and an API over a vault
   import      Bring in an existing Jira and Confluence instance
   mcp         Serve the vault to an agent over MCP
@@ -90,6 +91,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runCheck(args[1:], stdout, stderr)
 	case "graph":
 		return runGraph(args[1:], stdout, stderr)
+	case "people":
+		return runPeople(args[1:], stdout, stderr)
 	case "project":
 		return runProject(args[1:], stdout, stderr)
 	case "workspace":
