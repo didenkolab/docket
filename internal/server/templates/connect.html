@@ -17,7 +17,7 @@
 {{else}}
 
 <table class="settings">
-  <thead><tr><th>Project</th><th>Folder</th><th>Host</th><th>Remote</th></tr></thead>
+  <thead><tr><th>Project</th><th>Folder</th><th>Host</th><th>Remote</th>{{if .You.CanConfigure}}<th></th>{{end}}</tr></thead>
   <tbody>
     {{range $data.Projects}}
     <tr>
@@ -25,10 +25,40 @@
       <td><code>{{.Path}}</code></td>
       <td>{{if .Host}}{{.Host}}{{else}}<span class="muted">nobody vouches for it</span>{{end}}</td>
       <td class="remote">{{if .Remote}}<code>{{.Remote}}</code>{{else}}<span class="muted">none</span>{{end}}</td>
+      {{if $.You.CanConfigure}}
+      <td class="take-out">
+        {{if .Manifest}}
+        <form method="post" action="/projects/remove"
+              onsubmit="return confirm('Take {{.Manifest}} out of this workspace? The repository is not touched.')">
+          {{template "csrf" $}}
+          <input type="hidden" name="key" value="{{.Manifest}}">
+          <button type="submit" class="quiet">Take out</button>
+        </form>
+        <form method="post" action="/projects/remove"
+              onsubmit="return confirm('Take {{.Manifest}} out and delete the folder {{.Path}}? Everything in it is on its remote.')">
+          {{template "csrf" $}}
+          <input type="hidden" name="key" value="{{.Manifest}}">
+          <input type="hidden" name="delete_folder" value="1">
+          <button type="submit" class="danger"
+            {{if or .Unsent .Dirty}}title="{{if .Dirty}}uncommitted changes here{{end}}{{if and .Dirty .Unsent}}, {{end}}{{if .Unsent}}{{.Unsent}} commits never sent{{end}}"{{end}}>
+            and delete the folder
+          </button>
+        </form>
+        {{end}}
+      </td>
+      {{end}}
     </tr>
     {{end}}
   </tbody>
 </table>
+
+{{if .You.CanConfigure}}
+<p class="footnote">
+  Taking a project out is a manifest edit: the repository is untouched and pasting its URL below
+  brings it back. Deleting the folder is refused while it holds uncommitted work or commits that
+  were never sent — those exist nowhere else. Nothing here can delete a repository on its host.
+</p>
+{{end}}
 
 {{if .You.CanConfigure}}
 <h2>Add one</h2>

@@ -271,3 +271,21 @@ func Init(dir string) ([]string, error) {
 	}
 	return append(written, FileName, ".gitignore"), nil
 }
+
+// Remove takes a project out of the manifest and returns what it was.
+//
+// The repository itself is left alone. Removing a project from a workspace is
+// saying "I do not want to look at this here", which is not the same sentence
+// as "destroy it", and a manifest edit that quietly deleted a clone would make
+// the two impossible to tell apart.
+func (m *Manifest) Remove(key string) (Project, error) {
+	key = strings.TrimSpace(key)
+	for i, p := range m.Projects {
+		if !strings.EqualFold(p.Key, key) {
+			continue
+		}
+		m.Projects = append(m.Projects[:i], m.Projects[i+1:]...)
+		return p, nil
+	}
+	return Project{}, fmt.Errorf("no project %s in this workspace", key)
+}

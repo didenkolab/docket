@@ -381,9 +381,14 @@ func wantsJSON(r *http.Request) bool {
 		strings.Contains(r.Header.Get("Accept"), "application/json")
 }
 
-func urlEscape(s string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(s, "&", "%26"), "?", "%3F")
-}
+// urlEscape makes a value safe to carry in a query parameter.
+//
+// It replaced two characters by hand — & and ? — which is enough for a path
+// being handed back after a sign-in and wrong for everything else it grew to be
+// used for. A sentence redirected as a message came back with its spaces intact
+// and the browser refused the whole header, so the message never arrived; a
+// message with a per cent sign in it would have been decoded as an escape.
+func urlEscape(s string) string { return url.QueryEscape(s) }
 
 // backTo is where to send somebody after they sign in.
 //

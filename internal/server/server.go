@@ -466,6 +466,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /projects", s.handleConnectForm)
 	mux.HandleFunc("POST /projects", s.handleConnect)
 	mux.HandleFunc("POST /projects/new", s.handleCreateProject)
+	mux.HandleFunc("POST /projects/remove", s.handleDisconnect)
 
 	mux.HandleFunc("GET /api/tasks", s.apiListTasks)
 	mux.HandleFunc("POST /api/tasks", s.apiCreateTask)

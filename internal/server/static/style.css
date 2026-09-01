@@ -2223,3 +2223,7 @@ details.sprint > summary:hover .version { color: var(--accent); }
 .who-link:hover { color: var(--ink); }
 .people-table { max-width: 46rem; }
 .people-table .count { font-variant-numeric: tabular-nums; }
+
+/* Taking a project out: two buttons, and the second one has to look like what
+ * it does. */
+.take-out { display: flex; gap: var(--s2); align-items: center; }

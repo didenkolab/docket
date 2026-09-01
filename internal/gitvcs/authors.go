@@ -66,3 +66,16 @@ func (r *Repo) Contributors() ([]Contributor, error) {
 func (c Contributor) String() string {
 	return c.Name + " — " + strconv.Itoa(c.Commits) + " commits"
 }
+
+// Dirty reports whether anything in the working tree is uncommitted.
+//
+// Asked before anything is thrown away. The board commits everything it writes,
+// so a dirty tree is a person editing in the folder — which is exactly whose
+// work must not disappear because somebody clicked remove in a browser.
+func (r *Repo) Dirty() (bool, error) {
+	out, err := r.output("status", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) != "", nil
+}

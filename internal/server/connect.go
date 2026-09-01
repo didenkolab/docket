@@ -52,11 +52,24 @@ type connectRow struct {
 	Path   string
 	Remote string
 	Host   string
+	// Manifest is the key the manifest calls this project, which is what taking
+	// it out asks for. It is not always the key inside the vault: a repository
+	// may hold several projects, and the workspace knows it by one name.
+	Manifest string
+	// Unsent is how many commits here have never left the folder, so the page
+	// can say what deleting the clone would cost before anybody clicks.
+	Unsent int
+	Dirty  bool
 }
 
 func (s *Server) handleConnectForm(w http.ResponseWriter, r *http.Request) {
 	c, _ := s.config()
-	s.render(w, r, "connect.html", c, "Add a project", s.connectPage(r, "", ""))
+	// What the last change said. Every write here redirects rather than
+	// rendering, so that a reload does not repeat it — and until this read the
+	// message it redirected with was thrown away, which meant adding a project
+	// looked exactly like doing nothing.
+	s.render(w, r, "connect.html", c, "Add a project", s.connectPage(r,
+		r.URL.Query().Get("trouble"), r.URL.Query().Get("saved")))
 }
 
 func (s *Server) connectPage(r *http.Request, problem, saved string) connectView {
@@ -72,13 +85,25 @@ func (s *Server) connectPage(r *http.Request, problem, saved string) connectView
 	}
 	view.Create.Hosts = s.creatableHosts()
 
+	byPath := map[string]string{}
+	if m, err := workspace.Load(sp.Root); err == nil {
+		for _, p := range m.Projects {
+			byPath[strings.Trim(p.Path, "/")] = p.Key
+		}
+	}
+
 	for _, v := range sp.Vaults() {
-		row := connectRow{Path: v.Prefix}
+		row := connectRow{Path: v.Prefix, Manifest: byPath[strings.Trim(v.Prefix, "/")]}
 		if c, err := project.Load(v.Root); err == nil {
 			row.Key = strings.Join(c.ProjectKeys(), ", ")
 		}
 		if v.Repo != nil {
 			row.Remote, _ = remoteOf(v.Root)
+			// What would be lost. Asked here rather than at the moment of
+			// deleting, so the page can say it before the click rather than
+			// refuse after it.
+			row.Unsent, _ = v.Repo.Unpushed()
+			row.Dirty, _ = v.Repo.Dirty()
 		}
 		for _, repo := range s.repositories() {
 			if repo.prefix == v.Prefix && repo.host != nil {
