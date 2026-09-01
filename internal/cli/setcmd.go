@@ -156,6 +156,18 @@ func setOne(sp *space.Space, c *project.Config, t *task.Task, name, value string
 		t.SetEstimate(size)
 		return "estimate " + value, nil
 
+	case "tags":
+		// Obsidian's own tags, comma or space separated. A property of the
+		// format rather than a declared field, and it was missing here — which
+		// an importer found the first time it tried to carry a scenario's tags
+		// across.
+		t.SetTags(listOf(value))
+		return "tags " + orNobody(value), nil
+
+	case "labels":
+		t.SetLabels(listOf(value))
+		return "labels " + orNobody(value), nil
+
 	case "sprint":
 		t.SetSprint(value)
 		return "sprint " + orNobody(value), nil
@@ -223,4 +235,17 @@ func noteFor(sp *space.Space, key string) string {
 		return key
 	}
 	return strings.TrimSuffix(filepath.Base(rel), ".md")
+}
+
+// listOf reads a comma or space separated list.
+func listOf(value string) []string {
+	var out []string
+	for _, part := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t'
+	}) {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }

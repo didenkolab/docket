@@ -318,7 +318,7 @@ func Create(root string, c *project.Config, opts NewOptions) (string, *task.Task
 		return "", nil, err
 	}
 
-	t, err := task.Parse(taskTemplate(root))
+	t, err := task.Parse(taskTemplate(root, opts.Type))
 	if err != nil {
 		return "", nil, fmt.Errorf("%s: %w", TaskTemplate, err)
 	}
@@ -384,7 +384,21 @@ func writeNew(path string, content []byte) error {
 	return err
 }
 
-func taskTemplate(root string) []byte {
+// taskTemplate is what a new task starts as: the one for its own type when the
+// vault has one, and the general one otherwise.
+//
+// A type-specific template is how an app teaches a kind of work its shape — a
+// test carries a gherkin block, a postmortem carries "why it was possible" —
+// and without this every one of them started as the generic "one paragraph on
+// what needs to happen", with the app's own template sitting unused in
+// templates/.
+func taskTemplate(root, taskType string) []byte {
+	if name := strings.TrimSpace(taskType); name != "" {
+		at := filepath.Join(root, TemplatesDir, name+".md")
+		if raw, err := os.ReadFile(at); err == nil {
+			return raw
+		}
+	}
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(TaskTemplate)))
 	if err != nil {
 		return []byte(builtinTaskTemplate)
