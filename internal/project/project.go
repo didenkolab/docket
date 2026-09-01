@@ -69,6 +69,16 @@ type SignIn struct {
 	DeviceClientID string `yaml:"device_client_id,omitempty"`
 }
 
+// Reaction is one declaration: an event, a program in the repository, and what
+// narrows it. Read by internal/reaction, which is where the rules are.
+type Reaction struct {
+	On      string `yaml:"on"`
+	Run     string `yaml:"run"`
+	Name    string `yaml:"name,omitempty"`
+	Status  string `yaml:"status,omitempty"`
+	Project string `yaml:"project,omitempty"`
+}
+
 // App is a pack this vault has installed.
 type App struct {
 	Name    string `yaml:"name"`
@@ -237,6 +247,15 @@ type Config struct {
 	// Fields are the properties this vault added for itself, beyond the ones
 	// the format defines.
 	Fields []Field `yaml:"fields,omitempty"`
+
+	// Reactions are what this vault asks to be run when something happens.
+	//
+	// Declared here so the team agrees on them, reviews them and gets the same
+	// ones — and run only where somebody said so: a server runs nothing unless
+	// it was started with --reactions. Push access to a repository is not
+	// permission to execute code on somebody's machine, which is the same
+	// reason git does not share .git/hooks. See internal/reaction.
+	Reactions []Reaction `yaml:"reactions,omitempty"`
 
 	// Apps are the packs this vault has taken on: what they added is in the
 	// vocabulary above like anything else, and this is the record of where it

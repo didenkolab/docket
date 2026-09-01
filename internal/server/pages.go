@@ -830,6 +830,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	author := s.authorFor(r)
+	var was, title string
 	err = s.editTask(r, key, r.FormValue("version"), author, func(t *task.Task) (string, []string, error) {
 		if t.Status == status {
 			return "", nil, nil
@@ -838,10 +839,18 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 			return "", nil, fmt.Errorf("the workflow does not allow %s → %s. From %s a task can go to %s",
 				t.Status, status, t.Status, strings.Join(names(c.Reachable(t.Status)), ", "))
 		}
-		was := t.Status
+		was, title = t.Status, t.Title
 		t.SetStatus(status, category)
 		return key + ": " + was + " → " + status, nil, nil
 	})
+	// After it is committed, and only if it moved. A reaction is told what
+	// happened, not asked whether it may.
+	if err == nil && was != "" {
+		if owner, at, _, locateErr := s.sp().Locate(key); locateErr == nil {
+			projectKey, _, _ := project.SplitKey(key)
+			s.react(r, owner, s.movedEvent(r, key, at, title, was, status, projectKey, owner.Root))
+		}
+	}
 	s.afterEdit(w, r, key, err)
 }
 
