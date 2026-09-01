@@ -198,6 +198,11 @@ const defaultIgnore = `# Obsidian per-machine state — the layout of open panes
 # Obsidian local trash
 .trash/
 
+# Editors. Which panes somebody had open is not a fact about the project, and
+# an .idea/ committed once follows every clone around for good.
+.idea/
+.vscode/
+
 # macOS
 .DS_Store
 `

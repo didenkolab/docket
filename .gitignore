@@ -7,3 +7,8 @@
 
 # macOS
 .DS_Store
+
+# Editors. Which panes somebody had open is not a fact about the project, and
+# an .idea/ committed once follows every clone around for good.
+.idea/
+.vscode/
