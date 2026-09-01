@@ -227,6 +227,19 @@ type boardView struct {
 	// A board showing a proposal has to say so, or somebody acts on a plan
 	// nobody has agreed to.
 	Ref string
+
+	// Menus is the filter bar: who the cards are for, and which columns are
+	// drawn. The same menus the search page uses, because they are the same
+	// question asked in two places.
+	Menus []finderMenu
+	// Narrowed says the board is not showing everything, and Cleared is where
+	// to go to see it all. A board that quietly hid work would be worse than no
+	// filter at all.
+	Narrowed bool
+	Cleared  string
+	// Hidden is how many cards the filter left out, so the narrowing is a
+	// number rather than a feeling.
+	Hidden int
 }
 
 // sortCards puts a column in the order somebody dragged it into.
@@ -322,6 +335,75 @@ func elsewhere(at *url.URL, key, value string) string {
 	return at.Path + "?" + q.Encode()
 }
 
+// worksFor reports whether a card belongs to the person the board is narrowed
+// to. "!unassigned" is nobody, which is the one filter a board is asked for
+// most: what has not been picked up.
+func worksFor(wanted, assignee string) bool {
+	switch wanted {
+	case "":
+		return true
+	case "!unassigned":
+		return strings.TrimSpace(assignee) == ""
+	}
+	return assignee == wanted
+}
+
+// boardMenus is the filter bar: whose work, and which column.
+//
+// The same two menus the search page has, built here rather than shared with
+// it, because a board narrows by different things and by fewer of them: the
+// bar is meant to be read at a glance above a wall of cards, and seven
+// dimensions above a board would be a form sitting on top of the work.
+func boardMenus(at *url.URL, c *project.Config, people map[string]int,
+	forWhom, atStatus string) []finderMenu {
+
+	who := finderMenu{Name: "Assignee", Value: forWhom, Shown: shownAs("Assignee", forWhom)}
+	who.Clear = elsewhere(at, "assignee", "")
+	who.Options = []finderOption{{Label: "Anyone", Href: who.Clear, On: forWhom == ""}}
+	if people[""] > 0 {
+		who.Options = append(who.Options, finderOption{
+			Label: "Nobody", Href: elsewhere(at, "assignee", "!unassigned"),
+			On: forWhom == "!unassigned",
+		})
+	}
+	var names []string
+	for name := range people {
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		who.Options = append(who.Options, finderOption{
+			Label: name, Href: elsewhere(at, "assignee", name), On: name == forWhom,
+		})
+	}
+
+	where := finderMenu{Name: "Status", Value: atStatus, Shown: shownAs("Status", atStatus)}
+	where.Clear = elsewhere(at, "status", "")
+	where.Options = []finderOption{{Label: "Every column", Href: where.Clear, On: atStatus == ""}}
+	for _, status := range c.Statuses {
+		where.Options = append(where.Options, finderOption{
+			Label: status.Name, Href: elsewhere(at, "status", status.Name),
+			On: status.Name == atStatus,
+		})
+	}
+
+	return []finderMenu{who, where}
+}
+
+// without is this address with those query parameters dropped.
+func without(at *url.URL, keys ...string) string {
+	q := at.Query()
+	for _, key := range keys {
+		q.Del(key)
+	}
+	if len(q) == 0 {
+		return at.Path
+	}
+	return at.Path + "?" + q.Encode()
+}
+
 // reachableList is the workflow, flattened for an attribute.
 func reachableList(c *project.Config, from string) string {
 	var names []string
@@ -388,8 +470,24 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		}
 	}
 
-	view := boardView{Selected: selected, Ref: ref}
+	// Narrowing the board is asking two questions of it: whose work, and which
+	// part of the workflow. Both are one value, and both are in the address, so
+	// a narrowed board is a link somebody can send.
+	forWhom := r.URL.Query().Get("assignee")
+	atStatus := r.URL.Query().Get("status")
+
+	view := boardView{
+		Selected: selected, Ref: ref,
+		Narrowed: forWhom != "" || atStatus != "",
+		Cleared:  without(r.URL, "assignee", "status"),
+	}
 	for _, status := range drawn.Statuses {
+		// A status filter draws that column and no other. The columns are the
+		// workflow, so narrowing to one is how "just show me what is in review"
+		// is asked of a board of fourteen of them.
+		if atStatus != "" && status.Name != atStatus {
+			continue
+		}
 		view.Columns = append(view.Columns, column{Status: status})
 	}
 
@@ -419,6 +517,9 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 	}
 
 	counts := map[string]int{}
+	// Who has work here, counted before the filter so that the menu offers
+	// everybody on the board rather than only the person already chosen.
+	people := map[string]int{}
 	for _, e := range entries {
 		if e.Err != nil {
 			view.Broken = append(view.Broken, e)
@@ -426,6 +527,11 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		}
 		counts[e.Project]++
 		if selected != "" && e.Project != selected {
+			continue
+		}
+		people[e.Task.Assignee]++
+		if !worksFor(forWhom, e.Task.Assignee) {
+			view.Hidden++
 			continue
 		}
 
@@ -438,6 +544,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 				epic, epicTitle = parent.Key, parent.Task.Title
 			}
 		}
+		placed := false
 		for i := range view.Columns {
 			if view.Columns[i].Status.Name == e.Task.Status {
 				drawn := card{
@@ -458,7 +565,14 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 				drawn.Notable = e.Task.Priority != configOf(e.Project).DefaultPriority()
 				view.Columns[i].Cards = append(view.Columns[i].Cards, drawn)
 				view.Total++
+				placed = true
 			}
+		}
+		// A card in a column the board is not drawing is a card the filter left
+		// out, and the line above the board has to count it: "not shown" that
+		// counts only half of what is not shown is the number that lies.
+		if !placed && atStatus != "" {
+			view.Hidden++
 		}
 	}
 
@@ -473,6 +587,8 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 			return elsewhere(r.URL, "full", status)
 		})
 	}
+
+	view.Menus = boardMenus(r.URL, drawn, people, forWhom, atStatus)
 
 	view.Projects = append(view.Projects, projectTab{
 		Key: "All", Name: "Every project", Count: len(entries), Href: "/", On: selected == "",

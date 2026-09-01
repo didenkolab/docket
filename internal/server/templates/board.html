@@ -46,6 +46,29 @@
 </div>
 {{end}}
 
+{{if $data.Menus}}
+<div class="finder-bar board-bar">
+  {{range $data.Menus}}
+  <details class="menu{{if .On}} on{{end}}">
+    <summary>
+      {{if .On}}<span class="menu-name">{{.Name}}</span> {{.Shown}}
+      {{else}}{{.Name}}{{end}}
+    </summary>
+    <div class="menu-list" role="menu">
+      {{range .Options}}
+      <a href="{{.Href}}" role="menuitem" {{if .On}}class="on" aria-current="true"{{end}}>{{.Label}}</a>
+      {{end}}
+    </div>
+  </details>
+  {{end}}
+
+  {{if $data.Narrowed}}
+  <a class="menu-clear" href="{{$data.Cleared}}">Show everything</a>
+  <span class="count-line">{{plural $data.Hidden "card" "cards"}} not shown</span>
+  {{end}}
+</div>
+{{end}}
+
 <div class="board"{{if $data.Ref}} data-ref="{{$data.Ref}}"{{end}}>
   {{range $data.Columns}}
   <section class="column {{categoryClass .Status.Category}}" data-status="{{.Status.Name}}">
