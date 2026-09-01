@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vadymdidenkolab/docket/internal/project"
 	"github.com/vadymdidenkolab/docket/internal/task"
 )
 
@@ -41,7 +42,7 @@ type mention struct {
 // Read on every request, like everything else. Obsidian keeps an index and
 // warns that it can fall out of step with the files; there is no index here to
 // fall out of step.
-func (s *Server) backlinks(r *http.Request, note, selfPath string) []mention {
+func (s *Server) backlinks(r *http.Request, note, selfPath string, relations []string) []mention {
 	entries, err := s.entries(r)
 	if err != nil {
 		return nil
@@ -54,7 +55,20 @@ func (s *Server) backlinks(r *http.Request, note, selfPath string) []mention {
 			continue
 		}
 		body := e.Task.Body()
-		if !mentions(body, note) && !mentions(strings.Join(e.Task.RawLabels(), " "), note) &&
+		// A relation is a link in frontmatter, and Obsidian counts one as a
+		// backlink — which is the whole reason a relationship here is a link
+		// rather than a field. Missing them meant a story never learned that
+		// eleven tests point at it: the link existed, on one side, and the
+		// other side of the page said "no backlinks".
+		linked := false
+		for _, name := range relations {
+			if mentions(strings.Join(e.Task.RawRelated(name), " "), note) {
+				linked = true
+				break
+			}
+		}
+		if !linked && !mentions(body, note) &&
+			!mentions(strings.Join(e.Task.RawLabels(), " "), note) &&
 			!mentions(e.Task.RawParent(), note) {
 			continue
 		}
@@ -116,4 +130,15 @@ func around(text, note string) string {
 		return ""
 	}
 	return clip(text, at-70, at+len(needle)+70)
+}
+
+// linkProperties is every relation the vault declares, so a backlink scan knows
+// which properties hold links rather than words.
+func linkProperties(c *project.Config) []string {
+	relations := c.Relations()
+	names := make([]string, 0, len(relations))
+	for _, r := range relations {
+		names = append(names, r.Name)
+	}
+	return names
 }

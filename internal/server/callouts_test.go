@@ -300,3 +300,45 @@ func TestParentIsNotARelation(t *testing.T) {
 		t.Error("parent was accepted as a relation")
 	}
 }
+
+// A relation is a link in frontmatter, and Obsidian counts one as a backlink —
+// which is the entire reason a relationship here is written as a link rather
+// than declared as a field. Reading only the body meant a story never learned
+// that eleven tests pointed at it: the link existed, on one side, and the other
+// side of the page said nothing refers to this.
+func TestARelationIsABacklinkOnTheOtherSide(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	where, _, err := vault.Create(root, c, vault.NewOptions{
+		Title: "A payer cannot cancel a paid invoice", Now: noon,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := filepath.Join(root, filepath.FromSlash(where))
+	raw, err := os.ReadFile(at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Written the way `docket set` writes one: a link, in a property.
+	edited := strings.Replace(string(raw), "\naliases: []",
+		"\naliases: []\nblocks: [\"[[ACME-1 Fix login redirect loop]]\"]", 1)
+	if edited == string(raw) {
+		t.Fatal("could not put a relation in the frontmatter")
+	}
+	if err := os.WriteFile(at, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	body := get(t, h, "/task/ACME-1").Body.String()
+	if !strings.Contains(body, "Referenced by") {
+		t.Fatal("a task something relates to shows nothing referring to it")
+	}
+	if !strings.Contains(body, "A payer cannot cancel a paid invoice") {
+		t.Error("the backlinks do not name the task whose relation points here")
+	}
+}

@@ -678,7 +678,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		Comments:    renderComments(t.Comments(), ix),
 		Children:    s.childrenOf(r, c, key),
 		Relations:   s.relationsOf(r, t),
-		Backlinks:   s.backlinks(r, strings.TrimSuffix(path.Base(rel), ".md"), rel),
+		Backlinks:   s.backlinks(r, strings.TrimSuffix(path.Base(rel), ".md"), rel, linkProperties(c)),
 		Version:     ver,
 		Path:        rel,
 		Unit:        c.Unit(),
