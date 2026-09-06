@@ -13,7 +13,7 @@ import (
 // board asks would change the board while looking like it only displayed it.
 func TestAFilterSurvivesBeingReadAsAFormAndWrittenBack(t *testing.T) {
 	c := &project.Config{
-		Projects: []project.Project{{Key: "ACME", Name: "Acme"}, {Key: "ACME", Name: "Acme"}},
+		Projects: []project.Project{{Key: "ACME", Name: "Acme"}, {Key: "BETA", Name: "Beta"}},
 		Statuses: []project.Status{
 			{Name: "Backlog", Category: project.CategoryTodo},
 			{Name: "In progress", Category: project.CategoryDoing},
@@ -25,7 +25,7 @@ func TestAFilterSurvivesBeingReadAsAFormAndWrittenBack(t *testing.T) {
 	notes := []Note{
 		note("ACME/ACME-1 a.md", "status_category", "todo", "type", "task", "assignee", "agent/claude"),
 		note("ACME/ACME-2 b.md", "status_category", "done", "type", "task"),
-		note("ACME/ACME-3 c.md", "status_category", "todo", "type", "subtask"),
+		note("BETA/BETA-3 c.md", "status_category", "todo", "type", "subtask"),
 		note("docs/why.md", "status_category", "todo"),
 	}
 

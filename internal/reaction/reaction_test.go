@@ -63,7 +63,7 @@ func TestAReactionRunsOnlyForWhatItAsksFor(t *testing.T) {
 		{"the project it named", Declared{On: OnMoved, Project: "ACME"},
 			Event{Event: OnMoved, Project: "ACME"}, true},
 		{"another project", Declared{On: OnMoved, Project: "ACME"},
-			Event{Event: OnMoved, Project: "ACME"}, false},
+			Event{Event: OnMoved, Project: "BETA"}, false},
 	} {
 		if got := c.declared.Wants(c.event); got != c.wants {
 			t.Errorf("%s: %v, want %v", c.what, got, c.wants)

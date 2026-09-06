@@ -21,7 +21,7 @@ func note(path string, pairs ...string) Note {
 // of a language nobody writes.
 func TestTheShippedBoardsAreReadable(t *testing.T) {
 	c := &project.Config{
-		Projects: []project.Project{{Key: "ACME", Name: "Acme"}, {Key: "ACME", Name: "Acme"}},
+		Projects: []project.Project{{Key: "ACME", Name: "Acme"}, {Key: "BETA", Name: "Beta"}},
 		Statuses: []project.Status{
 			{Name: "Backlog", Category: project.CategoryTodo},
 			{Name: "In progress", Category: project.CategoryDoing},
@@ -53,7 +53,7 @@ filters:
   and:
     - or:
       - file.inFolder("ACME")
-      - file.inFolder("ACME")
+      - file.inFolder("BETA")
     - 'note.status_category != "done"'
 `))
 	if err != nil {
@@ -66,7 +66,7 @@ filters:
 		want bool
 	}{
 		{"unfinished, in a project", note("ACME/ACME-1 A.md", "status_category", "doing"), true},
-		{"unfinished, in the other", note("ACME/ACME-9 B.md", "status_category", "todo"), true},
+		{"unfinished, in the other", note("BETA/BETA-9 B.md", "status_category", "todo"), true},
 		{"finished", note("ACME/ACME-2 C.md", "status_category", "done"), false},
 		{"a document, not a task", note("docs/design/why.md", "status_category", "todo"), false},
 		{"a task in a folder below the project", note("ACME/old/ACME-3 D.md", "status_category", "todo"), true},

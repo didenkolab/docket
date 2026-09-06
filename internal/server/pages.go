@@ -481,7 +481,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 	// The columns of the project being looked at, not of everything in the
 	// space. A workspace's statuses are the union of its projects' — which is
 	// the only honest answer for "every project", and the wrong one for a tab:
-	// a board of eleven hundred Acme tasks came out with twenty one columns,
+	// a board of eleven hundred tasks in one project came out with twenty one columns,
 	// fifteen of them belonging to somebody else's workflow and permanently
 	// empty. A column a card cannot be dropped into is a column in the way.
 	drawn := c
