@@ -519,6 +519,11 @@ func resolvable(root string) (map[string]bool, error) {
 
 		addName(rel)
 		addName(strings.TrimSuffix(rel, filepath.Ext(rel)))
+		// The bare file name, with and without its extension: Obsidian resolves
+		// ![[architecture.svg]] to attachments/architecture.svg by shortest
+		// path, and an embed written the way Obsidian writes it must not be a
+		// finding.
+		addName(d.Name())
 		addName(strings.TrimSuffix(d.Name(), filepath.Ext(d.Name())))
 		return nil
 	})

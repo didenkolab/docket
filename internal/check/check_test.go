@@ -193,6 +193,27 @@ func TestLinksThatDoResolve(t *testing.T) {
 	}
 }
 
+func TestAnEmbedByBareFileNameResolves(t *testing.T) {
+	root := newVault(t)
+	put(t, root, "ACME-1 A task.md", validTask)
+	if err := os.MkdirAll(filepath.Join(root, "attachments"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	svg := filepath.Join(root, "attachments", "architecture.svg")
+	if err := os.WriteFile(svg, []byte("<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	page := filepath.Join(root, "docs", "design.md")
+	body := "---\ntitle: design\ntype: page\nupdated: 2026-09-06\n---\n\n![[architecture.svg]] and ![[attachments/architecture.svg]].\n"
+	if err := os.WriteFile(page, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if findings := run(t, root); fired(findings, RuleLinks) {
+		t.Errorf("an embed by bare file name was reported as broken: %v", findings)
+	}
+}
+
 func TestBrokenLinksInPagesAreReported(t *testing.T) {
 	root := newVault(t)
 	put(t, root, "ACME-1 A task.md", validTask)
