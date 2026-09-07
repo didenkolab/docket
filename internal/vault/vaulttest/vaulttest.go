@@ -103,6 +103,7 @@ type: page
 	// A file that explains the template and must not survive into a vault made
 	// from it, so tests can check that it does not.
 	"TEMPLATE.md": "# The template\n\nThis file belongs to the template.\n",
+	"LICENSE":     "MIT License\n\nCopyright (c) the template's author\n",
 }
 
 // Template writes a template repository and returns its path, for

@@ -36,8 +36,10 @@ const DefaultTemplate = "https://github.com/vadymdidenkolab/docket-template.git"
 
 // TemplateOnly are the paths that belong to a template rather than to what it
 // makes. They let a template repository explain itself without every project
-// inheriting the explanation.
-var TemplateOnly = []string{"TEMPLATE.md", ".template"}
+// inheriting the explanation — and its licence: the terms a template is
+// published under are the template's, not the terms of every board made from
+// it, which is a decision for the team whose board it is.
+var TemplateOnly = []string{"TEMPLATE.md", ".template", "LICENSE"}
 
 // Options say what a new vault is for.
 type Options struct {

@@ -107,6 +107,15 @@ func TestInitWritesTheWholeVault(t *testing.T) {
 	}
 }
 
+// The licence is the template's, not the board's: a team decides its own
+// terms, and init must not decide for it.
+func TestInitLeavesTheTemplatesLicenceBehind(t *testing.T) {
+	dir, _ := initVault(t, Options{Key: "ACME", Name: "Acme Platform"})
+	if _, err := os.Stat(filepath.Join(dir, "LICENSE")); err == nil {
+		t.Error("the template's LICENSE was carried into the vault")
+	}
+}
+
 func TestInitStampsKeyAndName(t *testing.T) {
 	dir, _ := initVault(t, Options{Key: "ACME", Name: "Acme Platform"})
 
