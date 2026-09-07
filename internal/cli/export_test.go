@@ -1,6 +1,11 @@
 package cli
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 // Three of the marketplace's top hundred are checklists, and the list is
 // already Markdown in the body. Counting it here means every app that wants
@@ -36,7 +41,62 @@ func TestEveryNamedColumnCanBeRead(t *testing.T) {
 			t.Errorf("%q is offered and cannot be read", name)
 		}
 	}
-	if _, ok := column["path"]; !ok {
-		t.Error("path is readable by name but not offered")
+	for _, name := range alsoAColumn {
+		if _, ok := column[name]; !ok {
+			t.Errorf("%q is readable by name but not offered", name)
+		}
+	}
+}
+
+// `docket.yaml` can say a type is a record rather than work — `board: false` —
+// and until now the export did not pass that on, so an app computing who is
+// carrying what counted every machine-written run as somebody's backlog. The
+// column answers it once, in the place that already reads the vocabulary.
+func TestTheExportSaysWhetherATypeIsOnTheBoard(t *testing.T) {
+	dir := vaultDir(t)
+
+	config := filepath.Join(dir, "docket.yaml")
+	raw, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A type the vault keeps out of its columns, declared the way an app does.
+	changed := strings.Replace(string(raw), "types:\n",
+		"types:\n  - name: test_run\n    level: -1\n    board: false\n", 1)
+	if changed == string(raw) {
+		t.Fatalf("the scaffolded vault declares no types:\n%s", raw)
+	}
+	if err := os.WriteFile(config, []byte(changed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, _, stderr := run(t, "new", "-C", dir, "Ordinary work"); code != exitOK {
+		t.Fatalf("new: %s", stderr)
+	}
+	if code, _, stderr := run(t, "new", "-C", dir, "A run", "--type", "test_run"); code != exitOK {
+		t.Fatalf("new: %s", stderr)
+	}
+
+	code, stdout, stderr := run(t, "export", "--format", "csv",
+		"--fields", "key,type,board", dir)
+	if code != exitOK {
+		t.Fatalf("export: exit %d; stderr:\n%s", code, stderr)
+	}
+	want := "key,type,board\nACME-1,task,true\nACME-2,test_run,false\n"
+	if got := strings.ReplaceAll(stdout, "\r\n", "\n"); got != want {
+		t.Errorf("csv is\n%q\nwant\n%q", got, want)
+	}
+
+	code, stdout, stderr = run(t, "export", "--format", "json", dir)
+	if code != exitOK {
+		t.Fatalf("export json: exit %d; stderr:\n%s", code, stderr)
+	}
+	// JSON carries the same answer as a boolean, and carries it for every task:
+	// omitting false would read as "not on the board" for ordinary work.
+	for _, want := range []string{`"type": "task"`, `"type": "test_run"`,
+		`"board": true`, `"board": false`} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("json does not say %s:\n%s", want, stdout)
+		}
 	}
 }

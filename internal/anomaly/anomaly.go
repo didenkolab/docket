@@ -51,7 +51,7 @@ type Finding struct {
 // the same thing: a report that shuffles is a report nobody can diff.
 func Look(entries []vault.Entry, shape vault.Shape, c *project.Config) []Finding {
 	var out []Finding
-	out = append(out, adrift(entries)...)
+	out = append(out, adrift(entries, c)...)
 	out = append(out, onlyOwner(entries)...)
 	out = append(out, overgrown(entries)...)
 	out = append(out, oneSided(entries, c)...)
@@ -79,7 +79,26 @@ func open(e vault.Entry) bool {
 // is a task that fell out of the plan. It will not appear under any epic, in
 // any label's page, or in anybody's search for the thing it belongs to — it can
 // only be found by scrolling the column it is in.
-func adrift(entries []vault.Entry) []Finding {
+//
+// A relation counts, in both directions, and it has to: `Links()` reads the
+// Markdown under the frontmatter, and a relation is a property above it. An app
+// that writes tasks whose only connections are relations — a test with `tests:`
+// and a run with `runs:` — had every one of them reported adrift while the
+// reason line said "no relation", which is the tool disagreeing with itself.
+func adrift(entries []vault.Entry, c *project.Config) []Finding {
+	verbs := make([]string, 0, len(c.Relations()))
+	for _, r := range c.Relations() {
+		verbs = append(verbs, r.Name)
+	}
+	related := func(t *task.Task) bool {
+		for _, verb := range verbs {
+			if len(t.Related(verb)) > 0 {
+				return true
+			}
+		}
+		return false
+	}
+
 	linkedTo := map[string]bool{}
 	for _, e := range entries {
 		if e.Task == nil {
@@ -90,6 +109,13 @@ func adrift(entries []vault.Entry) []Finding {
 		}
 		for _, link := range e.Task.Links() {
 			linkedTo[task.KeyOf(link)] = true
+		}
+		// Named by somebody else's relation is named: the task at the other end
+		// of `tests:` shows it as a backlink, exactly as a body link would.
+		for _, verb := range verbs {
+			for _, key := range e.Task.Related(verb) {
+				linkedTo[key] = true
+			}
 		}
 	}
 
@@ -102,7 +128,7 @@ func adrift(entries []vault.Entry) []Finding {
 		if t.Parent != "" || len(t.Labels) > 0 || len(t.Tags) > 0 || t.Sprint != "" {
 			continue
 		}
-		if len(t.Links()) > 0 || linkedTo[e.Key] {
+		if len(t.Links()) > 0 || related(t) || linkedTo[e.Key] {
 			continue
 		}
 		out = append(out, Finding{

@@ -147,3 +147,27 @@ func TestANoteHoldingMostOfTheLinksIsFound(t *testing.T) {
 		t.Error("an ordinary note was called a hub")
 	}
 }
+
+// A relation lives in the frontmatter, and `Links()` only reads the Markdown
+// under it. An app that writes tasks whose one connection is a relation — a
+// test that says `tests:`, a run that says `runs:` — had every one of them
+// reported adrift, while the finding's own reason said "no relation".
+func TestARelationIsNotAdriftAtEitherEnd(t *testing.T) {
+	c := vocabulary()
+	c.Declared = []project.Relation{{Name: "tests", Inverse: "tested_by"}}
+	entries := []vault.Entry{
+		// No parent, no label, no sprint, nothing in the body — and a relation.
+		made(t, "key: ACME-1\ntitle: The test\nstatus: Backlog\nstatus_category: todo\n"+
+			"tests: [\"[[ACME-2 The work]]\"]\n"),
+		// Named by that relation and carrying nothing itself.
+		made(t, "key: ACME-2\ntitle: The work\nstatus: Backlog\nstatus_category: todo\n"),
+	}
+
+	found := kinds(Look(entries, vault.Shape{}, c))
+	if strings.Contains(found, "adrift:ACME-1") {
+		t.Errorf("a task with a relation was called adrift: %s", found)
+	}
+	if strings.Contains(found, "adrift:ACME-2") {
+		t.Errorf("a task another task's relation names was called adrift: %s", found)
+	}
+}

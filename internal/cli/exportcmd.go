@@ -25,16 +25,22 @@ the awkward reading stays in one place that is tested. Flags:
 `
 
 type exported struct {
-	Key      string   `json:"key"`
-	Project  string   `json:"project"`
-	Title    string   `json:"title"`
-	Type     string   `json:"type"`
-	Status   string   `json:"status"`
-	Category string   `json:"category"`
-	Priority string   `json:"priority"`
-	Assignee string   `json:"assignee,omitempty"`
-	Parent   string   `json:"parent,omitempty"`
-	Sprint   string   `json:"sprint,omitempty"`
+	Key      string `json:"key"`
+	Project  string `json:"project"`
+	Title    string `json:"title"`
+	Type     string `json:"type"`
+	Status   string `json:"status"`
+	Category string `json:"category"`
+	Priority string `json:"priority"`
+	Assignee string `json:"assignee,omitempty"`
+	Parent   string `json:"parent,omitempty"`
+	Sprint   string `json:"sprint,omitempty"`
+	// Board is whether a task of this type belongs in a column, from the type's
+	// own `board:` setting. Always written, never omitted: an app reading this
+	// asks "is this somebody's work", and a missing key would answer "no" for
+	// every ordinary task. A workload report that does not ask counts seven
+	// hundred machine-written runs as somebody's backlog.
+	Board    bool     `json:"board"`
 	Labels   []string `json:"labels,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
 	Estimate *float64 `json:"estimate,omitempty"`
@@ -115,7 +121,7 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 			Priority: e.Task.Priority, Assignee: e.Task.Assignee, Parent: e.Task.Parent,
 			Sprint: e.Task.Sprint, Labels: e.Task.Labels, Tags: e.Task.Tags,
 			Created: e.Task.Created, Updated: e.Task.Updated, Path: e.Path,
-			Estimate: e.Task.Estimate,
+			Estimate: e.Task.Estimate, Board: c.OnBoard(e.Task.Type),
 		}
 		row.Checked, row.Boxes = boxes(e.Task.Body())
 		row.Relations = e.Task.AllRelations(relationNames(c))
@@ -165,7 +171,8 @@ func runExport(args []string, stdout, stderr io.Writer) int {
 				}
 				if _, ok := column[name]; !ok {
 					fmt.Fprintf(stderr, "docket export: %q is not a column: %s\n",
-						name, strings.Join(everyColumn, ", "))
+						name, strings.Join(append(append([]string{}, everyColumn...),
+							alsoAColumn...), ", "))
 					return exitUsage
 				}
 				wanted = append(wanted, name)
@@ -217,6 +224,11 @@ var everyColumn = []string{"key", "project", "title", "type", "status", "categor
 	"priority", "assignee", "parent", "sprint", "labels", "estimate",
 	"checked", "boxes", "created", "updated"}
 
+// alsoAColumn is readable by name and left out of the full export, so that
+// adding one does not move the columns under a program already reading it.
+// They are named here so that a mistyped `--fields` still lists them.
+var alsoAColumn = []string{"path", "board"}
+
 // column reads one column out of a row.
 //
 // Named rather than positional so that an app can ask for the two it wants and
@@ -233,7 +245,13 @@ var column = map[string]func(exported) string{
 	"assignee": func(r exported) string { return r.Assignee },
 	"parent":   func(r exported) string { return r.Parent },
 	"sprint":   func(r exported) string { return r.Sprint },
-	"labels":   func(r exported) string { return strings.Join(r.Labels, " ") },
+	"board": func(r exported) string {
+		if r.Board {
+			return "true"
+		}
+		return "false"
+	},
+	"labels": func(r exported) string { return strings.Join(r.Labels, " ") },
 	"estimate": func(r exported) string {
 		if r.Estimate == nil {
 			return ""
