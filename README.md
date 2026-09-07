@@ -391,10 +391,14 @@ changes is reported and left alone.
 | [`docket-board`](https://github.com/vadymdidenkolab/docket-board) | The format's specification, the decisions and the roadmap — and the project's own board, which makes it the working example |
 | [`docket-template`](https://github.com/vadymdidenkolab/docket-template) | What a new vault starts as. `docket init` clones it |
 | [`docket-demo`](https://github.com/vadymdidenkolab/docket-demo) | A small vault to open and look at: two projects, seven tasks and a page |
-| `docket-showcase` | An invented company's vault: three products, six people, twelve weeks, and every app installed — built by a generator |
+| [`docket-showcase`](https://github.com/vadymdidenkolab/docket-showcase) | An invented company's vault: three products, six people, twelve weeks, and every app installed — built by a generator |
 | [`northlight`](https://github.com/vadymdidenkolab/northlight) | That invented company's code, beside its vault |
 
 Only `docket-template` is public today; the rest need access.
+
+The demo is the format in a minute. To see the whole of it on a team's worth of work, clone
+[`docket-showcase`](https://github.com/vadymdidenkolab/docket-showcase): three products, six
+people, twelve weeks and every app, all invented.
 
 ## Contributing
 
