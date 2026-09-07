@@ -8,50 +8,38 @@ lines — no API to call, no schema it cannot read. The same folder, opened in O
 board with columns, a backlog, a linked wiki and a graph. Neither view is an export of the
 other; there is one set of files. Git is the history, and `git clone` is the export.
 
-This repository holds the tool. **The format, the specification and the project's own board
-live in [`docket-board`](https://github.com/vadymdidenkolab/docket-board)** — which is itself an
-docket vault, and therefore the working example.
-
-To see one without reading anything, clone
-[`docket-demo`](https://github.com/vadymdidenkolab/docket-demo) and open it in Obsidian: two
-projects, a board, a backlog and a wiki, with nothing installed.
-
-## Status
-
 The vault format is settled, and the whole local workflow works. A vault is usable without any
 of this — clone, open in Obsidian, work — but the tool makes the routine parts routine.
 
+## Quick start
+
+A vault is a git repository, so make one first — `docket init` fills it and commits, but it does
+not create it:
+
 ```bash
-docket init --key ACME --name "Acme Platform" acme   # a complete vault, ready to open
-cd acme
-docket new "Fix login redirect loop" --type bug      # ACME-1, with a valid key
-docket project add --key BETA --name "Beta"          # a second project in the same vault
-docket new --project BETA "Ship the widget"          # BETA-1
-docket check                                         # ten rules, file:line findings
-docket check --fix                                   # rename drifted files, link up relationships
+mkdir acme && cd acme && git init -q
+docket init --key ACME --name "Acme Platform"
+docket new "Fix login redirect loop" --type bug
+docket check
+docket serve --auth none --author "Your Name <you@example.com>"
 ```
 
-A key is `PROJECT-NUMBER`, and the file is named after the task:
-`ACME/ACME-1 Fix login redirect loop.md`. The key makes it sortable and unambiguous, the title
-makes the graph readable, and `[[ACME-1 Fix login redirect loop]]` resolves in Obsidian with no
-help — the reasoning is in
-[ADR-0005](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0005-a-file-is-named-after-its-task.md).
-One vault holds as many projects as you like, and links between projects work because the
-projects are one file tree.
+Open <http://127.0.0.1:8080>. You should see a board called Acme Platform with six columns —
+Backlog, Ready, In progress, In review, Done, Dropped — and one card in Backlog, `ACME-1`. Drag
+it to In progress and it lands in git as a commit. The same folder opened in Obsidian is the
+same board.
 
-| Command | What | State |
-|---|---|---|
-| `docket init` | Scaffold a new vault | works |
-| `docket project` | List the projects a vault holds, or add one | works |
-| `docket new` | Create a task with a valid key from the project's template | works |
-| `docket check` | Validate a vault against the specification | works |
-| `docket workspace` | Assemble several project repositories into one Obsidian vault | works |
-| `docket serve` | A board and an API over the same repository | works |
-| `docket mcp` | Serve the vault to an agent over the Model Context Protocol | works |
-| `docket version` | Print the version | works |
-| `docket import` | Bring in an existing Jira and Confluence instance | works |
+`docket init` clones the template over the network, so the first one needs a connection.
 
-Progress is tracked on the board in `docket-board`.
+## Requirements
+
+| | |
+|---|---|
+| git | Required, on the `PATH`. Every write is a commit, and the history is the record |
+| Go 1.26 or newer | Only to build from source. A released binary needs no toolchain |
+| Obsidian | Optional. The vault is Markdown either way; Obsidian is one of the two ways to read it |
+| Python 3.11 or newer, and `sh` | Optional, for the hooks some [apps](https://github.com/vadymdidenkolab/docket-apps) bring |
+| Docker | Optional, for `compose.yaml` |
 
 ## Install
 
@@ -75,7 +63,93 @@ go build -o docket ./cmd/docket
 Go and the single-binary distribution were chosen for the reasons in
 [ADR-0002](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0002-go-and-a-single-binary.md).
 
-## A board in the browser
+Check what you have:
+
+```bash
+docket version
+```
+
+## Usage
+
+A key is `PROJECT-NUMBER`, and the file is named after the task:
+`ACME/ACME-1 Fix login redirect loop.md`. The key makes it sortable and unambiguous, the title
+makes the graph readable, and `[[ACME-1 Fix login redirect loop]]` resolves in Obsidian with no
+help — the reasoning is in
+[ADR-0005](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0005-a-file-is-named-after-its-task.md).
+One vault holds as many projects as you like, and links between projects work because the
+projects are one file tree.
+
+| Command | What |
+|---|---|
+| `docket init` | Scaffold a new vault |
+| `docket new` | Create a task with a valid key from the project's template |
+| `docket project` | List the projects a vault holds, or add one |
+| `docket check` | Validate a vault against the specification |
+| `docket workspace` | Assemble several project repositories into one Obsidian vault |
+| `docket graph` | What shape the vault's links are in |
+| `docket people` | Who the work is on, and who has no page yet |
+| `docket app` | Install a pack of vocabulary and files |
+| `docket report` | What the board cannot say by looking at today |
+| `docket anomalies` | What is odd about how the work is connected |
+| `docket export` | The tasks, as JSON or CSV — and what an app computes from |
+| `docket adopt` | Promote an imported property to what the format calls it |
+| `docket set` | Write properties on a task, from a script |
+| `docket serve` | A board and an API over the same repository |
+| `docket import` | Bring in an existing Jira and Confluence instance |
+| `docket mcp` | Serve the vault to an agent over the Model Context Protocol |
+| `docket version` | Print the version |
+
+Every one of them works. `docket <command> --help` says what its flags are, and what is not built
+yet is on the board in `docket-board`.
+
+## Configuration
+
+Three files, and nothing else is state:
+
+| File | Where | What it says |
+|---|---|---|
+| `docket.yaml` | A vault's root | The projects it holds and the vocabulary they share: statuses and their categories, types and their levels, priorities, fields, relations, and the workflow |
+| `workspace.yaml` | A workspace's root | The project repositories assembled into one Obsidian vault |
+| `docket-app.yaml` | An app's root | The vocabulary and files a pack brings |
+
+`docket serve`:
+
+| Flag | What |
+|---|---|
+| `--addr` | Address to listen on (default `127.0.0.1:8080`) |
+| `--auth` | `auto`, `git`, or `none` (default `auto`) |
+| `--author` | Who unauthenticated writes are attributed to, as `"Name <email>"` |
+| `--programs` | Run the programs this vault declares — its reactions, pages and panels. Off unless said here |
+| `--behind-proxy` | A reverse proxy sits in front, so rate limits follow the client it names |
+| `--host`, `--api` | Which git host the remote is, and its API base URL — needed only for a self-hosted one |
+| `--device-client-id` | Override the OAuth application people sign in with, for this server only |
+| `--session`, `--recheck` | How long a session lasts (12h), and how often the host is re-asked about a signed-in person (5m) |
+| `--template` | The repository a new project is scaffolded from |
+
+Environment. docket itself reads two:
+
+| Variable | What |
+|---|---|
+| `DOCKET_TOKEN` | The API token for `docket import extract`, instead of `--token` |
+| `DOCKET_DEVICE_CLIENT_ID` | The same as `--device-client-id` |
+
+And it sets these for a program it runs, so a hook asks docket for data rather than parsing the
+vault itself:
+
+| Variable | What |
+|---|---|
+| `DOCKET_ROOT` | The vault on disk |
+| `DOCKET_BIN` | This binary |
+| `DOCKET_EVENT` | What happened, for a reaction |
+| `DOCKET_PREFIX` | Where the vault sits in the server's URL space — empty for a repository, set in a workspace — so a link a hook writes resolves |
+
+Hooks that apps bring read a few of their own — `DOCKET_JUNIT_SECRET`, `DOCKET_AUTHOR_NAME` and
+`DOCKET_AUTHOR_EMAIL`, `DOCKET_ENVIRONMENT`, `DOCKET_REVISION` — and are documented in
+[`docket-apps`](https://github.com/vadymdidenkolab/docket-apps).
+
+## How it works
+
+### A board in the browser
 
 For people who do not run Obsidian:
 
@@ -95,7 +169,7 @@ arranged is still arranged after a reload — and a vault where nobody has dragg
 simply sorted by key. Dragging is an enhancement, not the mechanism: without JavaScript the
 board is still a board and every task page still moves its own status.
 
-### An epic, a label and a task are joined by links
+#### An epic, a label and a task are joined by links
 
 `parent` and `labels` are wikilinks, not words:
 
@@ -119,7 +193,7 @@ the same commit as the rename, so no point in the history has the vault pointing
 `docket check` reports a relationship still written as a string, and `docket check --fix` rewrites
 it.
 
-### How two tasks are connected
+#### How two tasks are connected
 
 `parent` is hierarchy. How else two pieces of work relate is a property whose name is the verb:
 
@@ -137,7 +211,7 @@ reads. The exception is the one that changes what you pick up next — a task wa
 unfinished work is marked **blocked** on the board, and blocked by something already done is not
 blocked.
 
-### A plan on a branch
+#### A plan on a branch
 
 A branch is a proposal about the plan — a release re-scoped, an epic split, a quarter dropped.
 The **Branches** page lists them, and opening one draws the board as it would be, read out of
@@ -160,7 +234,7 @@ Looking at a proposal writes nothing and does not touch the working tree, so it 
 whoever is working in it. The cards there are not draggable, the page says which branch it is,
 and a proposal is changed by checking it out.
 
-### A release is a tag
+#### A release is a tag
 
 There is no version object, no `fixVersion` to set and no release notes to generate. A release
 is a git tag, and what went into it is the work whose files changed since the tag before it:
@@ -178,7 +252,7 @@ Ordered by the commit each tag points at rather than by when somebody typed the 
 because tagging is often retroactive and three releases labelled in one afternoon have tag
 dates minutes apart.
 
-### What happened to this task
+#### What happened to this task
 
 Every change is a commit, so the history of a task is the history of its file — and the
 interface shows it as a tracker does rather than as a diff: who, when, and which fields moved.
@@ -194,7 +268,7 @@ retitle that also rewrites the body falls under the threshold, and the history s
 The key is in the file name, so `ACME/ACME-12 *.md` is the whole life of ACME-12 and nothing
 else, decided by the format instead of by a heuristic.
 
-### Who may do what
+#### Who may do what
 
 docket keeps no users of its own. People sign in with a token for the git host that already
 holds the repository — GitHub, GitLab or Bitbucket, hosted or your own — and what they may do
@@ -207,7 +281,7 @@ it, so a button in this interface would appear to hand out something it cannot. 
 is in
 [ADR-0004](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0004-access-comes-from-git.md).
 
-### Standing up to the open internet
+#### Standing up to the open internet
 
 A change has to come from a page this server drew. Every form carries a token that lives in a
 cookie the page cannot read, and a request that admits to coming from another origin — by
@@ -228,7 +302,7 @@ file and then a commit, and stopping between the two leaves a change git never s
 None of this replaces the git host. Anyone who can clone the repository has everything in it;
 what is here keeps a browser from being used against its owner.
 
-### The workflow
+#### The workflow
 
 Which status may move to which is part of the vault's configuration, so it lives in
 `docket.yaml` and changes to it show up in `git log` like everything else. Leave it out and any
@@ -238,7 +312,7 @@ to the same files, not an owner of them: nothing is cached, every write becomes 
 attributed to whoever made it, and a write that would land on top of a change made in Obsidian
 or by an agent is refused rather than applied. Point all three at one repository at once.
 
-### Running it somewhere
+#### Running it somewhere
 
 In a container, with `compose.yaml` from this repository:
 
@@ -270,7 +344,7 @@ To let a server take changes people push to the remote — and to push its own b
 schedule beside it; docket does not fetch on its own, because a tracker that rebases your working
 copy out from under you is a tracker you stop trusting.
 
-## An agent, over a protocol
+### An agent, over a protocol
 
 An agent can edit the files directly — that is the point of the format, and nothing here
 replaces it. But an agent driving a tracker wants "move this to In review" to be one call that
@@ -295,7 +369,7 @@ agent cannot land on top of an edit somebody made in Obsidian while it was think
 workflow applies here exactly as it does on the board: a move the vault forbids comes back as
 an error that names the moves it allows instead.
 
-## A workspace
+### A workspace
 
 Several projects, each its own repository, opened in Obsidian as one vault:
 
@@ -307,6 +381,38 @@ docket workspace sync
 
 `sync` clones what is missing and fast-forwards what is there. A project with uncommitted
 changes is reported and left alone.
+
+## Where things are
+
+| Repository | What |
+|---|---|
+| [`docket`](https://github.com/vadymdidenkolab/docket) | This one: the CLI, the server and the MCP endpoint, as one Go binary |
+| [`docket-apps`](https://github.com/vadymdidenkolab/docket-apps) | Packs of vocabulary and files a vault takes on — tests, time, risks, OKRs and eight more |
+| [`docket-board`](https://github.com/vadymdidenkolab/docket-board) | The format's specification, the decisions and the roadmap — and the project's own board, which makes it the working example |
+| [`docket-template`](https://github.com/vadymdidenkolab/docket-template) | What a new vault starts as. `docket init` clones it |
+| [`docket-demo`](https://github.com/vadymdidenkolab/docket-demo) | A small vault to open and look at: two projects, seven tasks and a page |
+| `docket-showcase` | An invented company's vault: three products, six people, twelve weeks, and every app installed — built by a generator |
+| [`northlight`](https://github.com/vadymdidenkolab/northlight) | That invented company's code, beside its vault |
+
+Only `docket-template` is public today; the rest need access.
+
+## Contributing
+
+```bash
+go build ./...
+go test ./...
+```
+
+`docket check` prints a file and a line for every finding and exits non-zero when there is at
+least one, so it works as a vault's pre-commit hook:
+
+```sh
+#!/bin/sh
+exec docket check .
+```
+
+Work is tracked on the board in `docket-board`, where a task is a Markdown file — so a change to
+the plan is a pull request, reviewed on the lines, like a change to the code.
 
 ## License
 
