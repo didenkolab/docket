@@ -26,8 +26,6 @@ type index struct {
 	targets map[string]string // lower-case target -> href
 }
 
-var skipDirs = map[string]bool{".git": true, ".obsidian": true, ".trash": true}
-
 // buildIndex indexes one vault into ix, prefixing every path with where that
 // vault sits in the space. A space of one has no prefix and nothing changes.
 func buildIndex(ix *index, root, prefix string, c *project.Config) error {
@@ -47,7 +45,7 @@ func buildIndex(ix *index, root, prefix string, c *project.Config) error {
 			return err
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] {
+			if vault.Hidden(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil
