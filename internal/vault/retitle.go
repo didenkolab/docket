@@ -37,7 +37,7 @@ func Retitle(root, from, to string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			if skip[d.Name()] {
+			if Hidden(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil
@@ -65,9 +65,13 @@ func Retitle(root, from, to string) ([]string, error) {
 	return touched, err
 }
 
-// skip is what a rewrite never walks into: git's own storage, Obsidian's
-// configuration, and the trash — none of which is content.
-var skip = map[string]bool{".git": true, ".obsidian": true, ".trash": true}
+// Hidden says whether a directory is one no walk over the vault goes into:
+// git's own storage, Obsidian's configuration, the trash, and anything else a
+// tool keeps beside the content under a leading dot. A dot-directory is by
+// convention somebody's working state, not a page — so the graph, the pages
+// and the sprints are counted from what a reader would see, and a scratch
+// directory left by an editor or an agent does not become forty notes.
+func Hidden(name string) bool { return strings.HasPrefix(name, ".") }
 
 // noteName is what a wikilink to a file says: its name without the folder and
 // without the extension.

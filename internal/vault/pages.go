@@ -98,7 +98,7 @@ func Pages(root string) ([]Page, error) {
 			return err
 		}
 		if d.IsDir() {
-			if skip[d.Name()] {
+			if Hidden(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil

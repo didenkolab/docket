@@ -56,12 +56,7 @@ func (f Finding) String() string {
 	return fmt.Sprintf("%s: [rule %d] %s", where, f.Rule, f.Message)
 }
 
-// directories that hold no vault content
-var skipDirs = map[string]bool{
-	".git":      true,
-	".obsidian": true,
-	".trash":    true,
-}
+// A directory under a leading dot holds no vault content; see vault.Hidden.
 
 // Run validates the vault rooted at root.
 //
@@ -505,7 +500,7 @@ func resolvable(root string) (map[string]bool, error) {
 			return err
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] {
+			if vault.Hidden(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil

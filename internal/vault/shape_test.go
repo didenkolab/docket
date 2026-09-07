@@ -38,6 +38,11 @@ func TestMeasure(t *testing.T) {
 	write("README.md", "# A vault\n")
 	// Templates are not notes.
 	write("templates/task.md", "---\nkey:\n---\n[[auth]]\n")
+	// A directory under a dot is somebody's working state — an agent's scratch,
+	// an editor's cache — and its files are not notes either, however many
+	// wikilinks they hold.
+	write(".superpowers/sdd/task-1-brief.md", "[[auth]] and [[ACME-1 One]] forty times over.\n")
+	write(".obsidian/plugins/x/notes.md", "[[auth]]\n")
 
 	s, err := Measure(root)
 	if err != nil {

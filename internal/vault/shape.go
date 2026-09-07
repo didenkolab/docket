@@ -96,7 +96,7 @@ func Measure(root string) (Shape, error) {
 			return err
 		}
 		if d.IsDir() {
-			if skip[d.Name()] || d.Name() == TemplatesDir {
+			if Hidden(d.Name()) || d.Name() == TemplatesDir {
 				return fs.SkipDir
 			}
 			return nil
