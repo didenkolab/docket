@@ -152,7 +152,7 @@ func InProjects(c *project.Config) string {
 
 // Two details here were found by opening this in Obsidian rather than by
 // reading its documentation, which is wrong about both. Checked against
-// Obsidian 1.13.7 — see IGL-12.
+// Obsidian 1.13.7 — see DKT-12.
 //
 // `groupBy` needs `direction` as well as `property`. Without it the whole file
 // is refused with "groupBy must be of type object", which is true of the value

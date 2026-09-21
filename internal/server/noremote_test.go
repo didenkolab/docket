@@ -13,7 +13,7 @@ import (
 //
 // The repository was skipped before the panel was drawn, so a person moving
 // cards saw no badge, no warning and no explanation — which is the silence
-// IGL-37 exists to prevent, one step earlier in the chain. That rule catches a
+// DKT-37 exists to prevent, one step earlier in the chain. That rule catches a
 // push that failed; this is a push that was never attempted.
 func TestAVaultWithNoRemoteSaysSo(t *testing.T) {
 	s, handler, root := newServer(t)

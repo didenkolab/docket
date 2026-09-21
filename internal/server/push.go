@@ -67,7 +67,7 @@ type pushState struct {
 	//
 	// It used to say nothing whatsoever. A vault with no remote was skipped
 	// before the panel was drawn, so the board committed, published nothing and
-	// reported neither — which is the silence IGL-37 was written against, only
+	// reported neither — which is the silence DKT-37 was written against, only
 	// one step earlier in the chain. Reported once the board has actually
 	// written something, because a local-only vault nobody has touched is a
 	// normal thing to have and not something to nag about.
