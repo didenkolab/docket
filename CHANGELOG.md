@@ -50,16 +50,24 @@ Apps installed from the old library carry the old source URL in `docket.yaml`; r
 
 ### Fixed
 
+- **A retitle no longer leaves dangling links** (DKT-61). `docket check --fix` renamed a retitled
+  task's file and left every link naming the old title pointing at nothing, then reported the
+  vault clean — the rule that reads a relation matches the key inside the link, and the key had
+  not changed. Valid to the tool, and drawing no edge in Obsidian. `check` now reports such a
+  link and says what to write instead; `--fix` renames first and then puts every link back on the
+  note, for parents and for every declared relation.
+- **A write during a push is no longer dropped** (DKT-62). The background push loop stopped when
+  the unpushed count was no longer falling, reading that as a push that sends nothing. A push
+  that sends one commit while the next write lands leaves the count exactly where it was, so the
+  loop stopped with that write still in the folder and the board reporting nothing wrong.
+  Progress is now the upstream ref advancing, which says work was done whatever else arrived
+  meanwhile.
 - The test that writes a git tag now says who is writing it. It tagged with no identity, which
   passes on any machine with a global git config and fails on every CI runner — eleven red runs
   on main, all of them this one test.
 
 ### Known
 
-- `docket check --fix` renames a retitled task's file and leaves every link naming the old title
-  pointing at nothing, then reports the vault clean — the relation rule matches the key inside
-  the link, and the key did not change. Filed as DKT-61. Until it is fixed, grep for the old
-  title after a retitle.
 - The **Run the scenarios** button in the tests app does not land a result; the two routes that
   work are a commit from CI and `hooks/import-cucumber.sh`. Filed as DKT-57.
 - The Confluence half of `docket import` has never been pointed at a real space.

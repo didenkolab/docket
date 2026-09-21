@@ -118,9 +118,9 @@ yourself means picking a key by hand, and two agents on two branches pick the sa
    to the board. Fields carried in from another system are prefixed `x_`.
 4. **A key is permanent.** Never edit `key` or `created`; never renumber to close a gap.
 5. **Retitling renames the file and every link to it.** `docket set` cannot change a title: edit
-   `title`, run `docket check --fix` to rename the file, then grep for the old title and rewrite
-   every link naming it. `--fix` does not follow links and `check` will not warn you — its rule
-   matches the key inside the link, and the key did not change (DKT-61).
+   `title` in the frontmatter, then run `docket check --fix`. It renames the file and puts every
+   link naming the old title back on the note, in that order. Commit the whole thing together —
+   the rename and the rewritten links are one change.
 6. **Run `docket check` before every commit.** It exits non-zero on a finding, and prints a file
    and a line.
 

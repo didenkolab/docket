@@ -162,9 +162,9 @@ and fix the inbound links. Do not renumber to close gaps — a key is permanent.
 **The graph turns into a hairball.** Usually one page that links everything. `docket graph` names
 it and says what share of every edge it holds.
 
-**A retitle leaves dangling links.** `docket check --fix` renames the file but does not follow
-inbound links yet, and `check` does not warn — grep for the old title after a retitle. Filed as
-DKT-61.
+**A retitle is two changes.** Editing `title` leaves the file name and every link to it naming
+the old one. `docket check --fix` settles both — it renames the file, then puts every link back
+on the note. Commit them together.
 
 **Somebody expects the server to sync.** It does not fetch on its own, by design: a tracker that
 rebases your working copy out from under you is a tracker you stop trusting. Pull on a schedule
