@@ -92,6 +92,103 @@ func TestQuickChangesAllReachTheRemote(t *testing.T) {
 	}
 }
 
+// A write that lands while a push is in the air is sent by the push after it.
+//
+// The version before this one asked whether the unpushed count was falling and
+// stopped when it was not. That reads a write arriving mid-push as a push making
+// no progress: one commit goes, one arrives, the count is unchanged, and the
+// loop gives up with the new commit still in the folder and the board reporting
+// nothing wrong (DKT-62).
+//
+// The race is made deterministic with a pre-push hook that sleeps, so the window
+// is half a second wide rather than however long the machine happens to take.
+// Hoping the scheduler cooperates is what made the first version of this fail
+// about one run in ten, and only on the build.
+func TestAWriteDuringASlowPushIsNotStranded(t *testing.T) {
+	s, handler, root := newServer(t)
+
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v: %s", strings.Join(args, " "), err, out)
+		}
+	}
+	run(t.TempDir(), "init", "-q", "--bare", "-b", "main", remote)
+	run(root, "remote", "add", "origin", remote)
+	run(root, "push", "-q", "-u", "origin", "HEAD")
+
+	// The tasks first, and settled, so that the timed part below is only the
+	// three moves and not whatever their creation was still pushing.
+	for _, title := range []string{"One", "Two", "Three"} {
+		w := as(t, handler, nil, http.MethodPost, "/new",
+			url.Values{"title": {title}, "type": {"task"}, "priority": {"normal"}})
+		if w.Code != http.StatusSeeOther {
+			t.Fatalf("could not make %s: %d %s", title, w.Code, w.Body)
+		}
+	}
+	settle := func(within time.Duration) int {
+		t.Helper()
+		deadline, n := time.Now().Add(within), -1
+		for time.Now().Before(deadline) {
+			if got, err := s.sp().Vaults()[0].Repo.Unpushed(); err == nil {
+				if n = got; n == 0 {
+					return 0
+				}
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		return n
+	}
+	if n := settle(20 * time.Second); n != 0 {
+		t.Fatalf("setup never settled: %d commits still waiting", n)
+	}
+
+	// Every push from here takes half a second, on the client side, which is
+	// what a real one over a real network does.
+	hook := filepath.Join(root, ".git", "hooks", "pre-push")
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\nsleep 0.5\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// ACME-2 starts a push that runs until t+500ms.
+	// ACME-3 lands inside it, and is sent by the round that follows.
+	// ACME-4 lands inside *that* round — the case the count could not see,
+	// because one commit left and one arrived, so the count did not move.
+	move := func(key string) {
+		t.Helper()
+		w := as(t, handler, nil, http.MethodPost, "/task/"+key+"/status",
+			url.Values{"status": {"In review"}})
+		if w.Code != http.StatusSeeOther && w.Code != http.StatusOK {
+			t.Fatalf("%s was not moved: %d %s", key, w.Code, w.Body)
+		}
+	}
+	move("ACME-2")
+	time.Sleep(100 * time.Millisecond)
+	move("ACME-3")
+	time.Sleep(600 * time.Millisecond)
+	move("ACME-4")
+
+	if n := settle(30 * time.Second); n != 0 {
+		t.Errorf("%d commits never left the folder — a write that arrived during a push "+
+			"was dropped rather than sent after it", n)
+	}
+
+	cmd := exec.Command("git", "log", "main", "--format=%s", "-8")
+	cmd.Dir = remote
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("reading the remote: %v: %s", err, out)
+	}
+	for _, key := range []string{"ACME-2", "ACME-3", "ACME-4"} {
+		if !strings.Contains(string(out), key) {
+			t.Errorf("%s never reached the remote:\n%s", key, out)
+		}
+	}
+}
+
 // A commit the board did not make is sent too.
 //
 // This is what the count knows and a flag could not. The first version of the

@@ -141,35 +141,33 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 	go func() {
 		// Push, then ask what is left, and if anything is, push that too.
 		//
-		// The first version of this remembered that a write had arrived while
-		// the push was in the air, and went round again for it. That was a
-		// second record of a fact git already holds — and a worse one, because
-		// it only knew about writes the board made. A commit an agent wrote in
-		// the folder, or `docket new` on the command line, was invisible to it.
+		// Two things are read after every push, and keeping them apart is what
+		// took three attempts to get right.
 		//
-		// The count is the truth. Asking it after every push covers every way a
-		// commit can appear, which is the whole reason this project keeps no
-		// state beside the repository.
-		// Push, then ask what is left, and if anything is, push that too.
+		// What is left is the unpushed count, read while holding the same lock
+		// that says whether a push is running. That is the whole of the
+		// correctness on this side: a write commits and then calls after, which
+		// takes the lock; finding a push in flight, it returns and trusts this
+		// loop to notice. Reading the count outside the lock left a window
+		// where it did not — count zero, commit lands, write returns, loop
+		// clears the flag, commit stranded.
 		//
-		// The count is read while holding the same lock that says whether a
-		// push is running, and that is the whole of the correctness here. A
-		// write commits and then calls after, which takes the lock; if it finds
-		// a push in flight it returns, trusting this loop to notice. Reading
-		// the count outside the lock left a window where it did not: count zero,
-		// commit lands, write returns, loop clears the flag, commit stranded.
-		// One flaky test in ten runs, which is the worst kind.
+		// An earlier version kept a flag saying "a write arrived" rather than
+		// asking git. That was a second record of a fact git already holds, and
+		// a narrower one: it knew nothing of a commit an agent made in the
+		// folder, or one from `docket new`. Asking covers every way a commit can
+		// appear, which is the whole reason this project keeps no state beside
+		// the repository.
 		//
-		// An earlier version kept a flag saying "a write arrived" instead. That
-		// was a second record of a fact git already holds, and a narrower one:
-		// it knew nothing of a commit an agent made in the folder or one from
-		// `docket new`. The count knows about every commit however it got there.
-		previous := -1
+		// Whether progress was made is a different question, and the count
+		// cannot answer it. See the exit condition below.
+		previousUpstream := ""
 		for {
 			err := v.Repo.Push(cred)
 
 			s.pushes.mu.Lock()
 			waiting, countErr := v.Repo.Unpushed()
+			upstream, upstreamErr := v.Repo.UpstreamAt()
 
 			state := pushState{Waiting: waiting}
 			switch {
@@ -186,13 +184,21 @@ func (s *Server) after(r *http.Request, v *space.Vault) {
 			// worked. Not when it failed: pushing at a host that has just
 			// refused is how a server hammers one, and the retry is a button.
 			//
-			// And not when the count has stopped falling. A push that reports
+			// And not when the remote has stopped moving. A push that reports
 			// success while leaving the same commits behind is a state nobody
 			// has seen, and a loop that trusted it would spin against a host
 			// forever.
-			if state.Trouble == "" && countErr == nil && waiting > 0 &&
-				(previous < 0 || waiting < previous) {
-				previous = waiting
+			//
+			// Progress is the upstream ref advancing, not the unpushed count
+			// falling. The count was the first answer and it strands commits:
+			// a push that sends one commit while the next write is landing
+			// leaves the count where it was, so the loop read "not falling" as
+			// "stuck", stopped, and left that write in the folder with the
+			// board reporting nothing wrong. Three quick drags were enough, and
+			// it failed about one run in ten — on a slow host, more (DKT-62).
+			moved := upstreamErr == nil && upstream != previousUpstream
+			if state.Trouble == "" && countErr == nil && waiting > 0 && moved {
+				previousUpstream = upstream
 				s.pushes.mu.Unlock()
 				continue
 			}

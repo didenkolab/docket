@@ -120,6 +120,25 @@ func (r *Repo) Unpushed() (int, error) {
 	return strconv.Atoi(strings.TrimSpace(out))
 }
 
+// UpstreamAt is the commit the upstream ref points at.
+//
+// It exists so that a push loop can ask whether it is making progress. The
+// obvious question — is the unpushed count falling — is the wrong one: a push
+// that sends one commit while another is being written leaves the count exactly
+// where it was, and a loop reading that as "stuck" stops with the new commit
+// still in the folder. The remote ref moving is the thing that actually says
+// work was done, and it says it whatever else arrived meanwhile.
+func (r *Repo) UpstreamAt() (string, error) {
+	if _, err := r.output("rev-parse", "--abbrev-ref", "@{upstream}"); err != nil {
+		return "", ErrNoUpstream
+	}
+	out, err := r.output("rev-parse", "@{upstream}")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
 // HasRemote reports whether there is anywhere to push at all.
 func (r *Repo) HasRemote() bool {
 	out, err := r.output("remote")
