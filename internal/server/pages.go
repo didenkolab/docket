@@ -251,6 +251,10 @@ type boardView struct {
 	// Hidden is how many cards the filter left out, so the narrowing is a
 	// number rather than a feeling.
 	Hidden int
+	// Unit is the word estimates are in, so a column head can say "34 points"
+	// rather than a second bare number beside the card count. Two numbers with
+	// no words between them is a header nobody can read.
+	Unit string
 }
 
 // sortCards puts a column in the order somebody dragged it into.
@@ -501,6 +505,7 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request, sp *space.Space, 
 		Selected: selected, Ref: ref, Walk: s.timeTravel(r),
 		Narrowed: forWhom != "" || atStatus != "",
 		Cleared:  without(r.URL, "assignee", "status"),
+		Unit:     c.Unit(),
 	}
 	for _, status := range drawn.Statuses {
 		// A status filter draws that column and no other. The columns are the

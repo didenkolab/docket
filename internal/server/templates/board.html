@@ -98,8 +98,8 @@
       <b>{{.Status.Name}}</b>
       <span class="count">{{.Count}}</span>
       {{if .Size}}<span class="size"
-        title="{{if .Unsized}}{{plural .Unsized "card" "cards"}} here nobody has sized{{else}}every card here is sized{{end}}"
-        >{{.Size}}{{if .Unsized}}+{{end}}</span>{{end}}
+        title="{{.Size}}{{if .Unsized}}+{{end}}{{with $data.Unit}} {{.}}{{end}} in this column{{if .Unsized}}, and {{plural .Unsized "card" "cards"}} here nobody has sized{{end}}"
+        ><span class="sigma" aria-hidden="true">&Sigma;</span>{{.Size}}{{if .Unsized}}+{{end}}</span>{{end}}
     </header>
     <div class="cards">
       {{range .Cards}}
@@ -108,13 +108,13 @@
          data-reachable="{{.Reachable}}">
         <span class="card-head">
           <span class="key">{{.Key}}</span>
+          {{if .Notable}}<span class="priority p-{{.Priority}}" title="priority">{{.Priority}}</span>{{end}}
           {{if .Blocked}}<span class="blocked" title="waiting on something unfinished">blocked</span>{{end}}
           {{if .Size}}<span class="size">{{.Size}}</span>{{end}}
         </span>
         <span class="card-title">{{.Title}}</span>
         <span class="meta">
           {{if .Epic}}<span class="epic" title="{{.EpicTitle}}">{{.EpicTitle}}</span>{{end}}
-          {{if .Notable}}<span class="priority p-{{.Priority}}">{{.Priority}}</span>{{end}}
           {{if .Assignee}}<span class="assignee">{{.Assignee}}</span>{{end}}
           {{range .Labels}}<span class="label">{{.}}</span>{{end}}
         </span>

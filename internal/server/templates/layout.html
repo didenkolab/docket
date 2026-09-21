@@ -49,7 +49,7 @@
     {{range .Themes}}
     <button type="submit" name="theme" value="{{.Value}}"
             class="theme-pick{{if .On}} on{{end}}"
-            title="{{.Label}}"{{if .On}} aria-current="true"{{end}}>
+            title="{{.Label}}" aria-label="{{.Label}}"{{if .On}} aria-current="true"{{end}}>
       {{if eq .Value "system"}}A{{else if eq .Value "light"}}☀{{else}}☾{{end}}
     </button>
     {{end}}

@@ -56,9 +56,12 @@ type releaseView struct {
 	// A release page without it is a list of forty rows that has to be counted
 	// to be understood, which is the same as not being understood.
 	Says []string
-	// Open says this release is the one shown expanded. Only the newest is: a
-	// page of every release fully spelled out is a page nobody reaches the
-	// bottom of, and the newest is the one being asked about.
+	// Open says this release is the one shown expanded. Only the newest is, and
+	// only when it is short enough to read: a page of every release fully
+	// spelled out is a page nobody reaches the bottom of, and the newest can be
+	// that page on its own. The showcase's first real release was 254 tasks,
+	// which pushed the other four off the screen and turned an overview into a
+	// wall.
 	Open bool
 	// Board is the board as it stood at the tag, which is a thing git can
 	// answer exactly.
@@ -177,11 +180,16 @@ func (s *Server) releasesIn(v *space.Vault) ([]releaseView, error) {
 		}
 		view.Says = describeRelease(view)
 		view.Board = "/branch/" + url.PathEscape(tag.Name)
-		view.Open = i == 0
+		view.Open = i == 0 && len(view.Tasks) <= readableRelease
 		views = append(views, view)
 	}
 	return views, nil
 }
+
+// readableRelease is how many tasks a release can list before opening it costs
+// more than it gives. A screen's worth: enough to see what shipped without
+// scrolling past everything else on the page.
+const readableRelease = 20
 
 // describeRelease is the release in a line.
 //

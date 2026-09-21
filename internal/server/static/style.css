@@ -2272,3 +2272,72 @@ body > header nav .apps-menu .menu-list { z-index: 30; }
 /* The buttons an app puts on its own page. */
 .does { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s4); }
 .said.bad { color: var(--warn); }
+
+/* ---- a pass with a designer's eye, 2026-09-21 ---- */
+
+/* The assignee is the one row in the details list that is editable, and it
+ * looked it: a bordered field and a button in a column of plain values, so the
+ * eye went to the only thing on the page nobody had asked about. It reads as a
+ * value now and becomes a field when somebody means to use it. */
+.inline-set input {
+  border-color: transparent;
+  background: none;
+  padding-inline: 0.2rem;
+}
+.inline-set input:hover { border-color: var(--rule); }
+.inline-set input:focus { border-color: var(--accent); background: var(--surface); }
+.inline-set:focus-within input { padding-inline: var(--s2); }
+
+/* Priority sat in the same row as the labels, in the same shape, so "high" read
+ * as a label somebody had added. It belongs with the key and the blocked mark:
+ * that row is what the card is, the row below is what it is about. */
+.card-head .priority {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.4rem;
+}
+
+/* A phone gave five rows of navigation before the first card — a third of the
+ * screen spent on links nobody came for. The bar scrolls sideways instead, the
+ * way a tab strip does, and the brand stays put so there is always a way home.
+ * Scrollbar hidden because the overflow is obvious from the cut-off link. */
+@media (max-width: 46rem) {
+  body > header .bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: var(--s3);
+  }
+  body > header .bar::-webkit-scrollbar { display: none; }
+  body > header .bar > * { flex: none; }
+  /* The links live in a nav of their own, and it was that nav wrapping, not
+   * the bar: three rows inside a container that had been told not to wrap. */
+  body > header .bar > nav { flex-wrap: nowrap; }
+  body > header .bar .brand { position: sticky; left: 0; background: var(--bg); padding-right: var(--s2); }
+  body > header .bar .search { order: 99; }
+}
+
+/* Three rows of controls stood between the top of the board and the first card:
+ * the projects, where in its history the board is, and the filters. Each is
+ * worth having and none is worth a full line of air. */
+.projects { margin-bottom: var(--s3); }
+.board-head .walk { margin-block: var(--s2); }
+.board-head .finder-bar { margin-bottom: var(--s3); }
+
+/* The column total said "8+ story points", which is unambiguous and too long:
+ * it broke "In progress" onto two lines, and a vault whose unit is "ideal days"
+ * would be worse. A sigma says "this is a sum, not a second count" in one
+ * character, and the unit is in the tooltip where there is room for it. */
+.column-head .sigma { margin-right: 0.15rem; opacity: 0.55; font-weight: 400; }
+.column-head { flex-wrap: nowrap; }
+.column-head b { white-space: nowrap; }
+
+/* With the field quiet, the button beside it became a button nobody can see:
+ * it was found before by sitting next to a bordered input, and there is no
+ * border now. It appears when the row is being used and keeps its space, so
+ * nothing moves under the pointer. */
+.inline-set button { opacity: 0; transition: opacity 120ms; }
+.inline-set:hover button,
+.inline-set:focus-within button { opacity: 1; }
+.inline-set button:focus-visible { opacity: 1; }

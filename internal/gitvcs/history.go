@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -200,6 +201,23 @@ type Release struct {
 //
 // Not by name either: a version number sorts wrongly as a string, and every
 // scheme for sorting one properly is a scheme somebody's version numbers break.
+// version is what a release tag looks like: `v1.2.3`, `1.2`, `v2.0.0-rc1`.
+var version = regexp.MustCompile(`^v?[0-9]+(\.[0-9]+)*([.\-+][0-9A-Za-z.\-]+)?$`)
+
+// isVersion says whether a tag names a release.
+//
+// A repository carries tags that are not releases — a build marker, `latest`,
+// `nightly`, a bookmark somebody left — and listing them on a page headed
+// Releases said they had shipped. The showcase made it plain: its release page
+// opened with `scaffold`, the marker its generator replays onto, dated, with
+// "No task changed in this release" beneath it. A tag is a bookmark; a release
+// is a version, and this is the line between them (DKT-65).
+//
+// A team that tags releases some other way sees nothing here, which is a worse
+// failure than a stray row and is why this is written down in a decision rather
+// than buried: if it needs to be configurable, the vault should say so.
+func isVersion(tag string) bool { return version.MatchString(tag) }
+
 func (r *Repo) Releases() ([]Release, error) {
 	// One field per line rather than a separator: for-each-ref has its own
 	// format language and does not expand the %x1f that git log does, so a
@@ -227,6 +245,9 @@ func (r *Repo) Releases() ([]Release, error) {
 		stamp := lines[i+1]
 		if stamp == "" {
 			stamp = lines[i+2]
+		}
+		if !isVersion(lines[i]) {
+			continue
 		}
 		when, _ := time.Parse(time.RFC3339, stamp)
 		releases = append(releases, Release{
