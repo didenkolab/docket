@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: A change to the plan, or a feature
+    url: https://github.com/didenkolab/docket-board
+    about: Work is tracked in the board, which is a docket vault. A task is a Markdown file, so proposing one is a pull request that adds a file to DKT/.
+  - name: A security problem
+    url: https://github.com/didenkolab/docket/security/advisories/new
+    about: Report it privately rather than in an issue. See SECURITY.md.
