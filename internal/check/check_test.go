@@ -337,7 +337,7 @@ func TestRenamesFollowTheTitle(t *testing.T) {
 		t.Errorf("renaming to %q", renames[0].To)
 	}
 
-	if err := Apply(root, renames); err != nil {
+	if _, err := Apply(root, renames); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "ACME", "ACME-1 A new name.md")); err != nil {
@@ -381,7 +381,7 @@ func TestTwoTasksWithTheSameTitleDoNotCollide(t *testing.T) {
 	if len(renames) != 1 || renames[0].To != "ACME/ACME-2 A task.md" {
 		t.Fatalf("renames = %+v", renames)
 	}
-	if err := Apply(root, renames); err != nil {
+	if _, err := Apply(root, renames); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 

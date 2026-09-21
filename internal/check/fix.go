@@ -84,18 +84,33 @@ func Renames(root string) ([]Rename, error) {
 	return out, nil
 }
 
-// Apply performs the renames, stopping at the first that fails.
+// Apply performs the renames, stopping at the first that fails, and returns
+// every other file it had to touch.
 //
-// It goes through vault.Rename, which refuses to write over a file that is
-// already there — two tasks given the same title would otherwise leave one of
-// them silently gone.
-func Apply(root string, renames []Rename) error {
+// It goes through vault.Retitle, which is what the server uses when somebody
+// retitles a task in the interface: it moves the file and repoints every link
+// that named it, in a body or in frontmatter. Using plain Rename here was
+// DKT-61 — the file moved, every link to it went on naming a note that no
+// longer existed, and because the key inside those links still resolved, the
+// next pass reported the vault clean. Two implementations of one operation, and
+// `--fix` had the worse of them.
+//
+// Retitle refuses to write over a file that is already there, so two tasks
+// given the same title do not leave one of them silently gone.
+func Apply(root string, renames []Rename) ([]string, error) {
+	var touched []string
 	for _, r := range renames {
-		if err := vault.Rename(root, r.From, r.To); err != nil {
-			return fmt.Errorf("%s: %w", r.From, err)
+		paths, err := vault.Retitle(root, r.From, r.To)
+		if err != nil {
+			return touched, fmt.Errorf("%s: %w", r.From, err)
+		}
+		// The first two are the new name and the old one, which the caller
+		// already knows about: it asked for this rename.
+		if len(paths) > 2 {
+			touched = append(touched, paths[2:]...)
 		}
 	}
-	return nil
+	return touched, nil
 }
 
 // Relink rewrites the relationships that are still strings.

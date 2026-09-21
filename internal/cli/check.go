@@ -154,8 +154,12 @@ func repair(root string, stdout io.Writer) (int, error) {
 	for _, r := range renames {
 		fmt.Fprintf(stdout, "renamed %s\n     to %s\n", r.From, r.To)
 	}
-	if err := check.Apply(root, renames); err != nil {
+	repointed, err := check.Apply(root, renames)
+	if err != nil {
 		return 0, err
+	}
+	for _, path := range repointed {
+		fmt.Fprintf(stdout, "linked  %s\n", path)
 	}
 
 	relinked, err := check.Relink(root)
@@ -174,7 +178,16 @@ func repair(root string, stdout io.Writer) (int, error) {
 		fmt.Fprintf(stdout, "wrote   %s\n", path)
 	}
 
-	touched := len(relinked) + len(renames) + len(boards)
+	// Counted as distinct paths: a file whose links a rename repointed can be
+	// the same file relinking then rewrote, and saying "3 files changed" about
+	// two files is the kind of small lie that makes people stop reading output.
+	seen := map[string]bool{}
+	for _, group := range [][]string{repointed, relinked, boards} {
+		for _, path := range group {
+			seen[path] = true
+		}
+	}
+	touched := len(seen) + len(renames)
 	if touched > 0 {
 		fmt.Fprintf(stdout, "\n%s. Commit them together with whatever changed.\n",
 			plural(touched, "file changed", "files changed"))

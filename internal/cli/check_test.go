@@ -127,3 +127,55 @@ func TestFixRenamesThenPutsTheLinksBackOnTheNote(t *testing.T) {
 		t.Errorf("the vault is not clean after --fix: %d\n%s", code, stdout)
 	}
 }
+
+// A link in a body is repointed by a rename too, not only one in frontmatter.
+//
+// This is what using vault.Retitle buys: the same operation the server performs
+// when somebody retitles a task in the interface, rather than a second
+// implementation that moved the file and stopped there. A reference in prose is
+// the commonest kind there is — it is how one task explains itself by naming
+// another.
+func TestFixRepointsALinkInABody(t *testing.T) {
+	dir := vaultDir(t)
+	for _, title := range []string{"Fix login redirect loop", "Session model"} {
+		if code, _, stderr := run(t, "new", "-C", dir, title); code != exitOK {
+			t.Fatalf("new %q failed: %s", title, stderr)
+		}
+	}
+
+	first := filepath.Join(dir, "ACME", "ACME-1 Fix login redirect loop.md")
+	raw, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(first, append(raw,
+		[]byte("\nThe cause is in [[ACME-2 Session model]], which sets the cookie.\n")...),
+		0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	second := filepath.Join(dir, "ACME", "ACME-2 Session model.md")
+	was, err := os.ReadFile(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte(strings.Replace(string(was),
+		"title: Session model", "title: The session model, rewritten", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, stdout, stderr := run(t, "check", "--fix", dir); code != exitOK {
+		t.Fatalf("check --fix exited %d: %s%s", code, stdout, stderr)
+	}
+
+	body, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "[[ACME-2 Session model]]") {
+		t.Errorf("a link in the body still names the old note:\n%s", body)
+	}
+	if !strings.Contains(string(body), "[[ACME-2 The session model, rewritten]]") {
+		t.Errorf("the link in the body was not repointed:\n%s", body)
+	}
+}
