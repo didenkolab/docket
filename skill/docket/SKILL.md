@@ -43,8 +43,24 @@ docket export --open --format json                            # everything unfin
 docket export --format csv --fields key,title,status,assignee
 ```
 
-Open the task file before starting: the body holds the acceptance criteria. A task whose
-`blocked_by` points at unfinished work is blocked — leave it and say what it waits on.
+Open the task file before starting: the body holds the acceptance criteria.
+
+A task whose `blocked_by` names work that is still open is blocked. There is no `blocked` field
+to read — it is a join, and this is the whole of it:
+
+```bash
+docket export --open --format json | python3 -c '
+import json, sys
+tasks = json.load(sys.stdin)
+still_open = {t["key"] for t in tasks}
+for t in tasks:
+    waiting = [k for k in t.get("relations", {}).get("blocked_by", []) if k in still_open]
+    print(("blocked by " + ",".join(waiting)) if waiting else "ready      ", t["key"], t["title"])
+'
+```
+
+`--open` leaves out what is finished, so a key still in the list is work that is not done. Take a
+ready one; for a blocked one, say what it waits on rather than starting it.
 
 ### 2. Take it
 

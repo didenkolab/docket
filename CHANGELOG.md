@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 — 2026-09-21
+
+The first release under the name, and the first one anybody outside could read.
 
 ### The project is called docket
 
@@ -43,6 +45,11 @@ Apps installed from the old library carry the old source URL in `docket.yaml`; r
 
 ### Added
 
+- **The README leads with what this actually is**: git and Obsidian made into one tracker that a
+  person and an agent both find obvious. Neither half is new; what was missing between them was a
+  format each reads as if it were its own.
+- **`docs/how-you-work-in-this.md`** — the shape of a week. Who decides what, where each kind of
+  thing goes, three ways into one set of files, and what you stop doing.
 - **A skill for agents** — `skill/docket/SKILL.md`. One file an agent reads once and then knows
   the loop: what to pick up, how to take it, how to move it, what to write down, and the rules
   that break a vault when broken. Copy it into `~/.claude/skills/`.
@@ -62,6 +69,14 @@ Apps installed from the old library carry the old source URL in `docket.yaml`; r
   loop stopped with that write still in the folder and the board reporting nothing wrong.
   Progress is now the upstream ref advancing, which says work was done whatever else arrived
   meanwhile.
+- **The first release a project cuts lists its work** (DKT-64). With no tag before it there was
+  no range, and the code passed the tag alone to `git diff` — which compares the working tree
+  against that tag rather than the tag against the beginning of the repository. Every new project
+  met "No task changed in this release" once, under a heading promising the work up to here.
+- **No test reaches the network, and neither does an import.** Nine tests scaffolded a vault by
+  cloning the published template, so the suite depended on a repository somewhere being public.
+  `import apply` did the same at its last step, after the only part that is supposed to need a
+  network had finished; it takes `--template` now, and a path works.
 - The test that writes a git tag now says who is writing it. It tagged with no identity, which
   passes on any machine with a global git config and fails on every CI runner — eleven red runs
   on main, all of them this one test.
