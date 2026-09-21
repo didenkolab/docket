@@ -607,6 +607,14 @@ func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string, r
 				add(Finding{e.Path, t.PropertyLine(r.Name), RuleRelations,
 					fmt.Sprintf("%s %q is a string, not a link: it connects nothing in Obsidian. "+
 						"Write it as %q", r.Name, raw, task.Link(noteFor(raw, byKey)))})
+				continue
+			}
+			if want, stale := staleNote(raw, byKey); stale {
+				add(Finding{e.Path, t.PropertyLine(r.Name), RuleRelations,
+					fmt.Sprintf("%s %q names a title that task no longer has: it resolves to "+
+						"nothing in Obsidian, so it draws no edge and leaves no backlink. "+
+						"Write it as %q — docket check --fix does it",
+						r.Name, task.NoteOf(raw), task.Link(want))})
 			}
 		}
 		// A relation pointing at nothing is a relation about a task that was
@@ -620,11 +628,19 @@ func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string, r
 		}
 	}
 
-	if raw := t.RawParent(); raw != "" && !task.IsLink(raw) {
-		add(Finding{e.Path, t.PropertyLine("parent"), RuleRelations,
-			fmt.Sprintf("parent %q is a string, not a link: an epic written this way draws no "+
-				"edge to its tasks in Obsidian. Write it as %q — docket check --fix does it",
-				raw, task.Link(noteFor(raw, byKey)))})
+	if raw := t.RawParent(); raw != "" {
+		switch want, stale := staleNote(raw, byKey); {
+		case !task.IsLink(raw):
+			add(Finding{e.Path, t.PropertyLine("parent"), RuleRelations,
+				fmt.Sprintf("parent %q is a string, not a link: an epic written this way draws no "+
+					"edge to its tasks in Obsidian. Write it as %q — docket check --fix does it",
+					raw, task.Link(noteFor(raw, byKey)))})
+		case stale:
+			add(Finding{e.Path, t.PropertyLine("parent"), RuleRelations,
+				fmt.Sprintf("parent %q names a title that task no longer has: it resolves to "+
+					"nothing in Obsidian, so this task hangs off nothing there. Write it as "+
+					"%q — docket check --fix does it", task.NoteOf(raw), task.Link(want))})
+		}
 	}
 
 	for _, raw := range t.RawLabels() {
@@ -635,6 +651,31 @@ func checkRelations(add func(Finding), e vault.Entry, byKey map[string]string, r
 			fmt.Sprintf("label %q is a string, not a link: it connects nothing in Obsidian. "+
 				"Write it as %q — docket check --fix does it", raw, task.Link(raw))})
 	}
+}
+
+// staleNote is the name a link ought to carry, when the one it carries is out
+// of date, and whether that is the case.
+//
+// A link naming a title its task no longer has is the one way a vault can be
+// valid here and broken in Obsidian: the key inside the link still resolves, so
+// every rule that matches on the key sees nothing wrong, while Obsidian — which
+// resolves note names and consults nothing else — draws no edge and leaves no
+// backlink. `docket check --fix` used to rename a retitled file and leave every
+// link to it in exactly that state, and then report the vault clean (DKT-61).
+//
+// There is a right answer, which is why this is reported rather than guessed
+// at: the key says which task is meant, and the name for that task is a lookup.
+func staleNote(raw string, byKey map[string]string) (string, bool) {
+	note := task.NoteOf(raw)
+	key := task.KeyOf(note)
+	if key == "" {
+		return "", false
+	}
+	want, ok := byKey[key]
+	if !ok || want == note {
+		return "", false
+	}
+	return want, true
 }
 
 // noteFor is the note name a key should be linked by, or the key itself when

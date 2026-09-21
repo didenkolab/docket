@@ -74,3 +74,56 @@ func TestCheckTakesAtMostOneDirectory(t *testing.T) {
 		t.Errorf("exit code = %d, want %d", code, exitUsage)
 	}
 }
+
+// check --fix renames a retitled task and puts every link to it back on the
+// note, in that order.
+//
+// The order is the whole of DKT-61. Relinking used to run first, so it wrote
+// links naming the title the task was about to stop having, the rename then
+// made those names wrong, and the second pass reported the vault clean —
+// because the rule that reads a relation matches the key inside the link, and
+// the key had not changed. Valid here, and drawing no edges in Obsidian.
+func TestFixRenamesThenPutsTheLinksBackOnTheNote(t *testing.T) {
+	dir := vaultDir(t)
+	for _, title := range []string{"Fix login redirect loop", "Session model"} {
+		if code, _, stderr := run(t, "new", "-C", dir, title); code != exitOK {
+			t.Fatalf("new %q failed: %s", title, stderr)
+		}
+	}
+	if code, _, stderr := run(t, "set", "ACME-1", "blocked_by=ACME-2", dir); code != exitOK {
+		t.Fatalf("set failed: %s", stderr)
+	}
+
+	// Retitled by hand, the way somebody does in Obsidian: the frontmatter
+	// changes and the file name does not.
+	second := filepath.Join(dir, "ACME", "ACME-2 Session model.md")
+	raw, err := os.ReadFile(second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte(strings.Replace(string(raw),
+		"title: Session model", "title: The session model, rewritten", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, stdout, stderr := run(t, "check", "--fix", dir); code != exitOK {
+		t.Fatalf("check --fix exited %d: %s%s", code, stdout, stderr)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "ACME",
+		"ACME-2 The session model, rewritten.md")); err != nil {
+		t.Fatalf("the retitled task was not renamed: %v", err)
+	}
+	first, err := os.ReadFile(filepath.Join(dir, "ACME", "ACME-1 Fix login redirect loop.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(first), "[[ACME-2 The session model, rewritten]]") {
+		t.Errorf("the link still names a note that no longer exists:\n%s", first)
+	}
+
+	code, stdout, _ := run(t, "check", dir)
+	if code != exitOK || !strings.Contains(stdout, "No findings") {
+		t.Errorf("the vault is not clean after --fix: %d\n%s", code, stdout)
+	}
+}

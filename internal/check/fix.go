@@ -133,15 +133,36 @@ func Relink(root string) ([]string, error) {
 		t := e.Task
 
 		changed := false
-		if raw := t.RawParent(); raw != "" && !task.IsLink(raw) {
-			note, ok := notes[raw]
-			if !ok {
-				// Rule 5 already reports a parent that does not exist. Linking
-				// it by key keeps the intent visible rather than dropping it.
-				note = raw
+		if raw := t.RawParent(); raw != "" {
+			if note, ok := rename(raw, notes); ok {
+				t.SetParent(note)
+				changed = true
 			}
-			t.SetParent(note)
-			changed = true
+		}
+		// A link whose note name is out of date is rewritten here too, which is
+		// what makes a rename safe: Renames moves the file, and this puts every
+		// link that named the old title back on the note. Doing only the first
+		// left a vault that passed every rule and drew no edges in Obsidian
+		// (DKT-61).
+		for _, r := range c.Relations() {
+			raws := t.RawRelated(r.Name)
+			if len(raws) == 0 {
+				continue
+			}
+			names := make([]string, 0, len(raws))
+			touched := false
+			for _, raw := range raws {
+				note, ok := rename(raw, notes)
+				if !ok {
+					note = task.NoteOf(raw)
+				}
+				touched = touched || ok
+				names = append(names, note)
+			}
+			if touched {
+				t.SetRelated(r.Name, names)
+				changed = true
+			}
 		}
 		if needsLinking(t.RawLabels()) {
 			t.SetLabels(t.Labels)
@@ -165,6 +186,31 @@ func Relink(root string) ([]string, error) {
 		written = append(written, e.Path)
 	}
 	return written, nil
+}
+
+// rename is the note name a value should carry, and whether writing it would
+// change anything.
+//
+// Two findings with one right answer, so one function: a value that is a bare
+// key becomes a link, and a link naming a title its task no longer has gets the
+// name the task has now. Both are lookups rather than guesses, because the key
+// says which task is meant.
+//
+// A key nothing in the vault has is left as it is. Rule 5 already reports it,
+// and keeping the intent visible is better than dropping it.
+func rename(raw string, notes map[string]string) (string, bool) {
+	note := task.NoteOf(raw)
+	want, ok := notes[task.KeyOf(note)]
+	switch {
+	case ok && want != note:
+		return want, true
+	case !task.IsLink(raw):
+		if ok {
+			return want, true
+		}
+		return note, true
+	}
+	return note, false
 }
 
 func needsLinking(raw []string) bool {

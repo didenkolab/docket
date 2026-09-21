@@ -142,16 +142,11 @@ func repairAcross(sp *space.Space, stdout io.Writer) (int, error) {
 // printed before they happen, because a file moving under an editor is
 // something to be told about rather than to discover.
 func repair(root string, stdout io.Writer) (int, error) {
-	// Relinking first: it reads every task, and a rename would move the files
-	// out from under it.
-	relinked, err := check.Relink(root)
-	if err != nil {
-		return 0, err
-	}
-	for _, path := range relinked {
-		fmt.Fprintf(stdout, "linked  %s\n", path)
-	}
-
+	// Renaming first, then relinking. The order is the whole of DKT-61: a link
+	// names a note, so the names have to be right before the links are written,
+	// or every link to a retitled task is rewritten to the name it is about to
+	// stop having. Relink re-reads the vault, so nothing is moved out from
+	// under it — Apply has finished by then.
 	renames, err := check.Renames(root)
 	if err != nil {
 		return 0, err
@@ -161,6 +156,14 @@ func repair(root string, stdout io.Writer) (int, error) {
 	}
 	if err := check.Apply(root, renames); err != nil {
 		return 0, err
+	}
+
+	relinked, err := check.Relink(root)
+	if err != nil {
+		return 0, err
+	}
+	for _, path := range relinked {
+		fmt.Fprintf(stdout, "linked  %s\n", path)
 	}
 
 	boards, err := check.Boards(root)
