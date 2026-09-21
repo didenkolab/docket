@@ -38,8 +38,10 @@
 
     {{if .Annotation}}<p class="annotation">{{.Annotation}}</p>{{end}}
 
+    {{if .Shipped}}
+    <h3 class="release-group">Shipped</h3>
     <ul class="shipped">
-      {{range .Tasks}}
+      {{range .Shipped}}
       <li>
         <a class="hit-link" href="/task/{{.Key}}">
           <span class="key">{{.Key}}</span>
@@ -48,10 +50,34 @@
         <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
         {{if .Added}}<span class="new">new</span>{{end}}
       </li>
-      {{else}}
-      <li class="empty">No task changed in this release.</li>
       {{end}}
     </ul>
+    {{end}}
+
+    {{if .InFlight}}
+    <details class="in-flight">
+      <summary>{{len .InFlight}} more changed in this window without finishing</summary>
+      <p class="footnote">
+        These were created or edited between the two tags and had not reached a done status when
+        this one was cut. They are here because their files changed, which is what a release is
+        computed from — not because they shipped.
+      </p>
+      <ul class="shipped">
+        {{range .InFlight}}
+        <li>
+          <a class="hit-link" href="/task/{{.Key}}">
+            <span class="key">{{.Key}}</span>
+            <span class="hit-title">{{.Title}}</span>
+          </a>
+          <span class="pill {{categoryClass .Category}}">{{.Status}}</span>
+          {{if .Added}}<span class="new">new</span>{{end}}
+        </li>
+        {{end}}
+      </ul>
+    </details>
+    {{end}}
+
+    {{if not .Tasks}}<p class="empty">No task changed in this release.</p>{{end}}
   </div>
 </details>
 {{end}}

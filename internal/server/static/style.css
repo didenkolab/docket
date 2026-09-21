@@ -2341,3 +2341,16 @@ body > header nav .apps-menu .menu-list { z-index: 30; }
 .inline-set:hover button,
 .inline-set:focus-within button { opacity: 1; }
 .inline-set button:focus-visible { opacity: 1; }
+
+/* A release lists what shipped first and what merely moved second. Listing them
+   together said a backlog item had been released — which is what a reader sees,
+   whatever the heading above it claims. */
+.release-group {
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ink-faint);
+  margin: var(--s4) 0 var(--s2);
+}
+.in-flight { margin-top: var(--s4); }
+.in-flight > summary { font-size: 0.875rem; color: var(--ink-faint); cursor: pointer; }
+.in-flight > summary:hover { color: var(--ink); }
+.in-flight .footnote { max-width: var(--measure); margin: var(--s2) 0; }

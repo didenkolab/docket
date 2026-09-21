@@ -46,6 +46,13 @@ type releaseView struct {
 	// actually is rather than implying it.
 	Since string
 	Tasks []releaseTask
+	// Shipped is the work that had reached a done status by the tag, and
+	// InFlight is what changed in the window without finishing. Both are drawn
+	// from Tasks and both are worth showing — but not in one list, because a
+	// release page that lists a backlog item beside a shipped one is saying the
+	// backlog item shipped.
+	Shipped  []releaseTask
+	InFlight []releaseTask
 	// Other is how many files changed that were not tasks — pages, boards,
 	// configuration. Counted rather than listed: it says the release contained
 	// more than the list shows, which is honest, without filling the page.
@@ -76,6 +83,15 @@ type releaseTask struct {
 	// Added is set when the task did not exist before this release.
 	Added bool
 }
+
+// finished says the task had reached a done status by the time the tag was cut.
+//
+// It is the difference between what a release shipped and what merely moved
+// while it was being cut. A task created in the window and left in the backlog
+// changed its file, so it is in the range — and listing it beside the work that
+// actually shipped is how a release page comes to say a backlog item was
+// released.
+func (t releaseTask) finished() bool { return t.Category == "done" }
 
 func (s *Server) handleReleases(w http.ResponseWriter, r *http.Request) {
 	c, err := s.config()
@@ -178,9 +194,16 @@ func (s *Server) releasesIn(v *space.Vault) ([]releaseView, error) {
 				Added: since != "" && len(before[path]) == 0,
 			})
 		}
+		for _, t := range view.Tasks {
+			if t.finished() {
+				view.Shipped = append(view.Shipped, t)
+			} else {
+				view.InFlight = append(view.InFlight, t)
+			}
+		}
 		view.Says = describeRelease(view)
 		view.Board = "/branch/" + url.PathEscape(tag.Name)
-		view.Open = i == 0 && len(view.Tasks) <= readableRelease
+		view.Open = i == 0 && len(view.Shipped) <= readableRelease
 		views = append(views, view)
 	}
 	return views, nil
