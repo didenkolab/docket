@@ -156,9 +156,14 @@ func TestAnUnlinkedMentionIsNotABacklink(t *testing.T) {
 	}
 }
 
-// A parent is a link, so an epic is referenced by its children without anything
-// else being written down.
-func TestAParentLinkIsABacklink(t *testing.T) {
+// A parent is a link, so an epic knows its children without anything else being
+// written down — and says so once.
+//
+// It used to say so twice: the child appeared under Child tasks, where it
+// belongs, and again under Referenced by, because a parent written as a link is
+// a backlink like any other. Two headings for one fact. Referenced by is now
+// what the page has not already said.
+func TestAChildIsNamedOnceOnItsParent(t *testing.T) {
 	_, h, root := newServer(t)
 
 	c, err := project.Load(root)
@@ -172,8 +177,11 @@ func TestAParentLinkIsABacklink(t *testing.T) {
 	}
 
 	body := get(t, h, "/task/ACME-1").Body.String()
-	if !strings.Contains(body, "Referenced by") || !strings.Contains(body, "A child") {
-		t.Errorf("a child does not reference its parent:\n%s", body)
+	if !strings.Contains(body, "Child tasks") || !strings.Contains(body, "A child") {
+		t.Errorf("the parent does not name its child at all:\n%s", body)
+	}
+	if strings.Contains(body, "Referenced by") {
+		t.Errorf("the child is named a second time under Referenced by:\n%s", body)
 	}
 }
 
