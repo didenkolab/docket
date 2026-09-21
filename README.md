@@ -499,7 +499,7 @@ changes is reported and left alone.
 | [`docket-showcase`](https://github.com/didenkolab/docket-showcase) | An invented company's vault: three products, six people, twelve weeks, and every app installed — built by a generator |
 | [`northlight`](https://github.com/didenkolab/northlight) | That invented company's code, beside its vault |
 
-Only `docket-template` is public today; the rest need access.
+All of them are public. `docket init` clones the template, so that one has to be.
 
 The demo is the format in a minute. To see the whole of it on a team's worth of work, clone
 [`docket-showcase`](https://github.com/didenkolab/docket-showcase): three products, six
