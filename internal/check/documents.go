@@ -30,7 +30,7 @@ import (
 //
 // What is checkable is checked here. Whether the Context section actually states
 // a problem is not, and that is where judgement lives — see
-// docs/spec/documents.md.
+// docs/spec/Documents.md.
 
 // checkDocuments applies rule 14 to the knowledge base.
 func checkDocuments(pages []vault.Page) []Finding {
@@ -38,10 +38,27 @@ func checkDocuments(pages []vault.Page) []Finding {
 
 	numbered := map[string]string{} // decision number → path, so two cannot share one
 	for _, p := range pages {
+		// §10: a page is named after its title, for the same reason a task is —
+		// the name is what a wikilink says and what the graph shows. A decision
+		// is the exception: its name is an identifier that gets quoted outside
+		// the vault, so the number leads and the title only has to identify.
+		// index.md is a role rather than a title: it is the vault's front page,
+		// what `[[index]]` means, and what the scaffold ships. Naming it after
+		// its title would give every new vault a front page called after the
+		// project, and break the link the template writes.
+		if strings.TrimSpace(p.Title) != "" && strings.TrimSpace(p.Type) != "decision" &&
+			path.Base(p.Path) != "index.md" {
+			if want := vault.PageName(p.Title); want != "" && want != path.Base(p.Path) {
+				findings = append(findings, Finding{p.Path, 0, RuleDocuments,
+					fmt.Sprintf("the file should be named %q — a page is named after its title, "+
+						"so a wikilink to it says what it is (documents.md §10)", want)})
+			}
+		}
+
 		if strings.TrimSpace(p.Type) == "" {
 			findings = append(findings, Finding{p.Path, 0, RuleDocuments,
 				"this page does not say what kind of document it is. Add type: — " +
-					strings.Join(kinds(), ", ") + " — see docs/spec/documents.md"})
+					strings.Join(kinds(), ", ") + " — see docs/spec/Documents.md"})
 			continue
 		}
 

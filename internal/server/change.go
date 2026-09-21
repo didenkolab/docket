@@ -16,7 +16,7 @@ type changeView struct {
 	//
 	// A choice between two plans was two tabs, and comparing two things in two
 	// tabs is comparing one thing twice. Named in
-	// docs/design/git-as-the-database.md.
+	// docs/design/Git as the database.md.
 	Beside string
 	// Others are the branches that could be put beside this one.
 	Others []string

@@ -58,6 +58,26 @@ aliases: []
 // the characters a file name or a wikilink genuinely cannot hold are replaced,
 // and the replacements are listed in sanitise so that a reader can see exactly
 // how much of the original survives: all of it, except those.
+// PageName is what a page's file is called: its title, sanitised, with .md.
+//
+// A page is named after its title for the same reason a task is — the name is
+// what a wikilink says and what the graph and the file explorer show, so a page
+// called purpose.md reads as "purpose" in every one of them while its title says
+// "What docket is for". The exception is a decision, whose name is an identifier
+// that gets quoted where the vault cannot see it; documents.md §10 draws that
+// line and IsDecisionName holds it.
+func PageName(title string) string {
+	title = strings.TrimSpace(sanitise(title))
+	if title == "" {
+		return ""
+	}
+	const limit = 240
+	if len(title)+3 > limit {
+		title = strings.TrimSpace(truncate(title, limit-4))
+	}
+	return title + ".md"
+}
+
 func FileName(key, title string) string {
 	title = strings.TrimSpace(sanitise(title))
 	if title == "" {
@@ -413,14 +433,43 @@ func Rename(root, from, to string) error {
 	if from == to {
 		return nil
 	}
+	source := filepath.Join(root, filepath.FromSlash(from))
 	target := filepath.Join(root, filepath.FromSlash(to))
+
+	// A rename that only changes case is the file itself on a case-insensitive
+	// file system, which macOS and Windows both are by default. Stat says the
+	// target exists, and refusing would mean "Fix login" can never become "Fix
+	// Login" on the machines most people use. Told apart by asking the file
+	// system whether the two names are the same file, and done in two steps so
+	// that the intermediate name cannot collide with anything.
 	if _, err := os.Stat(target); err == nil {
-		return fmt.Errorf("%s already exists", to)
+		if !sameFile(source, target) {
+			return fmt.Errorf("%s already exists", to)
+		}
+		through := target + ".renaming"
+		if err := os.Rename(source, through); err != nil {
+			return err
+		}
+		return os.Rename(through, target)
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
 	}
-	return os.Rename(filepath.Join(root, filepath.FromSlash(from)), target)
+	return os.Rename(source, target)
+}
+
+// sameFile says whether two paths are the same file on disk — which is how a
+// case-only rename is told from a collision.
+func sameFile(a, b string) bool {
+	fa, err := os.Stat(a)
+	if err != nil {
+		return false
+	}
+	fb, err := os.Stat(b)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(fa, fb)
 }
 
 // PathFor is where a task with this key and title belongs.

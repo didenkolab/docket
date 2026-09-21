@@ -50,7 +50,7 @@ type Task struct {
 	// On disk they are wikilinks: `parent: "[[ACME-4 Session model]]"`. That is
 	// what Obsidian resolves, draws in the graph and counts as a backlink,
 	// which is the whole reason an epic and a label exist. See
-	// docs/purpose.md §3.
+	// docs/What docket is for.md §3.
 	//
 	// Here they are a key and a list of names, because that is what everything
 	// asking the question wants. The link form is written by SetParent and
@@ -75,7 +75,7 @@ type Task struct {
 	// a task, which commitment it is part of is worth knowing, and standing at
 	// a sprint, its contents are the whole point. A sprint page is a legitimate
 	// hub in time the way a label is a hub in theme — see
-	// docs/design/how-things-connect.md.
+	// docs/design/How things connect.md.
 	//
 	// One at a time. A task carried into the next sprint names the sprint it is
 	// in now; the one it came from says so in its retrospective, which is prose
@@ -100,7 +100,7 @@ type Task struct {
 	//
 	// It is a field rather than a link on purpose: nobody standing at a task
 	// needs to know what else was estimated at three. See
-	// docs/design/how-things-connect.md — this is the case that is supposed to
+	// docs/design/How things connect.md — this is the case that is supposed to
 	// fail its test, and priority is the precedent.
 	Estimate *float64 `yaml:"estimate,omitempty"`
 

@@ -16,7 +16,7 @@ import (
 //
 // A task here is a file, so git already knows, and this page is a reading of
 // something the storage was going to say anyway. Named in
-// docs/design/git-as-the-database.md as one of the two small things worth doing.
+// docs/design/Git as the database.md as one of the two small things worth doing.
 //
 // The frontmatter is shown as well as the body. It is where the status is, and
 // "who moved this to Done, and when" is asked at least as often as "who wrote

@@ -23,7 +23,7 @@ import (
 // The page's body is what Jira has no room for: the goal in more than one line,
 // what was cut and why, and the retrospective — written where the work is. That
 // is also what makes it a legitimate hub by the test in
-// docs/design/how-things-connect.md §5: delete the page and knowledge is lost.
+// docs/design/How things connect.md §5: delete the page and knowledge is lost.
 
 // SprintDir is where sprint pages live in a vault built from the template.
 // A vault may file them anywhere — they are found by their type, not by their

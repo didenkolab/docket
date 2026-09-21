@@ -355,7 +355,7 @@ type Branch struct {
 //
 // A branch is a proposal about the plan: re-scoping a release, splitting an
 // epic, dropping a quarter's work. This is what lets a board show one without
-// applying it — see docs/design/git-as-the-database.md.
+// applying it — see docs/design/Git as the database.md.
 // Branches is every branch worth reading a proposal from: the local ones, and
 // the remote-tracking ones nobody here has checked out.
 //

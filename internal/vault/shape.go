@@ -20,7 +20,7 @@ import (
 // "busy" and the count said which part was wrong and by how much.
 //
 // So the counting is a command rather than a script somebody wrote once. The
-// four questions are the ones docs/design/how-things-connect.md opens with:
+// four questions are the ones docs/design/How things connect.md opens with:
 // what moves with what, what is this part of, where does work pile up, and what
 // is nobody looking after.
 

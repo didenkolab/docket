@@ -11,7 +11,7 @@ import (
 // draws it as a coloured box; plain Markdown draws it as a blockquote with
 // literal `[!warning]` at the front. A task that reads as a warning in one
 // client and as a quote with syntax leaking into it in the other is the kind of
-// disagreement between the two views that docs/purpose.md exists to prevent.
+// disagreement between the two views that docs/What docket is for.md exists to prevent.
 //
 // This is a rewrite over the text rather than a Markdown extension: it turns
 // the callout into HTML with the body still Markdown inside, which goldmark

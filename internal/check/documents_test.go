@@ -95,3 +95,45 @@ func TestDocuments(t *testing.T) {
 		}
 	}
 }
+
+// A page is named after its title, and a decision is not.
+//
+// §10: the name is what a wikilink says and what the graph shows, so a page
+// called purpose.md reads as "purpose" everywhere while its title says "What
+// docket is for". A decision is the exception — its name is an identifier that
+// gets quoted outside the vault — and index.md is another: it is the vault's
+// front page, a role rather than a title, and naming it after its title would
+// give every new vault a front page called after the project.
+func TestAPageIsNamedAfterItsTitle(t *testing.T) {
+	root := newVault(t)
+
+	page := func(rel, body string) {
+		t.Helper()
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	page("docs/purpose.md", "---\ntitle: What docket is for\ntype: design\nupdated: 2026-09-21\n---\n\nWhy.\n")
+	page("docs/Kept as it is.md", "---\ntitle: Kept as it is\ntype: design\nupdated: 2026-09-21\n---\n\nFine.\n")
+	page("docs/index.md", "---\ntitle: Anything At All\ntype: page\nupdated: 2026-09-21\n---\n\nFront page.\n")
+	page("docs/decisions/0007-a-short-name.md",
+		"---\ntitle: A decision whose file is numbered\ntype: decision\nstatus: accepted\n"+
+			"date: 2026-09-21\nupdated: 2026-09-21\n---\n\n"+
+			"## Context\nx\n\n## Decision\nx\n\n## What this costs\nx\n\n## Alternatives considered\nx\n")
+
+	var named []string
+	for _, f := range run(t, root) {
+		if strings.Contains(f.Message, "a page is named after its title") {
+			named = append(named, f.Path)
+		}
+	}
+
+	if len(named) != 1 || named[0] != "docs/purpose.md" {
+		t.Errorf("wanted one finding, on docs/purpose.md; got %v", named)
+	}
+}

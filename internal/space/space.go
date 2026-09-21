@@ -43,7 +43,7 @@ type Space struct {
 	// A branch is a proposal about the plan, and the only way to judge one is to
 	// see the board it produces. Reading it out of the object database means
 	// looking at a proposal cannot disturb whoever is editing the tree — see
-	// docs/design/git-as-the-database.md.
+	// docs/design/Git as the database.md.
 	ref string
 }
 

@@ -129,7 +129,7 @@ func GraphConfig(c *project.Config) GraphSettings {
 
 		// A tag is not a node — that is the whole reason tags are cheap and
 		// links are spent deliberately, and showing them as nodes would undo
-		// it. See docs/design/how-things-connect.md §6.
+		// it. See docs/design/How things connect.md §6.
 		ShowTags:        false,
 		ShowAttachments: false,
 		// An island is usually an owner who left, and hiding it is hiding the

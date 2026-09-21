@@ -9,7 +9,7 @@ import (
 // A wikilink is how one note points at another, and it is the only kind of
 // pointer Obsidian resolves, draws in its graph and counts as a backlink. A key
 // written as a bare string is a string; the same key written as a link is a
-// relationship. That distinction is the whole of docs/purpose.md §3, and it is
+// relationship. That distinction is the whole of docs/What docket is for.md §3, and it is
 // what this file exists to make easy to get right.
 
 // Link wraps a note name as a wikilink, ready to be written into frontmatter or

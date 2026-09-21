@@ -594,7 +594,7 @@ func entryFor(entries []vault.Entry, key string) vault.Entry {
 // nothing: Obsidian resolves wikilinks and nothing else, so the relationship
 // exists for docket's own tools and is absent from the graph, the backlinks and
 // the quick switcher — which is where it was supposed to show. See
-// docs/purpose.md §3.
+// docs/What docket is for.md §3.
 //
 // `docket check --fix` rewrites them, because unlike every other finding this
 // one has a right answer.

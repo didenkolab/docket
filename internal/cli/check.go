@@ -151,6 +151,14 @@ func repair(root string, stdout io.Writer) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// Pages drift from their titles the same way tasks do, and are settled the
+	// same way — after the tasks, so that one Retitle pass never has to follow
+	// another's rename.
+	pageRenames, err := check.PageRenames(root)
+	if err != nil {
+		return 0, err
+	}
+	renames = append(renames, pageRenames...)
 	for _, r := range renames {
 		fmt.Fprintf(stdout, "renamed %s\n     to %s\n", r.From, r.To)
 	}

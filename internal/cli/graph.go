@@ -21,7 +21,7 @@ looked the same before and after a change that was measurably wrong: navigation
 pages that held eighteen per cent of every edge, and sprint pages that reached
 twenty-eight. Both were found by counting.
 
-So this counts. The four questions are the ones docs/design/how-things-connect.md
+So this counts. The four questions are the ones docs/design/How things connect.md
 opens with — what moves with what, what is this part of, where does work pile
 up, and what is nobody looking after.
 

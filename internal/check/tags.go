@@ -23,7 +23,7 @@ import (
 // one that goes stale. A label is a topic with a page; a tag is a set with
 // nothing to explain. Anything that is both is one of them written twice.
 //
-// See docs/spec/vault-format.md §5.2.
+// See docs/spec/Vault format.md §5.2.
 
 // checkTags applies both to the whole vault at once, because neither question
 // can be answered from one file.

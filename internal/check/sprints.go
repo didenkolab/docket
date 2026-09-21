@@ -27,7 +27,7 @@ import (
 // Two sprints covering the same day is a planning mistake, and the interface has
 // to pick one, so it says which and why rather than choosing quietly.
 //
-// See docs/spec/vault-format.md and docs/design/how-things-connect.md.
+// See docs/spec/Vault format.md and docs/design/How things connect.md.
 
 // And one that was found by measuring rather than by reasoning: a sprint page
 // that names its tasks in prose.
@@ -143,13 +143,13 @@ func listedInProse(entries []vault.Entry, sprints []vault.Sprint) []Finding {
 
 		message := fmt.Sprintf("this page links %s: %s. A sprint's contents are its "+
 			"backlinks — write the key in backticks instead. See "+
-			"docs/design/how-things-connect.md §2",
+			"docs/design/How things connect.md §2",
 			plural(len(keys), "1 task", "tasks"), strings.Join(keys, ", "))
 		if outside > 0 {
 			message = fmt.Sprintf("this page links %s, %d of them not in this sprint: %s. "+
 				"A sprint's contents are its backlinks, and a link to work it does not "+
 				"hold makes it a hub over that work — write the key in backticks "+
-				"instead. See docs/design/how-things-connect.md §2",
+				"instead. See docs/design/How things connect.md §2",
 				plural(len(keys), "1 task", "tasks"), outside, strings.Join(keys, ", "))
 		}
 		findings = append(findings, Finding{s.Path, 0, RuleSprints, message})

@@ -3,7 +3,9 @@ package check
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/didenkolab/docket/internal/project"
 	"github.com/didenkolab/docket/internal/task"
@@ -79,6 +81,36 @@ func Renames(root string) ([]Rename, error) {
 		out = append(out, Rename{
 			From: e.Path,
 			To:   filepath.ToSlash(filepath.Join(filepath.Dir(e.Path), want)),
+		})
+	}
+	return out, nil
+}
+
+// PageRenames is every page whose file name has drifted from its title.
+//
+// The same finding as a task's, for the same reason, and settled the same way:
+// the title in the frontmatter is what the page says about itself, and the name
+// is derived from it. A decision is left alone — its name is an identifier that
+// gets quoted outside the vault, and documents.md §10 says so.
+func PageRenames(root string) ([]Rename, error) {
+	pages, err := vault.Pages(root)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []Rename
+	for _, p := range pages {
+		if strings.TrimSpace(p.Title) == "" || strings.TrimSpace(p.Type) == "decision" ||
+			path.Base(p.Path) == "index.md" {
+			continue
+		}
+		want := vault.PageName(p.Title)
+		if want == "" || want == path.Base(p.Path) {
+			continue
+		}
+		out = append(out, Rename{
+			From: p.Path,
+			To:   path.Join(path.Dir(p.Path), want),
 		})
 	}
 	return out, nil

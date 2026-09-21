@@ -10,7 +10,7 @@ several places.
 
 ## What the tool is allowed to be
 
-Four sentences from `docs/purpose.md` in `docket-board`, which is normative and wins every
+Four sentences from `docs/What%20docket%20is%20for.md` in `docket-board`, which is normative and wins every
 argument:
 
 - **A repository is a project.** Its tasks, its documentation and its history are in it and
@@ -112,8 +112,8 @@ test fixture. A token lives in memory for the length of a session and nowhere el
 
 The tasks, the roadmap, the specification and the design documents are in `docket-board`, which is
 its own repository and is itself a docket vault. A change to behaviour usually needs a change
-there as well: a task moved, a rule added to `docs/spec/vault-format.md`, sometimes a decision in
-`docs/decisions/`. That repository's `AGENTS.md` and `docs/spec/documents.md` say how those
+there as well: a task moved, a rule added to `docs/spec/Vault%20format.md`, sometimes a decision in
+`docs/decisions/`. That repository's `AGENTS.md` and `docs/spec/Documents.md` say how those
 documents are written.
 
 `docket-testbed` is a fictional team's vault in a language that is not ours, kept to catch the
