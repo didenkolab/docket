@@ -474,9 +474,10 @@ image the source of truth, which is the opposite of the whole design. The image 
 binary, git and certificates and keeps no state, so restarting it loses nothing and two of them
 against one clone is only a question of file locking.
 
-There is a published image as well — `ghcr.io/didenkolab/docket` — which needs a
-`docker login ghcr.io` for as long as this repository is private. Building does not, which is
-why compose builds by default.
+There is a published image as well — `ghcr.io/didenkolab/docket`, built from each tag. It needs
+a `docker login ghcr.io` until its package is made public: GitHub keeps a new package private
+even when the repository it was built from is not. Building needs no login, which is why compose
+builds by default.
 
 Or without any of it, since this is one static binary: put it on the machine, clone the vault
 beside it, and run `docket serve --auth git`.
