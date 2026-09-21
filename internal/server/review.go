@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/space"
 )
 
 // Reviewing a proposal you were sent a link to.

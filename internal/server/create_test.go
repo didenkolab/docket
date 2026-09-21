@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/workspace"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/workspace"
 )
 
 // makingHost is a host that can be asked for a repository, and makes it as a

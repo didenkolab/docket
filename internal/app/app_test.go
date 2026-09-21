@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 )
 
 // pack writes an app to a directory and returns the path.

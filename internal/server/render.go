@@ -10,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	goldmarkhtml "github.com/yuin/goldmark/renderer/html"

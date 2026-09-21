@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // Rights on the repository are how somebody becomes a person work can be put

@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/task"
 )
 
 // Entry is one task file found in a vault.

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 	"time"
 	"unicode/utf8"
 
-	"github.com/vadymdidenkolab/docket/internal/check"
-	"github.com/vadymdidenkolab/docket/internal/snapshot"
+	"github.com/didenkolab/docket/internal/check"
+	"github.com/didenkolab/docket/internal/snapshot"
 )
 
 var noon = time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)

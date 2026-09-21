@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // reactingServer is a vault that asks for a program to be run when a card

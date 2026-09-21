@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // settingsForm builds the form the settings page submits, from a config plus

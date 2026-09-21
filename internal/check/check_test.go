@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 )
 
 // task is a valid task, which each test then breaks in exactly one way.

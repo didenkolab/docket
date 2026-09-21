@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // A column head is where "how much is in progress" is asked, and counting cards

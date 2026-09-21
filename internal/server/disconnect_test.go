@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/workspace"
+	"github.com/didenkolab/docket/internal/workspace"
 )
 
 // Taking a project out is a manifest edit. The repository is not touched, and

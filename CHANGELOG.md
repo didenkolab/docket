@@ -21,7 +21,7 @@ binary built from that point. What changed, everywhere:
 | `igile-app.yaml` | `docket-app.yaml` |
 | `IGILE_*` environment variables | `DOCKET_*` |
 | `X-Igile-*` request headers | `X-Docket-*` |
-| `github.com/vadymdidenkolab/igile` | `github.com/vadymdidenkolab/docket` |
+| `github.com/didenkolab/igile` | `github.com/didenkolab/docket` |
 | `agent@igile.local` | `agent@docket.local` |
 | The project's own board, keys `IGL-*` | `DKT-*` |
 
@@ -30,7 +30,7 @@ to repositories created for it, and the old ones deleted. A clone of an `igile` 
 be pulled forward and has to be replaced:
 
 ```bash
-git clone https://github.com/vadymdidenkolab/docket.git
+git clone https://github.com/didenkolab/docket.git
 ```
 
 An existing vault is migrated by renaming one file and one string in it:

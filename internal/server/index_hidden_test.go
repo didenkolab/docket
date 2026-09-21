@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 )
 
 // A directory under a dot is somebody's working state, not a page: the server

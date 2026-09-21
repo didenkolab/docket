@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // drawingServer is a vault with a page and a panel drawn by programs.

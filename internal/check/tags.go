@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // A tag is a set somebody asks for, and it is said once.

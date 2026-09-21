@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // deviceStub is a host that can also hand out codes. It answers the way a real

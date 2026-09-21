@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/base"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/base"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // Saved views: the boards/*.base files, read as what they are.

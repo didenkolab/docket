@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 const newUsage = `docket new — create a task with a valid key.

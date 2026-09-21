@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/base"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/base"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // Editing a saved view.

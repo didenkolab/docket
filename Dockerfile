@@ -4,7 +4,7 @@
 # baking it in would make the image the source of truth instead of the
 # repository — the opposite of the whole design. Mount it:
 #
-#   docker run --rm -p 8080:8080 -v "$PWD:/vault" ghcr.io/vadymdidenkolab/docket
+#   docker run --rm -p 8080:8080 -v "$PWD:/vault" ghcr.io/didenkolab/docket
 #
 # Two stages: build with the Go toolchain, run on Alpine. Not scratch, because
 # the server shells out to git for every write and needs certificates to ask a
@@ -24,7 +24,7 @@ COPY . .
 # Go's build info says, which is the honest answer for one.
 ARG VERSION=""
 RUN CGO_ENABLED=0 go build -trimpath \
-    -ldflags "-s -w -X github.com/vadymdidenkolab/docket/internal/cli.version=${VERSION}" \
+    -ldflags "-s -w -X github.com/didenkolab/docket/internal/cli.version=${VERSION}" \
     -o /out/docket ./cmd/docket
 
 FROM alpine:3.22

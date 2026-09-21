@@ -5,9 +5,9 @@ import (
 	"os"
 	"sort"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // place decides where a card sits in its column and writes that down.

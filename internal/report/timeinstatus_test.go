@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/gitvcs"
 )
 
 func at(day int) time.Time {

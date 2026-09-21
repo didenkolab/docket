@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/report"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/report"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 const reportUsage = `docket report — what the board cannot say by looking at today.

@@ -7,7 +7,7 @@ package main
 import (
 	"os"
 
-	"github.com/vadymdidenkolab/docket/internal/cli"
+	"github.com/didenkolab/docket/internal/cli"
 )
 
 func main() {

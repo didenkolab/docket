@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 )
 
 var noon = time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)

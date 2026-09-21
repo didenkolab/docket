@@ -29,8 +29,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/vault"
 	"gopkg.in/yaml.v3"
 )
 

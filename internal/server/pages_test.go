@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/access"
 )
 
 // A type carries a level now, so a template that ranges over the types gets

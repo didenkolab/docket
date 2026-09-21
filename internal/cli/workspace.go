@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vadymdidenkolab/docket/internal/workspace"
+	"github.com/didenkolab/docket/internal/workspace"
 )
 
 const workspaceUsage = `docket workspace — assemble several project repositories into one Obsidian vault.

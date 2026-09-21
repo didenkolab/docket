@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/task"
 )
 
 // What shape the vault is, as numbers.

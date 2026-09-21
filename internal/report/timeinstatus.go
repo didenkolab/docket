@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/gitvcs"
 )
 
 // Span is a stretch of time a task spent in one status.

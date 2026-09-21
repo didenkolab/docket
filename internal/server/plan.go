@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // A branch, read as a change to the plan.

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 const adoptUsage = `docket adopt — promote an imported property to what the format calls it.

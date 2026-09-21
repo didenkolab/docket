@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/reaction"
-	"github.com/vadymdidenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/reaction"
+	"github.com/didenkolab/docket/internal/space"
 )
 
 // Letting the outside speak.

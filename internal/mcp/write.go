@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/check"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/check"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // fingerprint identifies the exact bytes an agent was given, so a write can be

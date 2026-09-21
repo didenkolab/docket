@@ -4,8 +4,8 @@ Two apps, one idea: work rolls up. An epic is a container of tasks, a key result
 of epics, and the roll-up is computed from the links rather than typed into a status report.
 
 ```bash
-docket app add https://github.com/vadymdidenkolab/docket-apps.git#okr
-docket app add https://github.com/vadymdidenkolab/docket-apps.git#portfolio
+docket app add https://github.com/didenkolab/docket-apps.git#okr
+docket app add https://github.com/didenkolab/docket-apps.git#portfolio
 docket check && git add -A && git commit -m "Installed the apps okr and portfolio"
 ```
 

@@ -8,13 +8,13 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // version is stamped at build time:
 //
-//	go build -ldflags "-X github.com/vadymdidenkolab/docket/internal/cli.version=v0.1.0"
+//	go build -ldflags "-X github.com/didenkolab/docket/internal/cli.version=v0.1.0"
 //
 // Left empty in ordinary builds, where Version falls back to Go's build info.
 var version string
@@ -52,7 +52,7 @@ Commands:
   help        Print this help
 
 The format and the roadmap live in
-https://github.com/vadymdidenkolab/docket-board
+https://github.com/didenkolab/docket-board
 `
 
 const initUsage = `docket init — scaffold a new project vault.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // An app's second version changes its own type, and that is not a conflict with

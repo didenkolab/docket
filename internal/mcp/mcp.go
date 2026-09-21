@@ -17,11 +17,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // Protocol is the revision this server speaks.

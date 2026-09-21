@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // Folders a vault has, named once.
@@ -32,7 +32,7 @@ const (
 //
 // The cost is honest: init needs to reach it. --template names another one, and
 // any git remote will do, including a path on disk.
-const DefaultTemplate = "https://github.com/vadymdidenkolab/docket-template.git"
+const DefaultTemplate = "https://github.com/didenkolab/docket-template.git"
 
 // TemplateOnly are the paths that belong to a template rather than to what it
 // makes. They let a template repository explain itself without every project

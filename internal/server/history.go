@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/task"
 )
 
 // historyDepth is how far back one page goes. A task with more than this many

@@ -59,7 +59,7 @@ you already have, offline, in every clone.
 ## The app, if you want it on the board
 
 ```bash
-docket app add https://github.com/vadymdidenkolab/docket-apps.git#time-in-status
+docket app add https://github.com/didenkolab/docket-apps.git#time-in-status
 docket serve --programs
 ```
 

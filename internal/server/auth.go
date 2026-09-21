@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/gitvcs"
 )
 
 // sessionCookie holds nothing but an opaque id. The token that proves who

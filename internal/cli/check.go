@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vadymdidenkolab/docket/internal/check"
-	"github.com/vadymdidenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/check"
+	"github.com/didenkolab/docket/internal/space"
 )
 
 const checkUsage = `docket check — validate a vault against the specification.

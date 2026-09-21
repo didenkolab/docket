@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // A sprint is a page, so most of what could go wrong with one is caught by the

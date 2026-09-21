@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 )
 
 func TestInitCreatesAVault(t *testing.T) {

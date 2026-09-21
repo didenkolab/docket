@@ -6,8 +6,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/mcp"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/mcp"
 )
 
 const mcpUsage = `docket mcp — serve a vault to an agent over the Model Context Protocol.

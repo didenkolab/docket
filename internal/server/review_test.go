@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/access"
 )
 
 // askingHost is a stubHost that also answers questions about pull requests.

@@ -16,7 +16,7 @@ services:
     build: .
     # Or take the published image instead of building. It is only readable
     # while you are logged in to ghcr.io, which building does not require:
-    # image: ghcr.io/vadymdidenkolab/docket:latest
+    # image: ghcr.io/didenkolab/docket:latest
     ports:
       - "${PORT:-8080}:8080"
     volumes:

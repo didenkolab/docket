@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/access"
 )
 
 // Signing in with what is already on this machine.

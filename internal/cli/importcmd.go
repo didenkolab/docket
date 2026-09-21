@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/importer"
-	"github.com/vadymdidenkolab/docket/internal/snapshot"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/importer"
+	"github.com/didenkolab/docket/internal/snapshot"
 )
 
 const importUsage = `docket import — bring an existing Jira and Confluence instance into a vault.
@@ -167,7 +167,7 @@ func runApply(args []string, stdout, stderr io.Writer) int {
 	vaultDir := flags.String("vault", "", "the vault to create")
 	author := flags.String("author", "", `who the import commit is by, as "Name <email>"`)
 	template := flags.String("template", "", "the repository the new vault is scaffolded from\n"+
-		"\t\t(default https://github.com/vadymdidenkolab/docket-template.git; a path works too,\n"+
+		"\t\t(default https://github.com/didenkolab/docket-template.git; a path works too,\n"+
 		"\t\tand is how an import runs with no route to the internet)")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {

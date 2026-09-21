@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/task"
 )
 
 // A release is a git tag, and that is the whole of it.

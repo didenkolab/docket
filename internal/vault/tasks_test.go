@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+	"github.com/didenkolab/docket/internal/vault/vaulttest"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // newVault scaffolds a vault and loads its config, which is the state every

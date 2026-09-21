@@ -1,6 +1,6 @@
 # Workspace
 
-A [docket](https://github.com/vadymdidenkolab/docket) workspace: several project vaults
+A [docket](https://github.com/didenkolab/docket) workspace: several project vaults
 assembled into one Obsidian vault.
 
 Open this folder in Obsidian and you get every project at once — `[[wikilinks]]`, search,

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/gitvcs"
 )
 
 // Who wrote each line of a task.

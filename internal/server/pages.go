@@ -13,11 +13,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/task"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 type pageData struct {

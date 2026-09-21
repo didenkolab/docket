@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/space"
 )
 
 const exportUsage = `docket export — the tasks, as data.

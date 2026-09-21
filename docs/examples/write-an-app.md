@@ -10,7 +10,7 @@ There is nothing to register with and nobody to ask. A URL is the whole distribu
 ## Install one first, to see the shape
 
 ```bash
-docket app add https://github.com/vadymdidenkolab/docket-apps.git#checklists
+docket app add https://github.com/didenkolab/docket-apps.git#checklists
 ```
 
 ```
@@ -170,6 +170,6 @@ without output when the task has no list.
 
 ## Next
 
-- [`docket-apps`](https://github.com/vadymdidenkolab/docket-apps) — twelve of them to read, and `WRITING-AN-APP.md`
+- [`docket-apps`](https://github.com/didenkolab/docket-apps) — twelve of them to read, and `WRITING-AN-APP.md`
 - [Tests, and results from CI](tests-and-ci.md) — the largest app, and what it takes to feed one
 - [What the board cannot see](what-the-board-cannot-see.md) — what `export` will give your hook

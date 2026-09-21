@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/snapshot"
+	"github.com/didenkolab/docket/internal/snapshot"
 )
 
 // ExtractOptions selects what to pull.

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/vadymdidenkolab/docket/internal/confluence"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/confluence"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // sourcePage is the part of a Confluence page an import uses.

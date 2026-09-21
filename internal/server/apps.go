@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/app"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/app"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // Installing an app from the browser.

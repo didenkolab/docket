@@ -21,5 +21,5 @@ Start with the first one. The rest can be read in any order.
 | [Who may do what](who-may-do-what.md) | Access without a user table |
 
 Something missing, or a recipe that no longer matches what the tool does? The board is in
-[`docket-board`](https://github.com/vadymdidenkolab/docket-board), where a task is a Markdown
+[`docket-board`](https://github.com/didenkolab/docket-board), where a task is a Markdown
 file — so filing one is a pull request.

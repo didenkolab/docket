@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/gitvcs"
 )
 
 // localServer is a guarded server told whether it is reachable only from this

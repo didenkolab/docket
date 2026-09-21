@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/app"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/app"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 const appUsage = `docket app — vocabulary and files a vault takes on.

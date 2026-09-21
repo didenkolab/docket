@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/access"
-	"github.com/vadymdidenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/access"
+	"github.com/didenkolab/docket/internal/project"
 )
 
 // Signing in without pasting anything.

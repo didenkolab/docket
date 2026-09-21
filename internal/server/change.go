@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 // The page that reads a branch as a change to the plan. See plan.go for why.

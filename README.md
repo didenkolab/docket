@@ -53,7 +53,7 @@ and, at the bottom of the details, every change to this task and who wrote each 
 Releases, computed from the tags every time the page is opened. Nothing was set on any task to
 produce this, and it cannot drift.
 
-All three are the [showcase vault](https://github.com/vadymdidenkolab/docket-showcase) — an
+All three are the [showcase vault](https://github.com/didenkolab/docket-showcase) — an
 invented company, three products, six people, twelve weeks. Clone it and you get these pages.
 
 ## Quick start
@@ -104,19 +104,19 @@ the same checkout, and what it did to both arrives in one pull request.
 | git | Required, on the `PATH`. Every write is a commit, and the history is the record |
 | Go 1.26 or newer | Only to build from source. A released binary needs no toolchain |
 | Obsidian | Optional. The vault is Markdown either way; Obsidian is one of the two ways to read it |
-| Python 3.11 or newer, and `sh` | Optional, for the hooks some [apps](https://github.com/vadymdidenkolab/docket-apps) bring |
+| Python 3.11 or newer, and `sh` | Optional, for the hooks some [apps](https://github.com/didenkolab/docket-apps) bring |
 | Docker | Optional, for `compose.yaml` |
 
 ## Install
 
 Download the binary for your platform from
-[Releases](https://github.com/vadymdidenkolab/docket/releases) and put it on your `PATH`. That
+[Releases](https://github.com/didenkolab/docket/releases) and put it on your `PATH`. That
 is the whole procedure — there is no runtime to install.
 
 With Go already on the machine:
 
 ```bash
-go install github.com/vadymdidenkolab/docket/cmd/docket@latest
+go install github.com/didenkolab/docket/cmd/docket@latest
 ```
 
 From a checkout — Go 1.26 or newer, one dependency:
@@ -127,7 +127,7 @@ go build -o docket ./cmd/docket
 ```
 
 Go and the single-binary distribution were chosen for the reasons in
-[ADR-0002](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0002-go-and-a-single-binary.md).
+[ADR-0002](https://github.com/didenkolab/docket-board/blob/main/docs/decisions/0002-go-and-a-single-binary.md).
 
 Check what you have:
 
@@ -141,7 +141,7 @@ A key is `PROJECT-NUMBER`, and the file is named after the task:
 `ACME/ACME-1 Fix login redirect loop.md`. The key makes it sortable and unambiguous, the title
 makes the graph readable, and `[[ACME-1 Fix login redirect loop]]` resolves in Obsidian with no
 help — the reasoning is in
-[ADR-0005](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0005-a-file-is-named-after-its-task.md).
+[ADR-0005](https://github.com/didenkolab/docket-board/blob/main/docs/decisions/0005-a-file-is-named-after-its-task.md).
 One vault holds as many projects as you like, and links between projects work because the
 projects are one file tree.
 
@@ -196,12 +196,12 @@ and hooks. Nothing is executed and nothing is committed for you: what an install
 diff.
 
 ```bash
-docket app add https://github.com/vadymdidenkolab/docket-apps.git#tests
+docket app add https://github.com/didenkolab/docket-apps.git#tests
 git status                       # everything it wrote, unstaged
 docket check && git add -A && git commit -m "Installed the app tests"
 ```
 
-Twelve of them ship in [`docket-apps`](https://github.com/vadymdidenkolab/docket-apps) — tests,
+Twelve of them ship in [`docket-apps`](https://github.com/didenkolab/docket-apps) — tests,
 time, risks, incidents, intake, OKRs, checklists, estimation, portfolio, workload, time in
 status, anomalies. Writing a thirteenth is a manifest and, if it draws something, a script that
 prints Markdown; [the recipe](docs/examples/write-an-app.md) walks through one. There is nothing
@@ -250,7 +250,7 @@ vault itself:
 
 Hooks that apps bring read a few of their own — `DOCKET_JUNIT_SECRET`, `DOCKET_AUTHOR_NAME` and
 `DOCKET_AUTHOR_EMAIL`, `DOCKET_ENVIRONMENT`, `DOCKET_REVISION` — and are documented in
-[`docket-apps`](https://github.com/vadymdidenkolab/docket-apps).
+[`docket-apps`](https://github.com/didenkolab/docket-apps).
 
 ## How it works
 
@@ -384,7 +384,7 @@ by the person who made them, so `git log` says who moved what.
 Access is granted on the host, not here. Anyone who can clone the repository has everything in
 it, so a button in this interface would appear to hand out something it cannot. The reasoning
 is in
-[ADR-0004](https://github.com/vadymdidenkolab/docket-board/blob/main/docs/decisions/0004-access-comes-from-git.md).
+[ADR-0004](https://github.com/didenkolab/docket-board/blob/main/docs/decisions/0004-access-comes-from-git.md).
 
 #### Standing up to the open internet
 
@@ -434,7 +434,7 @@ image the source of truth, which is the opposite of the whole design. The image 
 binary, git and certificates and keeps no state, so restarting it loses nothing and two of them
 against one clone is only a question of file locking.
 
-There is a published image as well — `ghcr.io/vadymdidenkolab/docket` — which needs a
+There is a published image as well — `ghcr.io/didenkolab/docket` — which needs a
 `docker login ghcr.io` for as long as this repository is private. Building does not, which is
 why compose builds by default.
 
@@ -491,18 +491,18 @@ changes is reported and left alone.
 
 | Repository | What |
 |---|---|
-| [`docket`](https://github.com/vadymdidenkolab/docket) | This one: the CLI, the server and the MCP endpoint, as one Go binary |
-| [`docket-apps`](https://github.com/vadymdidenkolab/docket-apps) | Packs of vocabulary and files a vault takes on — tests, time, risks, OKRs and eight more |
-| [`docket-board`](https://github.com/vadymdidenkolab/docket-board) | The format's specification, the decisions and the roadmap — and the project's own board, which makes it the working example |
-| [`docket-template`](https://github.com/vadymdidenkolab/docket-template) | What a new vault starts as. `docket init` clones it |
-| [`docket-demo`](https://github.com/vadymdidenkolab/docket-demo) | A small vault to open and look at: two projects, seven tasks and a page |
-| [`docket-showcase`](https://github.com/vadymdidenkolab/docket-showcase) | An invented company's vault: three products, six people, twelve weeks, and every app installed — built by a generator |
-| [`northlight`](https://github.com/vadymdidenkolab/northlight) | That invented company's code, beside its vault |
+| [`docket`](https://github.com/didenkolab/docket) | This one: the CLI, the server and the MCP endpoint, as one Go binary |
+| [`docket-apps`](https://github.com/didenkolab/docket-apps) | Packs of vocabulary and files a vault takes on — tests, time, risks, OKRs and eight more |
+| [`docket-board`](https://github.com/didenkolab/docket-board) | The format's specification, the decisions and the roadmap — and the project's own board, which makes it the working example |
+| [`docket-template`](https://github.com/didenkolab/docket-template) | What a new vault starts as. `docket init` clones it |
+| [`docket-demo`](https://github.com/didenkolab/docket-demo) | A small vault to open and look at: two projects, seven tasks and a page |
+| [`docket-showcase`](https://github.com/didenkolab/docket-showcase) | An invented company's vault: three products, six people, twelve weeks, and every app installed — built by a generator |
+| [`northlight`](https://github.com/didenkolab/northlight) | That invented company's code, beside its vault |
 
 Only `docket-template` is public today; the rest need access.
 
 The demo is the format in a minute. To see the whole of it on a team's worth of work, clone
-[`docket-showcase`](https://github.com/vadymdidenkolab/docket-showcase): three products, six
+[`docket-showcase`](https://github.com/didenkolab/docket-showcase): three products, six
 people, twelve weeks and every app, all invented.
 
 ## Contributing

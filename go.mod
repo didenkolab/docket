@@ -1,4 +1,4 @@
-module github.com/vadymdidenkolab/docket
+module github.com/didenkolab/docket
 
 go 1.26
 

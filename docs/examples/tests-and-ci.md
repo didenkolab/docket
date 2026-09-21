@@ -4,7 +4,7 @@ The largest app in the library. It brings test plans, sets, cases, executions an
 thing Zephyr and Xray sell — and it feeds on the output your pipeline already produces.
 
 ```bash
-docket app add https://github.com/vadymdidenkolab/docket-apps.git#tests
+docket app add https://github.com/didenkolab/docket-apps.git#tests
 docket check && git add -A && git commit -m "Installed the app tests"
 ```
 
@@ -105,4 +105,4 @@ This is written down rather than hidden because you will find the button.
 
 - [Write your own app](write-an-app.md) — how these hooks are put together
 - [A release is a tag](a-release-is-a-tag.md) — tying a green suite to what shipped
-- [`docket-apps`](https://github.com/vadymdidenkolab/docket-apps) — the app's own documentation
+- [`docket-apps`](https://github.com/didenkolab/docket-apps) — the app's own documentation

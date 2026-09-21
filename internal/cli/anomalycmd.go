@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vadymdidenkolab/docket/internal/anomaly"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/vault"
+	"github.com/didenkolab/docket/internal/anomaly"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/vault"
 )
 
 const anomalyUsage = `docket anomalies — what is odd about how the work is connected.

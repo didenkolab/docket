@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vadymdidenkolab/docket/internal/gitvcs"
-	"github.com/vadymdidenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/gitvcs"
+	"github.com/didenkolab/docket/internal/space"
 )
 
 // Sending what the board wrote to where everybody else will read it.

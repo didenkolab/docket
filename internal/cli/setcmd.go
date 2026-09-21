@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vadymdidenkolab/docket/internal/check"
-	"github.com/vadymdidenkolab/docket/internal/project"
-	"github.com/vadymdidenkolab/docket/internal/space"
-	"github.com/vadymdidenkolab/docket/internal/task"
+	"github.com/didenkolab/docket/internal/check"
+	"github.com/didenkolab/docket/internal/project"
+	"github.com/didenkolab/docket/internal/space"
+	"github.com/didenkolab/docket/internal/task"
 )
 
 const setUsage = `docket set — write properties on a task, from a script.
