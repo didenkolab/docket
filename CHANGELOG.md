@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.6.0 — 2026-09-21
+
+The first release anybody outside can install. `go install` against v0.5.0 fails — that tag
+predates the move to `github.com/didenkolab`, so its `go.mod` declares a module path that no
+longer resolves. This is that release, cut after the move.
+
+### The account is didenkolab
+
+`github.com/vadymdidenkolab` became `github.com/didenkolab`, and the module path with it:
+
+```bash
+go install github.com/didenkolab/docket/cmd/docket@latest
+```
+
+Fixed forward rather than rewritten. An old module path breaks nothing — `go.mod` and the
+imports agree inside every commit — so the build works at any point in the history, unlike
+`igile.yaml`, which was a file the new binary could not read.
+
+### Added
+
+- **SECURITY.md**, **CONTRIBUTING.md** and issue and pull request templates. The security page
+  says which three behaviours are deliberate — programs need `--programs`, a program is a path
+  and never a shell, and the inbox secret lives in the server's environment — so a reader can
+  tell a finding from a design decision.
+
+### Fixed
+
+- **A page is named after its title** (DKT-46). The rule was in the specification and enforced
+  for tasks only, so this project's own vault broke it twenty-one times. `check` reports it now
+  and `check --fix` settles it, with two carve-outs: a decision keeps its number, and `index.md`
+  is a role rather than a title.
+- **A case-only rename works** on a case-insensitive file system. `vault.Rename` refused one
+  outright, because Stat reports the target as existing — so a task could never be retitled from
+  "fix login" to "Fix login" on macOS or Windows.
+- **A release lists what shipped first.** The page listed every task whose file changed between
+  two tags, which put a task somebody had only written into the backlog beside the work that went
+  out. Shipped comes first now; what the window merely touched is behind a summary that says so.
+- **A tag that is not a version is not a release** (DKT-65, ADR-0006). The showcase's release
+  page opened with the generator's build marker, captioned "No task changed in this release".
+- **A task page says each thing once.** A declared relation arrived as a backlink as well, so the
+  same tasks appeared under two headings — three times over once an app's panel added its copy.
+- **The board**: priority reads as priority rather than as a label, a column total carries a
+  sigma instead of being a second bare number, the assignee row reads as a value until it is
+  used, and a phone spends 76 pixels on navigation instead of 180.
+- Every commit message is in English, and the old board key `IGL-` is gone from the code.
+
+### Known
+
+- `check --fix` renames a file by case and git quietly keeps the old name on a case-insensitive
+  file system, so the rename can be committed as nothing (DKT-67).
+- The **Run the scenarios** button in the tests app does not land a result; a commit from CI and
+  `hooks/import-cucumber.sh` are the routes that work (DKT-57).
+- The Confluence half of `docket import` has never been pointed at a real space.
+
 ## v0.5.0 — 2026-09-21
 
 The first release under the name, and the first one anybody outside could read.
