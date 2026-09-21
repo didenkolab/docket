@@ -11,6 +11,32 @@ git push --follow-tags
 
 That is the whole procedure.
 
+## When do you cut it — before the work, or after?
+
+**After. Always after.** A tag points at a commit, so it cannot exist before the work does. That
+is not a limitation being worked around; it is the property that makes a release page unable to
+lie.
+
+This is the one habit somebody arriving from Jira has to drop. There you create a version up
+front, set `fixVersion` on every issue as you plan, and press Release at the end. Three records
+of one intention — the version object, the field on each issue, and the notes generated from
+them — kept in step by hand, and re-edited every time the plan changes.
+
+Here the plan and the record are different objects, on purpose:
+
+| You want | Use |
+|---|---|
+| "What are we doing next?" | A [sprint](sprints.md) — a page with dates, and tasks that link to it |
+| "What if we shipped it this way instead?" | A [branch](../how-you-work-in-this.md) — the Branches page draws the board it would produce |
+| "What is left before we can ship?" | The board. A status, not a version field |
+| "What did we ship?" | The tag, cut when you ship it |
+
+If you genuinely want a named thing to plan into — a page under `docs/` called `v1.1` with links
+to the work intended for it — write one. It is a plan document and it says so, and when the
+release happens the tag is the record and the page becomes history. What you should not do is
+try to make the tag the plan: a tag moved to keep up with a changing plan is a tag that no
+longer says what shipped, which was the only thing it was for.
+
 ## What the Releases page does with that
 
 It reads the tags out of the repository, works out which task files changed between each tag and
@@ -38,10 +64,18 @@ than the order they shipped.
 
 ## What "went into a release" means exactly
 
-The task files whose contents changed between the two tags. Not "tasks closed in that window" —
-a task that was created, worked on and closed shows up; so does one whose acceptance criteria
-were rewritten. That is usually what you want from release notes, and when it is not, the diff
-is right there to look at.
+Two questions, and the page answers them separately because they are not the same.
+
+**Shipped** is the work that had reached a done status when the tag was cut. That is what a
+release notes list is, and it comes first.
+
+**Everything else the window touched** is behind a summary. A task created, edited or moved
+between the two tags changed its file, so it is inside the range the release is computed from —
+but it did not ship, and listing it beside the work that did is how a release page comes to say
+a backlog item was released. It is still worth having: it is what was in flight when you cut.
+
+A task whose acceptance criteria were rewritten and nothing else shows up in the second group,
+which is right — something happened to it, and it was not shipping.
 
 A release page shows how much of it was actually finished at the tag, because it parses the
 files at that commit: a task still In progress when you tagged says so, on the release page,
