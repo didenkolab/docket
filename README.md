@@ -149,11 +149,45 @@ the same checkout, and what it did to both arrives in one pull request.
 
 ## Install
 
-Download the binary for your platform from
-[Releases](https://github.com/didenkolab/docket/releases) and put it on your `PATH`. That
-is the whole procedure — there is no runtime to install.
+One static binary, no runtime. Pick whichever line you already trust.
 
-With Go already on the machine:
+**macOS and Linux**
+
+```bash
+brew install didenkolab/tap/docket
+```
+
+or, without Homebrew:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/didenkolab/docket/main/install.sh | sh
+```
+
+It reads the release's own `checksums.txt`, refuses to install anything that does not match, and
+puts the binary in `~/.local/bin`. `DOCKET_BIN_DIR` and `DOCKET_VERSION` override where and
+which.
+
+**Windows**
+
+```powershell
+scoop bucket add docket https://github.com/didenkolab/scoop-bucket
+scoop install docket
+```
+
+**By hand**, from [Releases](https://github.com/didenkolab/docket/releases) — with one warning
+worth reading first. The binaries are ad-hoc signed and **not notarized by Apple**, so a macOS
+copy downloaded with a *browser* carries a quarantine flag and Gatekeeper refuses it outright,
+with a dialog whose only button throws it away. Either of the two lines above clears that flag;
+downloading by hand does not. On macOS, if you have already done it:
+
+```bash
+xattr -d com.apple.quarantine ./docket
+```
+
+Notarization needs a paid Apple developer account and this project does not have one yet.
+Linux and Windows are unaffected.
+
+**With Go already on the machine**
 
 ```bash
 go install github.com/didenkolab/docket/cmd/docket@latest
