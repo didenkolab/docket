@@ -7,13 +7,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
+
 	"github.com/vadymdidenkolab/docket/internal/project"
 )
 
 func withTasks(t *testing.T) (root string, c *project.Config) {
 	t.Helper()
 	root = filepath.Join(t.TempDir(), "v")
-	if _, err := Init(root, Options{Key: "ACME", Name: "Acme"}); err != nil {
+	if _, err := Init(root, Options{Key: "ACME", Name: "Acme", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatal(err)
 	}
 	c, err := project.Load(root)

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 )
 
 func newTestFlags() *flag.FlagSet {
@@ -16,10 +18,16 @@ func newTestFlags() *flag.FlagSet {
 }
 
 // vaultDir scaffolds a vault and returns its path.
+//
+// From a local template, because a test must not reach the network: it would be
+// slow, it would fail on a machine without one, and it would tie the suite to
+// whether a repository somewhere is published. That last one is not theoretical
+// — these tests went red the moment the published template stopped being public.
 func vaultDir(t *testing.T) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "vault")
-	if code, _, stderr := run(t, "init", "--key", "ACME", dir); code != exitOK {
+	if code, _, stderr := run(t, "init", "--key", "ACME",
+		"--template", vaulttest.Template(t), dir); code != exitOK {
 		t.Fatalf("init failed: %s", stderr)
 	}
 	return dir

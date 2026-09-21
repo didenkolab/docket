@@ -166,6 +166,9 @@ func runApply(args []string, stdout, stderr io.Writer) int {
 		"comma-separated spaces to write as pages; every space in the snapshot by default")
 	vaultDir := flags.String("vault", "", "the vault to create")
 	author := flags.String("author", "", `who the import commit is by, as "Name <email>"`)
+	template := flags.String("template", "", "the repository the new vault is scaffolded from\n"+
+		"\t\t(default https://github.com/vadymdidenkolab/docket-template.git; a path works too,\n"+
+		"\t\tand is how an import runs with no route to the internet)")
 
 	if err := flags.Parse(permute(flags, args)); err != nil {
 		return exitUsage
@@ -213,10 +216,11 @@ func runApply(args []string, stdout, stderr io.Writer) int {
 
 	log := func(format string, args ...any) { fmt.Fprintf(stdout, format+"\n", args...) }
 	report, err := importer.Apply(snap, loaded, importer.ApplyOptions{
-		Root:    *vaultDir,
-		Project: *projectKey,
-		Spaces:  wanted,
-		Now:     time.Now(),
+		Root:     *vaultDir,
+		Project:  *projectKey,
+		Spaces:   wanted,
+		Now:      time.Now(),
+		Template: *template,
 	}, log)
 	if err != nil {
 		fmt.Fprintf(stderr, "docket import apply: %v\n", err)

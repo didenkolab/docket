@@ -153,7 +153,7 @@ func TestNameDefaultsToKey(t *testing.T) {
 
 func TestInitCreatesTheDirectory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "deep", "nested", "vault")
-	if _, err := Init(dir, Options{Key: "ACME"}); err != nil {
+	if _, err := Init(dir, Options{Key: "ACME", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatalf("Init into a missing directory: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "docket.yaml")); err != nil {
@@ -167,7 +167,7 @@ func TestInitRefusesANonEmptyDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Init(dir, Options{Key: "ACME"}); err == nil {
+	if _, err := Init(dir, Options{Key: "ACME", Template: vaulttest.Template(t)}); err == nil {
 		t.Fatal("Init overwrote a non-empty directory")
 	} else if !strings.Contains(err.Error(), "notes.md") {
 		t.Errorf("the error does not name what was in the way: %v", err)
@@ -186,14 +186,14 @@ func TestInitRunsInsideAFreshClone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Init(dir, Options{Key: "ACME"}); err != nil {
+	if _, err := Init(dir, Options{Key: "ACME", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatalf("Init refused a directory holding only .git: %v", err)
 	}
 }
 
 func TestInitRefusesToRunTwice(t *testing.T) {
 	dir, _ := initVault(t, Options{Key: "ACME"})
-	if _, err := Init(dir, Options{Key: "ACME"}); err == nil {
+	if _, err := Init(dir, Options{Key: "ACME", Template: vaulttest.Template(t)}); err == nil {
 		t.Error("Init ran twice over the same directory")
 	}
 }
@@ -201,7 +201,7 @@ func TestInitRefusesToRunTwice(t *testing.T) {
 func TestKeysThatAreRejected(t *testing.T) {
 	for _, key := range []string{"", "  ", "a", "AC ME", "acme", "1ACME", "ACME-1", "TOOLONGAKEY", "DOCS"} {
 		dir := filepath.Join(t.TempDir(), "vault")
-		if _, err := Init(dir, Options{Key: key}); err == nil {
+		if _, err := Init(dir, Options{Key: key, Template: vaulttest.Template(t)}); err == nil {
 			t.Errorf("key %q was accepted", key)
 		}
 		if _, err := os.Stat(dir); err == nil {
@@ -213,7 +213,7 @@ func TestKeysThatAreRejected(t *testing.T) {
 func TestKeysThatAreAccepted(t *testing.T) {
 	for _, key := range []string{"AC", "ACME", "A1", "PROJECT123"} {
 		dir := filepath.Join(t.TempDir(), "vault")
-		if _, err := Init(dir, Options{Key: key}); err != nil {
+		if _, err := Init(dir, Options{Key: key, Template: vaulttest.Template(t)}); err != nil {
 			t.Errorf("key %q was rejected: %v", key, err)
 		}
 	}

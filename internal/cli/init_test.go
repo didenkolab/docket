@@ -5,12 +5,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 )
 
 func TestInitCreatesAVault(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "acme")
 
-	code, stdout, stderr := run(t, "init", "--key", "ACME", "--name", "Acme Platform", dir)
+	code, stdout, stderr := run(t, "init", "--key", "ACME", "--name", "Acme Platform",
+		"--template", vaulttest.Template(t), dir)
 	if code != exitOK {
 		t.Fatalf("exit code = %d, want %d; stderr:\n%s", code, exitOK, stderr)
 	}
@@ -26,7 +29,8 @@ func TestInitDefaultsToTheCurrentDirectory(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 
-	if code, _, stderr := run(t, "init", "--key", "ACME"); code != exitOK {
+	if code, _, stderr := run(t, "init", "--key", "ACME",
+		"--template", vaulttest.Template(t)); code != exitOK {
 		t.Fatalf("exit code = %d, want %d; stderr:\n%s", code, exitOK, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "docket.yaml")); err != nil {
@@ -50,7 +54,7 @@ func TestInitWithoutAKeyIsAUsageError(t *testing.T) {
 func TestInitWithABadKeyFails(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "acme")
 
-	code, _, stderr := run(t, "init", "--key", "acme", dir)
+	code, _, stderr := run(t, "init", "--key", "acme", "--template", vaulttest.Template(t), dir)
 	if code != exitError {
 		t.Errorf("exit code = %d, want %d", code, exitError)
 	}
@@ -68,7 +72,7 @@ func TestInitIntoANonEmptyDirectoryFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code, _, stderr := run(t, "init", "--key", "ACME", dir)
+	code, _, stderr := run(t, "init", "--key", "ACME", "--template", vaulttest.Template(t), dir)
 	if code != exitError {
 		t.Errorf("exit code = %d, want %d", code, exitError)
 	}

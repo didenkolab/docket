@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 	"time"
 	"unicode/utf8"
 
@@ -263,6 +265,7 @@ func TestApplyWritesAValidVault(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vault")
 	report, err := Apply(snap, maps, ApplyOptions{
 		Root: root, Project: "ACME", Spaces: []string{"ENG"}, Now: noon,
+		Template: vaulttest.Template(t),
 	}, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
@@ -291,6 +294,7 @@ func TestApplyCarriesTheDetailAcross(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vault")
 	if _, err := Apply(snap, maps, ApplyOptions{
 		Root: root, Project: "ACME", Spaces: []string{"ENG"}, Now: noon,
+		Template: vaulttest.Template(t),
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +333,7 @@ func TestApplyKeepsTheHistoryGitNeverSaw(t *testing.T) {
 	maps, _, _ := Plan(snap)
 
 	root := filepath.Join(t.TempDir(), "vault")
-	if _, err := Apply(snap, maps, ApplyOptions{Root: root, Project: "ACME", Now: noon}, nil); err != nil {
+	if _, err := Apply(snap, maps, ApplyOptions{Root: root, Project: "ACME", Now: noon, Template: vaulttest.Template(t)}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -347,7 +351,7 @@ func TestApplyBuildsTheProjectVocabularyFromTheMaps(t *testing.T) {
 	maps, _, _ := Plan(snap)
 
 	root := filepath.Join(t.TempDir(), "vault")
-	if _, err := Apply(snap, maps, ApplyOptions{Root: root, Project: "ACME", Now: noon}, nil); err != nil {
+	if _, err := Apply(snap, maps, ApplyOptions{Root: root, Project: "ACME", Now: noon, Template: vaulttest.Template(t)}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -370,6 +374,7 @@ func TestApplyPlacesPagesUnderTheirParents(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "vault")
 	if _, err := Apply(snap, maps, ApplyOptions{
 		Root: root, Project: "ACME", Spaces: []string{"ENG"}, Now: noon,
+		Template: vaulttest.Template(t),
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -390,6 +395,7 @@ func TestApplyRefusesAProjectKeyAVaultCannotUse(t *testing.T) {
 
 	if _, err := Apply(snap, maps, ApplyOptions{
 		Root: t.TempDir(), Project: "not-a-key", Now: noon,
+		Template: vaulttest.Template(t),
 	}, nil); err == nil {
 		t.Error("Apply accepted a key a vault cannot use")
 	}
@@ -402,6 +408,7 @@ func TestApplyStopsOnAStatusTheMapsDoNotCover(t *testing.T) {
 
 	if _, err := Apply(snap, maps, ApplyOptions{
 		Root: filepath.Join(t.TempDir(), "v"), Project: "ACME", Now: noon,
+		Template: vaulttest.Template(t),
 	}, nil); err == nil {
 		t.Error("Apply silently invented a status")
 	}

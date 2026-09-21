@@ -22,6 +22,16 @@ type ApplyOptions struct {
 	Project string // which project in the snapshot
 	Spaces  []string
 	Now     time.Time
+	// Template is the repository the new vault is scaffolded from, empty for
+	// the published one.
+	//
+	// It is here because the doc comment below was not true: apply scaffolds a
+	// vault, scaffolding clones a template, and the default template is a URL —
+	// so an import on a machine with no route to the internet failed at the
+	// last step, after the part that was supposed to be the only one needing a
+	// network had already finished. The help says only extract touches it, and
+	// now that is so.
+	Template string
 }
 
 // ApplyReport is what was written.
@@ -61,7 +71,8 @@ func Apply(snap Reader, maps *Maps, opts ApplyOptions, log Logf) (*ApplyReport, 
 		return nil, fmt.Errorf("the snapshot holds no issues for project %s", opts.Project)
 	}
 
-	if err := writeConfig(opts.Root, opts.Project, projectName(issues, opts.Project), maps, declaredPriorities(snap)); err != nil {
+	if err := writeConfig(opts.Root, opts.Project, projectName(issues, opts.Project),
+		opts.Template, maps, declaredPriorities(snap)); err != nil {
 		return nil, err
 	}
 
@@ -159,8 +170,9 @@ func projectName(issues []sourceIssue, fallback string) string {
 
 // writeConfig builds docket.yaml from the maps, so the vault's vocabulary is
 // exactly what the import decided rather than the scaffold's defaults.
-func writeConfig(root, key, name string, maps *Maps, priorities []string) error {
-	if _, err := vault.Init(root, vault.Options{Key: key, Name: name}); err != nil {
+func writeConfig(root, key, name, template string, maps *Maps, priorities []string) error {
+	if _, err := vault.Init(root, vault.Options{
+		Key: key, Name: name, Template: template}); err != nil {
 		return err
 	}
 

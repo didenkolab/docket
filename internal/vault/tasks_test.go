@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/vadymdidenkolab/docket/internal/vault/vaulttest"
 	"time"
 
 	"github.com/vadymdidenkolab/docket/internal/project"
@@ -16,7 +18,7 @@ import (
 func newVault(t *testing.T) (root string, c *project.Config) {
 	t.Helper()
 	root = filepath.Join(t.TempDir(), "vault")
-	if _, err := Init(root, Options{Key: "ACME", Name: "Acme Platform"}); err != nil {
+	if _, err := Init(root, Options{Key: "ACME", Name: "Acme Platform", Template: vaulttest.Template(t)}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
 	c, err := project.Load(root)
