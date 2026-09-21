@@ -1,23 +1,31 @@
 # docket
 
-**A task tracker your AI agent runs.**
+**Git and Obsidian, made into one tracker that a person and an AI agent both find obvious.**
 
-An agent creates a task by writing a file and moves it by editing two lines. There is no API it
-has to be taught, no schema it cannot read, and no credential you have to hand it that you would
-not hand a person cloning the repository. Give it [the skill](#give-it-to-your-agent) and it
-knows the whole loop — find the work, take it, move it, write down what it did, close the
-release.
+Neither half is new, and that is the point. Git already keeps a history, reviews a change on the
+lines, branches a proposal and says who did what. Obsidian already draws a folder of Markdown as
+a board, a backlog, a linked wiki and a graph. What was missing between them was a format each
+reads as if it were its own — and a tool that keeps that format honest.
 
-**Git is the only database there is.** Every task is a Markdown file, every move is a commit,
-and a task's history is the history of its file. Nothing has to be running for the record to
-exist, nothing can drift out of step with anything else, and `git clone` is both the export and
-the backup. The same folder opened in Obsidian is a board with columns, a backlog, a linked wiki
-and a graph — not an export of the tracker, the same files.
+So a task here is a Markdown file in a git repository, and that one decision is what makes all
+three readers agree:
 
-**It does what Jira and six paid add-ons do.** Test management, worklogs, a risk register, OKRs,
-time in status, portfolio roll-ups: twelve packs, each installed with a URL and reviewed as a
-`git diff`. No instance to administer, no seats to buy, no marketplace to ask. And when a pack
-does not exist, [writing one](#write-your-own) is a manifest and a shell script.
+- **A person** opens the folder in Obsidian and has a board with columns, cards, backlinks and a
+  graph. Or opens `docket serve` and has the board in a browser. Nothing to learn that is not
+  already Jira-shaped.
+- **An agent** is pointed at the same folder and needs no API, no schema and no credential you
+  would not give anyone who can clone the repository — it already knows how to write a file.
+  Give it [the skill](#give-it-to-your-agent) and it knows the whole loop.
+- **Git** holds the history, because every move is a commit. Nothing has to be running for the
+  record to exist, nothing drifts out of step, and `git clone` is the export and the backup.
+
+None of the three views is an export of the others. There is one set of files, and all of them
+are writing to it at once.
+
+**And it does what Jira and six paid add-ons do.** Test management, worklogs, a risk register,
+OKRs, time in status, portfolio roll-ups: twelve packs, each installed with a URL and reviewed as
+a `git diff`. No instance to administer, no seats to buy, no marketplace to ask. When a pack does
+not exist, [writing one](#write-your-own) is a manifest and a shell script.
 
 The vault format is settled and the whole local workflow works. A vault is usable without any of
 this — clone, open in Obsidian, work — but the tool makes the routine parts routine.

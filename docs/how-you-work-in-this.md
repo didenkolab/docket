@@ -7,15 +7,19 @@ Read this before the cookbook. The recipes assume the shape described here.
 
 ## The one idea
 
-**The plan lives where the code lives.** Not beside it, not linked to it — in the same
-repository, in the same branch, arriving in the same pull request.
+**A task is a Markdown file in a git repository** — and everything here is a consequence of that
+one decision.
 
-Everything below follows from that. The reason a task is a file is so that a change to the plan
-is a diff. The reason every move is a commit is so that the history of the project is the history
-of the repository. The reason an agent is the first-class user is that an agent already has the
-repository open.
+It is why you and an agent can work on the same board without either of you being given a
+special view of it: Obsidian draws a folder of Markdown as a board because that is what Obsidian
+does, and an agent writes a file because that is what an agent does. Neither had to be taught
+anything. It is why the history is `git log`, why a plan change is a diff, why a proposal is a
+branch, and why nothing can fall out of step with anything else — there is only one record.
 
-If you take one habit from this page, take this one: **when you change what you are building,
+The practical form of it is this: **the plan lives where the code lives.** Not beside it, not
+linked to it — in the same repository, in the same branch, arriving in the same pull request.
+
+If you take one habit from this page, take that one: **when you change what you are building,
 change the plan in the same commit.** That is the whole discipline, and nothing else here is
 hard.
 
