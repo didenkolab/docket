@@ -42,7 +42,7 @@ type mention struct {
 // Read on every request, like everything else. Obsidian keeps an index and
 // warns that it can fall out of step with the files; there is no index here to
 // fall out of step.
-func (s *Server) backlinks(r *http.Request, note, selfPath string, relations []string) []mention {
+func (s *Server) backlinks(r *http.Request, note, selfPath string, relations []string, shown map[string]bool) []mention {
 	entries, err := s.entries(r)
 	if err != nil {
 		return nil
@@ -51,7 +51,11 @@ func (s *Server) backlinks(r *http.Request, note, selfPath string, relations []s
 	var tasks, pages []mention
 
 	for _, e := range entries {
-		if e.Task == nil || e.Path == selfPath {
+		if e.Task == nil || e.Path == selfPath || shown[e.Key] {
+			// shown is what the page has already listed under Linked work or
+			// as a child. A relation is written on both sides, so every one of
+			// them would otherwise appear here too, under a second heading,
+			// making one fact look like two.
 			continue
 		}
 		body := e.Task.Body()

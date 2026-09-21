@@ -34,6 +34,28 @@ this — clone, open in Obsidian, work — but the tool makes the routine parts 
 decides what, where each kind of thing goes, and what you stop doing. Ten minutes, and the rest
 of this page makes sense afterwards.
 
+## What it looks like
+
+![The board](docs/screenshots/board.png)
+
+A board across a quarter's work. The columns are whatever `docket.yaml` says they are; the cards
+are files. `← earlier` walks the board backwards through its own history, because the history is
+the repository.
+
+![A task](docs/screenshots/task.png)
+
+A task page in the shape people know — with the acceptance list ticked, the work it is linked to,
+and, at the bottom of the details, every change to this task and who wrote each line. Both are
+`git log` on one file.
+
+![Releases](docs/screenshots/releases.png)
+
+Releases, computed from the tags every time the page is opened. Nothing was set on any task to
+produce this, and it cannot drift.
+
+All three are the [showcase vault](https://github.com/vadymdidenkolab/docket-showcase) — an
+invented company, three products, six people, twelve weeks. Clone it and you get these pages.
+
 ## Quick start
 
 A vault is a git repository, so make one first — `docket init` fills it and commits, but it does

@@ -669,6 +669,21 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// What the page has already said, so that Referenced by does not say it
+	// again. A relation is written on both sides, so a task named under Linked
+	// work names this one back — and listing it twice under two headings makes
+	// one fact look like two. Same for a child, which links to its parent.
+	children, relations := s.childrenOf(r, c, key), s.relationsOf(r, t)
+	shown := map[string]bool{}
+	for _, child := range children {
+		shown[child.Key] = true
+	}
+	for _, group := range relations {
+		for _, to := range group.To {
+			shown[to.Key] = true
+		}
+	}
+
 	view := taskView{
 		Task:        t,
 		Reachable:   c.Reachable(t.Status),
@@ -676,9 +691,9 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 		ProjectName: c.ProjectName(projectKey),
 		Description: renderMarkdown(t.Description(), ix),
 		Comments:    renderComments(t.Comments(), ix),
-		Children:    s.childrenOf(r, c, key),
-		Relations:   s.relationsOf(r, t),
-		Backlinks:   s.backlinks(r, strings.TrimSuffix(path.Base(rel), ".md"), rel, linkProperties(c)),
+		Children:    children,
+		Relations:   relations,
+		Backlinks:   s.backlinks(r, strings.TrimSuffix(path.Base(rel), ".md"), rel, linkProperties(c), shown),
 		Version:     ver,
 		Path:        rel,
 		Unit:        c.Unit(),
