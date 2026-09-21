@@ -114,10 +114,22 @@ func TestAReleaseReadsEachTagOnce(t *testing.T) {
 			t.Errorf("the releases page does not mention %q", want)
 		}
 	}
-	// The task that was already in v1.0.0 is not new in v1.1.0, and the one
-	// that was not there is. That is the comparison the per-file read was for.
-	if strings.Count(body, first) > 1 {
-		t.Errorf("%s is in both releases; it shipped once", first)
+	// The task that was already in v1.0.0 is not in v1.1.0, and the one that
+	// was not there is. That is the comparison the per-file read was for.
+	//
+	// Measured by section rather than by counting the key over the whole page:
+	// releases are newest first, so everything above the v1.0.0 heading is the
+	// v1.1.0 release. A row renders its key twice — once in the link and once
+	// as the text — so counting occurrences called one correct listing two.
+	newest := body
+	if at := strings.Index(body, "v1.0.0"); at > 0 {
+		newest = body[:at]
+	}
+	if strings.Contains(newest, first) {
+		t.Errorf("%s shipped in v1.0.0 but is listed under v1.1.0 as well", first)
+	}
+	if !strings.Contains(body[len(newest):], first) {
+		t.Errorf("%s shipped in v1.0.0 and is not listed there", first)
 	}
 }
 
@@ -128,4 +140,52 @@ func keyOfPath(at string) string {
 		return name[:i]
 	}
 	return name
+}
+
+// The first release a project cuts lists the work that went into it.
+//
+// It used to list nothing. With no tag before it there is no range, and the
+// code passed the tag on its own to `git diff` — which compares the working
+// tree against that tag, not the tag against the beginning of the repository.
+// On a clean checkout the answer is "nothing", so a project's very first
+// release page said "No task changed in this release" under a heading
+// promising "the work up to here". Every new project met that, once, at the
+// moment it first shipped something.
+func TestTheFirstReleaseListsItsWork(t *testing.T) {
+	_, h, root := newServer(t)
+
+	c, err := project.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := gitvcs.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	who := gitvcs.Author{Name: "Dana", Email: "dana@example.com"}
+
+	path, _, err := vault.Create(root, c, vault.NewOptions{Title: "The only task", Now: noon})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Commit([]string{"."}, "the only task", who); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git",
+		"-c", "user.name="+who.Name, "-c", "user.email="+who.Email,
+		"tag", "-a", "v1.0.0", "-m", "First")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git tag: %v: %s", err, out)
+	}
+
+	body := get(t, h, "/releases").Body.String()
+	if strings.Contains(body, "No task changed in this release") {
+		t.Errorf("the first release says nothing shipped in it:\n%s", body)
+	}
+	for _, want := range []string{"v1.0.0", keyOfPath(path), "The only task"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the first release page does not mention %q", want)
+		}
+	}
 }

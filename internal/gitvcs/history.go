@@ -266,12 +266,26 @@ func (r *Repo) depthOf(ref string) int {
 // An empty `from` means everything up to `to` — the first release, which
 // contains the whole history before it.
 func (r *Repo) Shipped(from, to string) ([]string, error) {
-	span := to
+	args := []string{"-c", "core.quotePath=false", "diff", "--name-only", "--diff-filter=ACMR"}
 	if from != "" {
-		span = from + ".." + to
+		args = append(args, from+".."+to)
+	} else {
+		// The first tag has nothing before it, so everything up to it shipped
+		// in it — which is what the release page promises in its own words,
+		// "the work up to here".
+		//
+		// It used to pass the tag on its own, and `git diff <tag>` compares the
+		// working tree against that tag. On a clean checkout the answer is
+		// "nothing", so the first release a project ever cuts listed no work at
+		// all, under a heading saying it was everything. Diffing the empty tree
+		// against the tag asks the question the page is actually asking.
+		empty, err := r.emptyTree()
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, empty, to)
 	}
-	out, err := r.output("-c", "core.quotePath=false",
-		"diff", "--name-only", "--diff-filter=ACMR", span)
+	out, err := r.output(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -283,6 +297,17 @@ func (r *Repo) Shipped(from, to string) ([]string, error) {
 		}
 	}
 	return paths, nil
+}
+
+// emptyTree is the hash of a tree with nothing in it, asked of git rather than
+// written down: a repository on SHA-256 has a different one from a repository
+// on SHA-1, and hard-coding either makes this work on some machines only.
+func (r *Repo) emptyTree() (string, error) {
+	out, err := r.output("hash-object", "-t", "tree", "/dev/null")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
 }
 
 // At is a file's content at a point in history — a tag, a branch, a commit.
