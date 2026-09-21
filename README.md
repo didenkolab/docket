@@ -56,6 +56,46 @@ produce this, and it cannot drift.
 All three are the [showcase vault](https://github.com/didenkolab/docket-showcase) — an
 invented company, three products, six people, twelve weeks. Clone it and you get these pages.
 
+## Coming from Jira
+
+docket is a free, open-source, self-hosted alternative to Jira — and to Linear, Asana, Notion
+and the rest of the hosted trackers — for teams who would rather own the work as files than rent
+it as rows. There is no instance to administer, no seat to buy and no vendor between you and your
+own history: the tracker is a git repository, and the board is a program that reads it.
+
+| What you pay for there | What it is here |
+|---|---|
+| Issues, epics, sprints, a kanban board | Markdown files in a folder, drawn as a board by Obsidian or `docket serve` |
+| Workflows, custom fields, screens | `docket.yaml` — your statuses, types, priorities and transitions, in a few lines you can read |
+| Xray or Zephyr, for test management | the `tests` pack |
+| Tempo, for worklogs and timesheets | the `time` pack |
+| Risk registers, OKRs, time in status, portfolio roll-ups, capacity | five more packs, each installed with a URL |
+| An audit log, sold as an add-on | `git log` — every move was already a commit |
+| The REST API, and a token to call it | `git clone`. An agent reads and writes the files directly, or speaks [MCP](#an-agent-over-a-protocol) |
+| Export, so that you could leave | nothing to export; you already have the whole repository |
+
+Twelve packs in all, in [docket-apps](https://github.com/didenkolab/docket-apps). Each arrives as
+a diff you read before you commit it, so a pack cannot do anything to a vault that you did not
+see first.
+
+**Migrating is three commands**, and only the first one touches the network:
+
+```bash
+docket import extract --site https://you.atlassian.net --email you@example.com --token "$JIRA_TOKEN" --snapshot ./snap
+docket import plan    --snapshot ./snap
+docket import apply   --snapshot ./snap --project ENG --vault ./eng
+```
+
+It brings issues, comments, attachments, links, sprints and the workflow itself, and Confluence
+spaces come across the same way. `plan` runs against the snapshot, so a mapping can be redone as
+many times as it takes without pulling the source again — see
+[the cookbook](docs/examples).
+
+**What you give up, honestly.** There is no hosted instance with a signup link; somebody clones a
+repository. There are no per-field permissions, because git's boundary is the repository, so
+access is per-vault. There are no live cursors — two people editing one task is a merge. If those
+three are what you are paying for, keep paying for them.
+
 ## Quick start
 
 A vault is a git repository, so make one first — `docket init` fills it and commits, but it does
