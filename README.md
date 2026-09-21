@@ -1,15 +1,26 @@
 # docket
 
-A task tracker and a knowledge base that live in a git repository as Markdown files and open
-in Obsidian as a board and a wiki.
+**A task tracker your AI agent runs.**
 
-Built for agents first. An agent creates a task by writing a file and moves it by editing two
-lines — no API to call, no schema it cannot read. The same folder, opened in Obsidian, is a
-board with columns, a backlog, a linked wiki and a graph. Neither view is an export of the
-other; there is one set of files. Git is the history, and `git clone` is the export.
+An agent creates a task by writing a file and moves it by editing two lines. There is no API it
+has to be taught, no schema it cannot read, and no credential you have to hand it that you would
+not hand a person cloning the repository. Give it [the skill](#give-it-to-your-agent) and it
+knows the whole loop — find the work, take it, move it, write down what it did, close the
+release.
 
-The vault format is settled, and the whole local workflow works. A vault is usable without any
-of this — clone, open in Obsidian, work — but the tool makes the routine parts routine.
+**Git is the only database there is.** Every task is a Markdown file, every move is a commit,
+and a task's history is the history of its file. Nothing has to be running for the record to
+exist, nothing can drift out of step with anything else, and `git clone` is both the export and
+the backup. The same folder opened in Obsidian is a board with columns, a backlog, a linked wiki
+and a graph — not an export of the tracker, the same files.
+
+**It does what Jira and six paid add-ons do.** Test management, worklogs, a risk register, OKRs,
+time in status, portfolio roll-ups: twelve packs, each installed with a URL and reviewed as a
+`git diff`. No instance to administer, no seats to buy, no marketplace to ask. And when a pack
+does not exist, [writing one](#write-your-own) is a manifest and a shell script.
+
+The vault format is settled and the whole local workflow works. A vault is usable without any of
+this — clone, open in Obsidian, work — but the tool makes the routine parts routine.
 
 ## Quick start
 
@@ -30,6 +41,26 @@ it to In progress and it lands in git as a commit. The same folder opened in Obs
 same board.
 
 `docket init` clones the template over the network, so the first one needs a connection.
+
+## Give it to your agent
+
+`skill/docket/SKILL.md` is one file an agent reads once and then knows how to run a project
+here: the vocabulary, the loop it works in, and the handful of rules it must not break. Install
+it into Claude Code and point the agent at a vault:
+
+```bash
+cp -r skill/docket ~/.claude/skills/
+```
+
+An agent that reads `AGENTS.md` instead gets the same thing with nothing installed — every vault
+`docket init` scaffolds carries one. An agent that would rather call a tool than write a file
+has [MCP](#an-agent-over-a-protocol). All three drive the same files, and the vault does not
+care which made a change — except that it records which did, because every write is a commit
+with an author.
+
+What that buys you is the thing a tracker has never been able to offer: the plan and the work
+are in one repository, so an agent that is already reading the code is reading the backlog from
+the same checkout, and what it did to both arrives in one pull request.
 
 ## Requirements
 
@@ -101,6 +132,45 @@ projects are one file tree.
 
 Every one of them works. `docket <command> --help` says what its flags are, and what is not built
 yet is on the board in `docket-board`.
+
+## Examples
+
+[`docs/examples/`](docs/examples) is a cookbook: each recipe is a task somebody actually has,
+done end to end, with commands that were run before they were written down.
+
+| | |
+|---|---|
+| [A project, from nothing to a release](docs/examples/a-project-from-nothing-to-a-release.md) | The whole loop in one sitting |
+| [A release is a tag](docs/examples/a-release-is-a-tag.md) | Shipping without a version object |
+| [Sprints](docs/examples/sprints.md) | A sprint is a page, and being in it is a link |
+| [Tests, and results from CI](docs/examples/tests-and-ci.md) | Cases, runs and coverage, fed by your own pipeline |
+| [OKRs and the portfolio](docs/examples/okrs-and-the-portfolio.md) | What the quarter was for, rolled up |
+| [Write your own app](docs/examples/write-an-app.md) | A manifest and a shell script |
+| [An agent runs the board](docs/examples/an-agent-runs-the-board.md) | The skill, MCP, and what to let it do |
+| [Moving off Jira](docs/examples/moving-off-jira.md) | Extract, plan, apply — and what to fix after |
+| [Many projects, one vault](docs/examples/many-projects-one-vault.md) | A workspace across repositories |
+| [What the board cannot see](docs/examples/what-the-board-cannot-see.md) | Anomalies and the shape of the graph |
+| [Where the time went](docs/examples/where-the-time-went.md) | Time in status, out of `git log` |
+| [Who may do what](docs/examples/who-may-do-what.md) | Access without a user table |
+
+## Write your own
+
+A pack — an app — is a git repository with a `docket-app.yaml` and some files. Installing one
+adds its types, fields and relations to `docket.yaml` and copies in its templates, boards, pages
+and hooks. Nothing is executed and nothing is committed for you: what an installation did is a
+diff.
+
+```bash
+docket app add https://github.com/vadymdidenkolab/docket-apps.git#tests
+git status                       # everything it wrote, unstaged
+docket check && git add -A && git commit -m "Installed the app tests"
+```
+
+Twelve of them ship in [`docket-apps`](https://github.com/vadymdidenkolab/docket-apps) — tests,
+time, risks, incidents, intake, OKRs, checklists, estimation, portfolio, workload, time in
+status, anomalies. Writing a thirteenth is a manifest and, if it draws something, a script that
+prints Markdown; [the recipe](docs/examples/write-an-app.md) walks through one. There is nothing
+to register with and nobody to ask.
 
 ## Configuration
 
