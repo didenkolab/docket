@@ -77,7 +77,10 @@ func TestAReleaseReadsEachTagOnce(t *testing.T) {
 	who := gitvcs.Author{Name: "Dana", Email: "dana@example.com"}
 	tag := func(name string) {
 		t.Helper()
-		cmd := exec.Command("git", "tag", "-a", name, "-m", name)
+		cmd := exec.Command("git",
+			"-c", "user.name="+who.Name,
+			"-c", "user.email="+who.Email,
+			"tag", "-a", name, "-m", name)
 		cmd.Dir = root
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git tag %s: %v: %s", name, err, out)
