@@ -22,6 +22,10 @@ does not exist, [writing one](#write-your-own) is a manifest and a shell script.
 The vault format is settled and the whole local workflow works. A vault is usable without any of
 this — clone, open in Obsidian, work — but the tool makes the routine parts routine.
 
+**New here?** [How you work in this](docs/how-you-work-in-this.md) is the shape of a week: who
+decides what, where each kind of thing goes, and what you stop doing. Ten minutes, and the rest
+of this page makes sense afterwards.
+
 ## Quick start
 
 A vault is a git repository, so make one first — `docket init` fills it and commits, but it does
@@ -44,9 +48,10 @@ same board.
 
 ## Give it to your agent
 
-`skill/docket/SKILL.md` is one file an agent reads once and then knows how to run a project
-here: the vocabulary, the loop it works in, and the handful of rules it must not break. Install
-it into Claude Code and point the agent at a vault:
+`skill/docket/` is what an agent reads once and then knows how to run a project here.
+`SKILL.md` is the loop it works in and the six rules it must not break; `reference.md` beside it
+is the detail — documents, labels and tags, estimates, sprints. Install it into Claude Code and
+point the agent at a vault:
 
 ```bash
 cp -r skill/docket ~/.claude/skills/
